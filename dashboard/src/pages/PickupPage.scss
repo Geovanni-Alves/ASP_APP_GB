@@ -1,0 +1,37 @@
+.pickupContainer {
+  margin-left: 15rem;
+  display: flex;
+}
+
+.scheduleCard {
+  width: 50%;
+  margin-right: 1rem;
+  padding: 1rem;
+}
+
+.statusA {
+  background-color: red;
+  color: white;
+}
+
+.statusP {
+  background-color: green;
+  color: white;
+}
+
+.statusN {
+  background-color: blue;
+  color: white;
+}
+
+.tableWrapper {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  background-color: white;
+  z-index: 1;
+}

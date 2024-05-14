@@ -1,0 +1,18 @@
+{
+  "resourceName": "s3d63c740a",
+  "policyUUID": "d63c740a",
+  "bucketName": "dropoffbuckettest",
+  "storageAccess": "authAndGuest",
+  "guestAccess": [
+    "READ",
+    "CREATE_AND_UPDATE",
+    "DELETE"
+  ],
+  "authAccess": [
+    "READ",
+    "CREATE_AND_UPDATE",
+    "DELETE"
+  ],
+  "triggerFunction": "NONE",
+  "groupAccess": {}
+}

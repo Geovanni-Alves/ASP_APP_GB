@@ -1,0 +1,178 @@
+.add-student {
+  width: 50%;
+}
+.add-employee {
+  width: 50%;
+}
+.add-van-info {
+  width: 30%;
+  height: 800px;
+}
+.vans-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin: auto;
+  gap: 5%;
+}
+.vans {
+  width: 65%;
+  height: auto;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+}
+.create-van-dropdown {
+  position: relative;
+  display: flex;
+}
+
+.create-new-van-form {
+  position: absolute;
+  top: 80%;
+  left: 0;
+  right: 20%;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: none;
+  z-index: 1;
+  width: 200px;
+}
+
+.create-van-dropdown .create-new-van-form.active {
+  display: block;
+}
+
+.create-van-button {
+  background-color: #ed3337;
+  color: #fff;
+  border: none;
+  padding: 20px 30px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  width: 220px;
+  font-size: 15px;
+}
+
+.create-van-button:hover {
+  background-color: #ed3337;
+}
+
+.create-new-van-form h3 {
+  margin-top: 0;
+}
+
+.create-new-van-form input {
+  margin: 5px 0;
+  width: 100%;
+  padding: 5px;
+}
+
+.create-new-van-form button {
+  background-color: #ed3337;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.create-new-van-form button:hover {
+  background-color: #0056b3;
+}
+.model-select {
+  width: 50%;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.van-employees {
+  list-style: none;
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  margin-left: 0;
+  padding: 0;
+  gap: 5%;
+}
+.van-employee img {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+}
+.van-employee {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  padding-bottom: 10px;
+  gap: 5px;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+}
+.van-employee button {
+  border: none;
+  width: 100%;
+  background-color: #ed3337;
+  color: #fff;
+  border-radius: 5px;
+  padding: 10px;
+  cursor: pointer;
+}
+.van-students {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 2fr));
+  gap: 20px;
+  list-style: none;
+  padding: 0;
+  width: 100%;
+  margin: auto;
+}
+.van-student {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 95%;
+  height: 110px;
+  background-color: #fff;
+  margin: 30px auto;
+  border-radius: 70px;
+  -webkit-box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
+  -moz-box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
+  box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
+}
+.van-student button {
+  margin-right: 20px;
+  padding: 15px;
+  background-color: red;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.van-student img {
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  border-radius: 70%;
+  margin-left: 5px;
+}
+.van-student-info {
+  display: flex;
+  flex-direction: column;
+}
+.van-student-address {
+  font-size: small;
+}
+.share-van {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3%;
+}
+.view-details-button {
+  font-size: 20px;
+  color: blue;
+}
