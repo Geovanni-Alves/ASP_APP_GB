@@ -57,9 +57,6 @@ const HomeScreen = () => {
   const [showTextConfirmationModal, setShowTextConfirmationModal] =
     useState(false);
 
-  // const [showConfirmationAbsentModal, setShowConfirmationAbsentModal] =
-  //   useState(false);
-
   // useEffect to fetch the events
   useEffect(() => {
     const fetchEvents = async () => {
