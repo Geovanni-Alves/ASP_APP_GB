@@ -1,26 +1,15 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import { useAuthContext } from "./AuthContext";
-import { API, graphqlOperation } from "aws-amplify";
-import {
-  listRoutes,
-  kidsByRouteID,
-  getVan,
-  getUser,
-  listAddressLists,
-  getKid,
-} from "../../src/graphql/queries";
-import { onUpdateRoute, onUpdateAddressList } from "../graphql/subscriptions";
+import { supabase } from "../../backend/lib/supabase";
+import { useUsersContext } from "./UsersContext";
 import { useKidsContext } from "./KidsContext";
 
 const RouteContext = createContext({});
 
 const RouteContextProvider = ({ children }) => {
-  const { dbUser, currentUserData, userEmail } = useAuthContext();
+  const { dbUser, currentUserData, userEmail } = useUsersContext();
   const { kids } = useKidsContext();
   const [currentRouteData, setCurrentRouteData] = useState(null);
-  //const navigation = useNavigation();
   const [routesData, setRoutesData] = useState(null);
-  //const [noKidsAvailable, setNoKidsAvailable] = useState(false);
   const [dropOffLatLng, setDropLatLng] = useState(null);
   const [dropOffAddress, setDropOffAddress] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,28 +23,30 @@ const RouteContextProvider = ({ children }) => {
 
   const getOrderAddress = async () => {
     try {
-      const variables = {
-        filter: {
-          routeID: { eq: currentRouteData.id },
-        },
-      };
-      const responseListAddress = await API.graphql({
-        query: listAddressLists,
-        variables: variables,
-      });
-      const AddressListsData = responseListAddress.data.listAddressLists.items;
-      const sortedAddressList = AddressListsData.sort(
-        (a, b) => a.order - b.order
-      );
+      const { data: addressData, error } = await supabase
+        .from("address_list")
+        .select("*")
+        .eq("routeId", currentRouteData.id);
+
+      if (error) {
+        throw error;
+      }
+
+      const sortedAddressList = addressData.sort((a, b) => a.order - b.order);
 
       const addressListWithKids = await Promise.all(
         sortedAddressList.map(async (addressListItem) => {
           try {
-            const responseGetKid = await API.graphql({
-              query: getKid,
-              variables: { id: addressListItem.addressListKidId },
-            });
-            const kidData = responseGetKid.data.getKid;
+            const { data: kidData, error: kidError } = await supabase
+              .from("students")
+              .select("*")
+              .eq("id", addressListItem.addressListKidId)
+              .single();
+
+            if (kidError) {
+              throw kidError;
+            }
+
             return {
               ...addressListItem,
               Kid: kidData,
@@ -66,6 +57,7 @@ const RouteContextProvider = ({ children }) => {
           }
         })
       );
+
       const groupedAddressList = new Map();
 
       addressListWithKids.forEach((address) => {
@@ -82,7 +74,6 @@ const RouteContextProvider = ({ children }) => {
         }
 
         const groupedAddress = groupedAddressList.get(locationKey);
-        // groupedAddress.AddressList.push(address);
         groupedAddress.Kid.push(address.Kid);
       });
 
@@ -96,59 +87,49 @@ const RouteContextProvider = ({ children }) => {
 
   const getRoutesData = async () => {
     try {
-      const variables = {
-        filter: {
-          or: [
-            { status: { eq: "WAITING_TO_START" } },
-            { status: { eq: "IN_PROGRESS" } }, //status: { eq: "IN_PROGRESS" }, //
-            { status: { eq: "PAUSED" } }, //status: { eq: "IN_PROGRESS" }, //
-          ],
-        },
-      };
+      const { data: routeData, error } = await supabase
+        .from("route")
+        .select("*")
+        .or(
+          "status.eq.WAITING_TO_START, status.eq.IN_PROGRESS, status.eq.PAUSED"
+        );
 
-      // Fetch route data
-      const responseListRoutes = await API.graphql({
-        query: listRoutes,
-        variables: variables,
-      });
-
-      const routeData = responseListRoutes.data.listRoutes.items;
-      if (routeData.length === 0) {
-        console.log("routesData not found any route", routeData);
-        // alert(
-        //   "Hi there, there is no route in progress now! come back later or contact us for more information!"
-        // );
-        setIsRouteInProgress(false);
-        //await navigation.navigate("Wait");
+      if (error) {
+        throw error;
       }
 
-      // Fetch kids data for each route
       const mergedData = await Promise.all(
         routeData.map(async (route) => {
-          const responseKidsByRouteID = await API.graphql({
-            query: kidsByRouteID,
-            variables: { routeID: route.id },
-          });
-          const kidsData = responseKidsByRouteID.data.kidsByRouteID.items;
-          // fetch the van
-          const responseGetVan = await API.graphql({
-            query: getVan,
-            variables: { id: route.routeVanId },
-          });
-          const vansData = responseGetVan.data.getVan;
+          const { data: kidsData, error: kidsError } = await supabase
+            .from("kidsByRouteID")
+            .select("*")
+            .eq("routeID", route.id);
+
+          if (kidsError) {
+            throw kidsError;
+          }
+
+          const { data: vansData, error: vanError } = await supabase
+            .from("van")
+            .select("*")
+            .eq("id", route.routeVanId)
+            .single();
+
+          if (vanError) {
+            throw vanError;
+          }
 
           return { ...route, Kid: kidsData, Van: vansData };
         })
       );
-      //console.log(mergedData);
+
       setRoutesData(mergedData);
     } catch (error) {
-      console.error("Error fetching data getROutesData: ", error);
+      console.error("Error fetching data getRoutesData: ", error);
     }
   };
 
   const checkKidsInRoutes = () => {
-    // Find the first route that has at least one kid from the context
     const routeWithMatchingKids = routesData.find((item) => {
       if (item.Kid && Array.isArray(item.Kid)) {
         return item.Kid.some((routeKid) =>
@@ -159,19 +140,16 @@ const RouteContextProvider = ({ children }) => {
       }
     });
     if (routeWithMatchingKids) {
-      // Update the state variable with the route that has matching kids
       setCurrentRouteData(routeWithMatchingKids);
-      //
+
       const matchingKidsArray = kids.filter((contextKid) =>
         routeWithMatchingKids.Kid.some(
           (routeKid) => routeKid.id === contextKid.id
         )
       );
       if (matchingKidsArray.length > 0) {
-        // Update the state variable with matching kids
         setMatchingKids(matchingKidsArray);
 
-        // Loop through matching kids and extract dropOffAddress and dropOffLatLng
         matchingKidsArray.forEach((matchingKid) => {
           const { dropOffAddress, lat, lng } = matchingKid;
           setDropLatLng({ latitude: lat, longitude: lng });
@@ -186,34 +164,38 @@ const RouteContextProvider = ({ children }) => {
 
   const getStaffData = async () => {
     if (currentRouteData.driver) {
-      const responseGetDriver = await API.graphql({
-        query: getUser,
-        variables: { id: currentRouteData.driver },
-      });
-      const driverData = responseGetDriver.data.getUser;
+      const { data: driverData, error: driverError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", currentRouteData.driver)
+        .single();
+
+      if (driverError) {
+        console.error("Error fetching driver data: ", driverError);
+      }
+
       setDriver(driverData);
     }
     if (currentRouteData.helper) {
-      //
-      const responseGetHelper = await API.graphql({
-        query: getUser,
-        variables: { id: currentRouteData.helper },
-      });
-      const helperData = responseGetHelper.data.getUser;
+      const { data: helperData, error: helperError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", currentRouteData.helper)
+        .single();
+
+      if (helperError) {
+        console.error("Error fetching helper data: ", helperError);
+      }
+
       setHelper(helperData);
     }
   };
 
-  //
-  //Start useEffect
-  //
-
   useEffect(() => {
-    // Fetch initial data when the component mounts
     if (dbUser && userEmail) {
       const fetchInitialData = async () => {
         await getRoutesData();
-        setIsLoading(false); // Set loading to false after data is fetched
+        setIsLoading(false);
       };
       fetchInitialData();
     }
@@ -233,26 +215,21 @@ const RouteContextProvider = ({ children }) => {
   }, [currentRouteData]);
 
   useEffect(() => {
-    // Fetch initial data when the component mounts
     if (routesData) {
-      setIsLoading(false); // Set loading to false after data is fetched
+      setIsLoading(false);
     }
   }, [routesData]);
 
   useEffect(() => {
     if (routesData && kids) {
-      // Check kids in routes after fetching initial data
       if (!checkKidsInRoutes()) {
-        //console.log("noKidsAvailadsdable", noKidsAvailable);
         setIsLoading(false);
-        //setNoKidsAvailable(true);
         setIsRouteInProgress(false);
       }
     }
   }, [routesData, kids]);
 
   useEffect(() => {
-    // Update the bus location state when currentRouteData changes
     if (currentRouteData) {
       const initialBusLocation = {
         latitude: currentRouteData.lat,
@@ -271,103 +248,55 @@ const RouteContextProvider = ({ children }) => {
     if (!busLocation) {
       return;
     }
-    const sub = API.graphql(graphqlOperation(onUpdateRoute)).subscribe({
-      next: ({ value }) => {
-        console.log(
-          "subscribe onUpdateRoute to check busLocation and route status",
-          value
-        );
-        const idUpdatedRoute = value.data.onUpdateRoute.id;
-        // console.log("current route ID", currentRouteData.id);
-        // console.log("idUpdatedRoute", idUpdatedRoute);
-        const routeStatus = value.data.onUpdateRoute.status;
+    const sub = supabase
+      .from("routes")
+      .on("*:onUpdateRoute", (payload) => {
+        const updatedRoute = payload.new;
+        const idUpdatedRoute = updatedRoute.id;
+        const routeStatus = updatedRoute.status;
         const newBusLocation = {
-          latitude: value.data.onUpdateRoute.lat,
-          longitude: value.data.onUpdateRoute.lng,
+          latitude: updatedRoute.lat,
+          longitude: updatedRoute.lng,
         };
+
         if (routeStatus === "IN_PROGRESS" && !routeFinished) {
           setIsRouteInProgress(true);
         } else if (idUpdatedRoute === currentRouteData.id) {
           setIsRouteInProgress(false);
         }
+
         if (
           newBusLocation.latitude !== busLocation.lat ||
           newBusLocation.longitude !== busLocation.lng
         ) {
           setBusLocation(newBusLocation);
         }
-      },
-      error: (error) => {
-        console.error("Subscription Error:", error);
-      },
-    });
+      })
+      .subscribe();
 
     return () => {
-      // Cleanup subscription on component unmount
       sub.unsubscribe();
     };
   }, [busLocation]);
-
-  // useEffect(() => {
-  //   if (!currentRouteData) {
-  //     return;
-  //   }
-  //   const sub = API.graphql(graphqlOperation(onUpdateRoute)).subscribe({
-  //     next: ({ value }) => {
-  //       if (value && value.data && value.data.onUpdateRoute) {
-  //         const idUpdatedRoute = value.data.onUpdateRoute.id;
-  //         const routeStatus = value.data.onUpdateRoute.status;
-
-  //         console.log(
-  //           "subscribe on updateRoute Route in Progress",
-  //           idUpdatedRoute
-  //         );
-  //         if (
-  //           idUpdatedRoute === currentRouteData.id &&
-  //           routeStatus === "IN_PROGRESS" &&
-  //           !routeFinished
-  //         ) {
-  //           setIsRouteInProgress(true);
-  //         } else {
-  //           setIsRouteInProgress(false);
-  //         }
-  //       }
-  //     },
-  //     error: (error) => {
-  //       console.error("Subscription Error:", error);
-  //     },
-  //   });
-
-  //   return () => {
-  //     // Cleanup subscription on component unmount
-  //     sub.unsubscribe();
-  //   };
-  // }, [routeFinished]);
 
   useEffect(() => {
     if (!matchingKids) {
       return;
     }
-    const sub = API.graphql(graphqlOperation(onUpdateAddressList)).subscribe({
-      next: ({ value }) => {
-        if (value && value.data && value.data.onUpdateAddressList) {
-          const addressListStatus = value.data.onUpdateAddressList;
+    const sub = supabase
+      .from("addressLists")
+      .on("*:onUpdateAddressList", (payload) => {
+        const updatedAddressList = payload.new;
 
-          if (addressListStatus.addressListKidId === matchingKids[0].id) {
-            if (addressListStatus.status === "FINISHED") {
-              setRouteFinished(true);
-              //setIsRouteInProgress(false);
-            }
+        if (updatedAddressList.addressListKidId === matchingKids[0].id) {
+          if (updatedAddressList.status === "FINISHED") {
+            setRouteFinished(true);
           }
         }
-      },
-      error: (error) => {
-        console.error("Subscription Error:", error);
-      },
-    });
+      })
+      .subscribe();
 
     return () => {
-      // Cleanup subscription on component unmount
       sub.unsubscribe();
     };
   }, [matchingKids]);
@@ -385,7 +314,6 @@ const RouteContextProvider = ({ children }) => {
         dropOffLatLng,
         dropOffAddress,
         currentRouteData,
-        //noKidsAvailable,
         matchingKids,
         driver,
         helper,

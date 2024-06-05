@@ -14,6 +14,7 @@ import styles from "./styles";
 import { useFeedContext } from "../../contexts/FeedContext";
 import { usePicturesContext } from "../../contexts/PicturesContext";
 import { useKidsContext } from "../../contexts/KidsContext";
+import RemoteImage from "../../components/RemoteImage";
 
 const FeedScreen = () => {
   const route = useRoute();
@@ -181,11 +182,8 @@ const FeedScreen = () => {
               source={{ uri: selectedKid?.uriKid }}
               style={styles.KidImage}
             /> */}
-            {selectedKid.uriKid ? (
-              <Image
-                source={{ uri: selectedKid.uriKid }}
-                style={styles.KidImage}
-              />
+            {selectedKid.photo ? (
+              <RemoteImage path={selectedKid.photo} style={styles.KidImage} />
             ) : (
               <View style={styles.placeholderImage}>
                 <Text style={styles.placeholderText}>

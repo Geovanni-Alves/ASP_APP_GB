@@ -1,3 +1,4 @@
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,28 +8,22 @@ import {
   Keyboard,
   TouchableOpacity,
 } from "react-native";
-import React, { useEffect, useState, useRef } from "react";
+import { supabase } from "../../../backend/lib/supabase";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuthContext } from "../../contexts/AuthContext";
-import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import { useNavigation } from "@react-navigation/native";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import PhoneInput from "react-native-phone-number-input";
-import { API, graphqlOperation } from "aws-amplify";
-import { createUser, updateUser, updateKid } from "../../graphql/mutations";
-import { getKid } from "../../graphql/queries";
-import { Auth } from "aws-amplify";
+import { useUsersContext } from "../../contexts/UsersContext";
+import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 
 const ProfileScreen = () => {
-  const { setDbUser, dbUser, userEmail, sub } = useAuthContext();
+  const { setDbUser, dbUser, userEmail, authUser } = useUsersContext();
   const { kids } = useKidsContext();
   const { expoPushToken } = usePushNotificationsContext();
-  //const [firstLogin, setFirstLogin] = useState(true);
 
   const [name, setName] = useState(dbUser?.name || "");
-  // const [setKids] = useState(kids);
   const [unitNumber, setUnitNumber] = useState(dbUser?.unitNumber || "");
   const [address, setAddress] = useState(dbUser?.address || "");
   const [phoneNumber, setPhoneNumber] = useState(dbUser?.phoneNumber || "");
@@ -38,22 +33,15 @@ const ProfileScreen = () => {
   const [lng, setLng] = useState(dbUser?.lng || null);
   const [confirmations, setConfirmations] = useState(kids.map(() => false));
 
-  //const { sub, setDbUser } = useAuthContext();
   const navigation = useNavigation();
 
   const handleConfirm = () => {
-    //console.log(phoneInputRef.current)
-
     if (phoneInputRef.current.isValidNumber(phoneNumber)) {
-      // The phone number is valid, proceed to another control or screen
-      //Alert.alert('Valid Phone Number', 'You can proceed to the next step.');
       Keyboard.dismiss();
     } else {
       Alert.alert("Invalid Phone Number", "Please enter a valid phone number.");
     }
   };
-
-  //const allKidsConfirmed = kids.every((kid) => kid.confirmed);
 
   const isSaveButtonVisible =
     name.trim() !== "" &&
@@ -61,67 +49,65 @@ const ProfileScreen = () => {
     phoneNumber.trim() !== "" &&
     confirmations.every((confirmed) => confirmed);
 
-  // const toggleKidsConfirmation = (index) => {
-  //   const updatedKids = kids.map(([...kids];
-  //   updatedKids[index].confirmed = !updatedKids[index].confirmed;
-  // };
-
   const toggleKidConfirmation = (index) => {
     const updatedConfirmations = [...confirmations];
     updatedConfirmations[index] = !updatedConfirmations[index];
     setConfirmations(updatedConfirmations);
   };
 
-  const onSave = async () => {
+  const onCreateUser = async () => {
     try {
-      // if (dbUser) {
-      //   await onUpdateUser();
-      // } else {
-      await onCreateUser();
-      //await onUpdateKid();
-      // }
+      const userDetails = {
+        name,
+        sub: authUser.id,
+        email: userEmail,
+        userType: "PARENT",
+        unitNumber,
+        address,
+        lng,
+        lat,
+        phoneNumber: phoneNumber,
+        pushToken: expoPushToken.data,
+      };
+
+      const { data, error } = await supabase
+        .from("users")
+        .insert(userDetails)
+        //.eq("id", dbUser.id)
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      const newUser = data[0];
+      setDbUser(newUser);
+
+      return newUser;
     } catch (e) {
-      Alert.alert("Error", e.message);
+      Alert.alert("Error creating user", e.message);
     }
   };
 
   const updateKidUserID = async (newUser) => {
     try {
-      //console.log(newUser);
-      //console.log(kids);
       for (const kid of kids) {
-        //console.log("kid id", kid.id);
-        // Query your GraphQL API to find the kid by some unique identifier (e.g., name or ID).
-        const queryResult = await API.graphql({
-          query: getKid,
-          variables: { id: kid.id },
-        });
+        // Determine the parent field to update
+        const parentField =
+          kid.parent1Email === null ? "parent1Id" : "parent2Id";
 
-        // Check if the query found a matching kid.
-        const foundKid = queryResult.data.getKid;
-        console.log("found??", foundKid);
-        if (foundKid) {
-          // If a matching kid was found, update their userID.
-          // if (kidparent1Email !== null) {
+        // Prepare the update data
+        const updateData = {};
+        updateData[parentField] = newUser.id;
 
-          const parentField =
-            kid.parent1Email === null ? "Parent1ID" : "Parent2ID";
+        // Update the student's parent ID in the Supabase `students` table
+        const { data, error } = await supabase
+          .from("students")
+          .update(updateData)
+          .eq("id", kid.id);
 
-          // console.log("parent 1 Email ", kid.parent1Email);
-          console.log("parent Field ", parentField);
-          //console.log(dbUser);
-          const variables = {
-            input: {
-              id: foundKid.id,
-            },
-          };
-
-          variables.input[parentField] = newUser.id;
-
-          const updateResult = await API.graphql({
-            query: updateKid,
-            variables: variables,
-          });
+        if (error) {
+          throw error;
         }
       }
     } catch (e) {
@@ -129,35 +115,91 @@ const ProfileScreen = () => {
     }
   };
 
-  const onCreateUser = async () => {
+  const onSave = async () => {
     try {
-      const userDetails = {
-        sub,
-        name,
-        email: userEmail,
-        userType: "PARENT",
-        unitNumber,
-        address,
-        lng,
-        lat,
-        phoneNumber,
-        pushToken: expoPushToken.data,
-      };
+      // Update the user and get the updated user object
+      const newUser = await onCreateUser();
 
-      const response = await API.graphql(
-        graphqlOperation(createUser, { input: userDetails })
-      );
-
-      const newUser = response.data.createUser; // Access the user data from the response
-      const userId = newUser.id; // Access the ID of the newly created user
-
+      // Update the kids with the updated user object
       await updateKidUserID(newUser);
-      setDbUser(newUser);
     } catch (e) {
-      Alert.alert("Error saving new user", e.message);
+      Alert.alert("Error", e.message);
     }
   };
-  //console.log(GOOGLE_MAPS_APIKEY);
+
+  // const updateKidUserID = async (newUser) => {
+  //   try {
+  //     //console.log(newUser);
+  //     //console.log(kids);
+  //     for (const kid of kids) {
+  //       //console.log("kid id", kid.id);
+  //       // Query your GraphQL API to find the kid by some unique identifier (e.g., name or ID).
+  //       const queryResult = await API.graphql({
+  //         query: getKid,
+  //         variables: { id: kid.id },
+  //       });
+
+  //       // Check if the query found a matching kid.
+  //       const foundKid = queryResult.data.getKid;
+  //       console.log("found??", foundKid);
+  //       if (foundKid) {
+  //         // If a matching kid was found, update their userID.
+  //         // if (kidparent1Email !== null) {
+
+  //         const parentField =
+  //           kid.parent1Email === null ? "Parent1ID" : "Parent2ID";
+
+  //         // console.log("parent 1 Email ", kid.parent1Email);
+  //         console.log("parent Field ", parentField);
+  //         //console.log(dbUser);
+  //         const variables = {
+  //           input: {
+  //             id: foundKid.id,
+  //           },
+  //         };
+
+  //         variables.input[parentField] = newUser.id;
+
+  //         const updateResult = await API.graphql({
+  //           query: updateKid,
+  //           variables: variables,
+  //         });
+  //       }
+  //     }
+  //   } catch (e) {
+  //     Alert.alert("Error updating kid", e.message);
+  //   }
+  // };
+
+  // const onCreateUser = async () => {
+  //   try {
+  //     const userDetails = {
+  //       sub,
+  //       name,
+  //       email: userEmail,
+  //       userType: "PARENT",
+  //       unitNumber,
+  //       address,
+  //       lng,
+  //       lat,
+  //       phoneNumber,
+  //       pushToken: expoPushToken.data,
+  //     };
+
+  //     const response = await API.graphql(
+  //       graphqlOperation(createUser, { input: userDetails })
+  //     );
+
+  //     const newUser = response.data.createUser; // Access the user data from the response
+  //     const userId = newUser.id; // Access the ID of the newly created user
+
+  //     await updateKidUserID(newUser);
+  //     setDbUser(newUser);
+  //   } catch (e) {
+  //     Alert.alert("Error saving new user", e.message);
+  //   }
+  // };
+
   return (
     <SafeAreaView>
       <Text style={styles.title}>Complete your Profile</Text>
@@ -198,7 +240,7 @@ const ProfileScreen = () => {
         style={styles.input}
       />
       <View style={styles.phoneInputContainer}>
-        <PhoneInput
+        {/* <PhoneInput
           ref={phoneInputRef}
           value={phoneNumber}
           //onChangeText={setPhoneNumber}
@@ -210,7 +252,7 @@ const ProfileScreen = () => {
           placeholder="Phone Number"
           style={styles.phoneInputField}
           //style={styles.phoneInput}
-        />
+        /> */}
         <TouchableOpacity
           style={styles.okButton}
           onPress={() => {
@@ -251,7 +293,7 @@ const ProfileScreen = () => {
         )}
         <TouchableOpacity
           style={styles.signOutButton}
-          onPress={() => Auth.signOut()}
+          onPress={() => supabase.auth.signOut()}
         >
           <Text style={styles.signOutButtonText}>Sign out</Text>
         </TouchableOpacity>

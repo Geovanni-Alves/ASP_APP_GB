@@ -2,9 +2,9 @@ import "dotenv/config";
 
 export default {
   name: "APP_ASP_USER",
-  slug: "DropoffUser",
+  slug: "asp-app-user",
   scheme: "your-app-scheme",
-  version: "1.0.2",
+  version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
@@ -26,7 +26,7 @@ export default {
         "This app requires access to your photo library to select images.",
     },
     supportsTablet: false,
-    bundleIdentifier: "com.geodarth.DropoffUser",
+    bundleIdentifier: "com.geodarth.app_asp_user",
     device: ["iphone"],
   },
   android: {
@@ -34,7 +34,7 @@ export default {
       foregroundImage: "./assets/adaptive-icon.png",
       backgroundColor: "#ffffff",
     },
-    package: "com.geodarth.DropoffUser",
+    package: "com.geodarth.app_asp_user",
     permissions: ["CAMERA", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"],
   },
   web: {
@@ -42,7 +42,7 @@ export default {
   },
   extra: {
     eas: {
-      projectId: "7c8a0c2e-12a3-4b4c-b54b-6db24b05ed92",
+      projectId: "682ba0bc-01bc-4e1b-99b4-b1e285d545c0",
     },
   },
   owner: "x3_web_services",

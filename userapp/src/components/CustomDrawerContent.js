@@ -5,10 +5,9 @@ import {
   DrawerItemList,
 } from "@react-navigation/drawer";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Auth } from "aws-amplify";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import ConfirmationModal from "./ConfirmationModal";
-//import User from "../../assets/user.jpeg";
+import { supabase } from "../../backend/lib/supabase";
 
 export default function CustomDrawerContent(props) {
   const { currentUserData } = props;
@@ -22,7 +21,7 @@ export default function CustomDrawerContent(props) {
   const confirmLogout = async () => {
     try {
       // Sign out the user using Amplify Auth
-      await Auth.signOut();
+      await supabase.auth.signOut();
     } catch (error) {
       console.error("Logout error:", error);
     } finally {

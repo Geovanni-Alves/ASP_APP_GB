@@ -1,27 +1,22 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { API } from "aws-amplify";
-import { listUsers } from "../graphql/queries";
-import { usePicturesContext } from "./PicturesContext";
+import { supabase } from "../../backend/lib/supabase";
 
 const StaffContext = createContext({});
 
 const StaffContextProvider = ({ children }) => {
   const [staff, setStaff] = useState([]);
-  const { getPhotoInBucket } = usePicturesContext();
 
   const fetchStaffData = async () => {
     try {
-      const variables = {
-        filter: {
-          or: [{ userType: { eq: "STAFF" } }, { userType: { eq: "DRIVER" } }],
-        },
-      };
-      const response = await API.graphql({
-        query: listUsers,
-        variables: variables,
-      });
-      const fetchedStaff = response.data.listUsers.items;
+      const { data, error } = await supabase
+        .from("users")
+        .select()
+        .or(`userType.eq.STAFF,userType.eq.DRIVER`);
+      if (error) {
+        throw error;
+      }
 
+      const fetchedStaff = data;
       const staffWithPhotos = await Promise.all(
         fetchedStaff.map(async (staff) => {
           if (staff.photo) {
@@ -32,7 +27,6 @@ const StaffContextProvider = ({ children }) => {
           }
         })
       );
-      //console.log("staff with photos", staffWithPhotos);
 
       setStaff(staffWithPhotos);
     } catch (error) {

@@ -1,7 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { API, graphqlOperation } from "aws-amplify";
-import { listFeeds } from "../graphql/queries";
-import { onCreateFeed } from "../graphql/subscriptions";
+import { createContext, useContext, useEffect, useState } from "react";
+import { supabase } from "../../backend/lib/supabase";
 
 const FeedContext = createContext({});
 
@@ -11,31 +9,37 @@ const FeedContextProvider = ({ children }) => {
   useEffect(() => {
     const fetchFeeds = async () => {
       try {
-        const { data } = await API.graphql({ query: listFeeds });
-        setFeeds(data.listFeeds.items);
+        // Retrieve feeds from Supabase
+        const { data, error } = await supabase.from("feeds").select("*");
+        if (error) {
+          throw error;
+        }
+        // Update state with fetched feeds
+        setFeeds(data);
       } catch (error) {
-        console.error("Error fetching feeds:", error);
+        console.error("Error fetching feeds:", error.message);
       }
     };
 
     fetchFeeds();
   }, []); // Empty dependency array means this effect runs only once, when component mounts
 
-  useEffect(() => {
-    const subscription = API.graphql(graphqlOperation(onCreateFeed)).subscribe({
-      next: ({ provider, value }) => {
-        // Add the new feed to the feeds array
-        setFeeds((prevFeeds) => [...prevFeeds, value.data.onCreateFeed]);
-        // Perform push notification here
-      },
-      error: (error) => console.error("Subscription error:", error),
-    });
+  // useEffect(() => {
+  //   // Subscribe to feed creation events
+  //   const subscription = supabase
+  //     .from("feeds")
+  //     .on("INSERT", (payload) => {
+  //       // Add the new feed to the feeds array
+  //       setFeeds((prevFeeds) => [...prevFeeds, payload.new]);
+  //       // Perform push notification here
+  //     })
+  //     .subscribe();
 
-    return () => {
-      // Clean-up function, unsubscribe from the subscription
-      subscription.unsubscribe();
-    };
-  }, []);
+  //   return () => {
+  //     // Clean-up function, unsubscribe from the subscription
+  //     subscription.unsubscribe();
+  //   };
+  // }, []);
 
   return (
     <FeedContext.Provider value={{ feeds }}>{children}</FeedContext.Provider>

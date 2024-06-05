@@ -1,39 +1,37 @@
-import React from "react";
-// import { SafeAreaView } from "react-native-safe-area-context";
-// import { useNavigation } from "@react-navigation/native";
+import React, { useEffect, useState } from "react";
+import {
+  SimpleLineIcons,
+  FontAwesome5,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
+import CustomDrawerContent from "../components/CustomDrawerContent";
+import { supabase } from "../../backend/lib/supabase";
+import Auth from "../components/Auth";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, Text, Button } from "react-native";
 import HomeScreen from "../screens/HomeScreen";
 import DropOffRouteScreen from "../screens/DropOffRouteScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import WaitingScreen from "../screens/WaitingScreen";
 import ChatScreen from "../screens/ChatScreen";
 import ChatUserScreen from "../screens/ChatUserScreen";
-//import PickScreen from "../screens/KidProfileScreen";
 import GalleryScreen from "../screens/GalleryScreen";
 import FeedScreen from "../screens/FeedScreen";
-
-//import SideDrawer from "../screens/SideDrawer/SideDrawer";
-import { useAuthContext } from "../contexts/AuthContext";
-import {
-  SimpleLineIcons,
-  FontAwesome5,
-  AntDesign,
-  MaterialCommunityIcons,
-} from "@expo/vector-icons";
-
-import { useRouteContext } from "../contexts/RouteContext";
-import CustomDrawerContent from "../components/CustomDrawerContent";
 import KidProfileScreen from "../screens/KidProfileScreen";
-//import { usePushNotificationsContext } from "../contexts/PushNotificationsContext";
+import NotStudentScreen from "../screens/NotStudentScreen";
+import { useAuthContext } from "../contexts/AuthContext";
+import { useRouteContext } from "../contexts/RouteContext";
+import { useUsersContext } from "../contexts/UsersContext";
+import { useKidsContext } from "../contexts/KidsContext";
 
 const RootNavigator = () => {
-  const { dbUser, loading, currentUserData } = useAuthContext();
+  const { session, loading } = useAuthContext();
+  const { dbUser, currentUserData } = useUsersContext();
   const { isRouteInProgress } = useRouteContext();
-  // const { isRouteInProgress } = useRouteContext();
-  //const { permissionMessage } = usePushNotificationsContext();
-  //const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const { kids, noKids } = useKidsContext();
+
+  //console.log(noKids);
 
   const Stack = createNativeStackNavigator();
   const Drawer = createDrawerNavigator();
@@ -45,7 +43,6 @@ const RootNavigator = () => {
           <CustomDrawerContent {...props} currentUserData={currentUserData} />
         )}
         screenOptions={{
-          // headerShown: false,
           drawerStyle: {
             backgroundColor: "#fff",
             width: 190,
@@ -96,17 +93,6 @@ const RootNavigator = () => {
           }}
           component={isRouteInProgress ? DropOffRouteScreen : WaitingScreen}
         />
-        {/* <Drawer.Screen
-          name="Pick"
-          options={{
-            drawerLabel: "Kids Info",
-            title: "Kids Info",
-            drawerIcon: () => (
-              <AntDesign name="profile" size={20} color="#808080" />
-            ),
-          }}
-          component={PickScreen}
-        /> */}
         <Drawer.Screen
           name="Gallery"
           options={{
@@ -127,32 +113,33 @@ const RootNavigator = () => {
   };
 
   const StackNav = () => {
-    //console.log("calls stacknav");
-    //const navigation = useNavigation();
-
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {dbUser ? (
-          // isRouteInProgress && !permissionMessage ? (
-          // <Stack.Screen name="Chat" component={ChatScreen} />
-          // <Stack.Screen name="Route" component={RouteScreen} />
-          // ) : (
-          <Stack.Screen name="DrawerNav" component={DrawerNav} />
+        {noKids ? (
+          <Stack.Screen name="NotStudent" component={NotStudentScreen} />
         ) : (
-          // <Stack.Screen name="Feed" component={FeedScreen} />
-          <Stack.Screen name="ParentLogin" component={ProfileScreen} />
-          // )
+          <>
+            {dbUser ? (
+              <Stack.Screen name="DrawerNav" component={DrawerNav} />
+            ) : (
+              <Stack.Screen name="ParentLogin" component={ProfileScreen} />
+            )}
+            <Stack.Screen name="Wait" component={WaitingScreen} />
+            <Stack.Screen name="Feed" component={FeedScreen} />
+            <Stack.Screen name="ChatUser" component={ChatUserScreen} />
+            <Stack.Screen name="KidProfile" component={KidProfileScreen} />
+          </>
         )}
-        <Stack.Screen name="Wait" component={WaitingScreen} />
-        <Stack.Screen name="Feed" component={FeedScreen} />
-        <Stack.Screen name="ChatUser" component={ChatUserScreen} />
-        <Stack.Screen name="KidProfile" component={KidProfileScreen} />
       </Stack.Navigator>
     );
   };
 
   if (loading) {
     return <ActivityIndicator size="large" color="gray" />;
+  }
+
+  if (!session) {
+    return <Auth />;
   }
 
   return <StackNav />;

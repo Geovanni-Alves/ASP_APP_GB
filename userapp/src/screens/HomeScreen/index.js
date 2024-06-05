@@ -9,9 +9,7 @@ import {
   ActivityIndicator,
   Animated,
 } from "react-native";
-import { API, graphqlOperation } from "aws-amplify";
-import { listEvents } from "../../graphql/queries";
-import { createMessage } from "../../graphql/mutations";
+import { supabase } from "../../../backend/lib/supabase";
 import Swiper from "react-native-swiper";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import styles from "./styles";
@@ -22,16 +20,16 @@ import { useNavigation } from "@react-navigation/native";
 import InfoModal from "../../components/InfoModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import TextConfirmationModal from "../../components/TextConfirmationModal";
-import { useAuthContext } from "../../contexts/AuthContext";
+import { useUsersContext } from "../../contexts/UsersContext";
 import { usePicturesContext } from "../../contexts/PicturesContext";
 import { useMessageContext } from "../../contexts/MessageContext";
 import { useKidsContext } from "../../contexts/KidsContext";
+import RemoteImage from "../../components/RemoteImage";
 
 const HomeScreen = () => {
   const navigation = useNavigation();
-  const { currentUserData } = useAuthContext();
+  const { currentUserData } = useUsersContext();
   const { unreadMessages } = useMessageContext();
-  const { getPhotoInBucket } = usePicturesContext();
   const { kids, kidCurrentStateData, ChangeKidState } = useKidsContext();
   //
   const [events, setEvents] = useState(null);
@@ -61,28 +59,21 @@ const HomeScreen = () => {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const response = await API.graphql(
-          graphqlOperation(listEvents, {
-            limit: 10,
-          })
-        );
-        const eventsList = response.data.listEvents.items;
+        const { data: events, error } = await supabase
+          .from("events")
+          .select()
+          .limit(10);
 
-        const eventsWithPhotos = await Promise.all(
-          eventsList.map(async (event) => {
-            if (event.image) {
-              const uriEventImage = await getPhotoInBucket(event.image);
-              return { ...event, uriEventImage };
-            } else {
-              return event;
-            }
-          })
-        );
-        setEvents(eventsWithPhotos);
+        if (error) {
+          throw error;
+        }
+        //
+        setEvents(events);
       } catch (error) {
         console.error("Error fetching events:", error);
       }
     };
+
     if (!events) {
       fetchEvents();
     }
@@ -247,8 +238,12 @@ const HomeScreen = () => {
     return (
       <Pressable key={item.id} onPress={() => handleEventPress(item.link)}>
         <View style={styles.eventContainer}>
-          <Image
-            source={{ uri: item.uriEventImage }}
+          <RemoteImage
+            path={item.image}
+            // fallback={
+            //   "https://letsenhance.io/static/8f5e523ee6b2479e26ecc91b9c25261e/1015f/MainAfter.jpg"
+            // }
+            //source={{ uri: item.uriEventImage }}
             style={styles.eventImage}
           />
           <View style={styles.eventDetails}>
@@ -377,7 +372,7 @@ const HomeScreen = () => {
         <Text style={styles.date}>{formattedDate}</Text>
         {/* <Text style={styles.currentTime}>{currentTime}</Text> */}
       </View>
-      <Text style={styles.welcomeText}>Welcome, {currentUserData.name} </Text>
+      <Text style={styles.welcomeText}>Welcome, {currentUserData?.name} </Text>
       <View style={styles.kidsContainer}>
         <Text style={styles.sectionTitle}>Your Kids</Text>
         {kids.map((kid, index) => (
@@ -398,9 +393,10 @@ const HomeScreen = () => {
             <Pressable onPress={() => handleKidPress(kid)}>
               <View style={styles.kidItem}>
                 <View style={styles.kidImageContainer}>
-                  {kid.uriKid ? (
-                    <Image
-                      source={{ uri: kid.uriKid }}
+                  {kid.photo ? (
+                    <RemoteImage
+                      path={kid.photo}
+                      //source={{ uri: kid.uriKid }}
                       style={styles.kidImage}
                     />
                   ) : (

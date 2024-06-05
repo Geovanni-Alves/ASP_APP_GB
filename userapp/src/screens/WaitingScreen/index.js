@@ -11,7 +11,7 @@ import {
   Modal,
   Pressable,
 } from "react-native";
-import { Auth } from "aws-amplify";
+//import { Auth } from "aws-amplify";
 import styles from "./styles";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { useAuthContext } from "../../contexts/AuthContext";

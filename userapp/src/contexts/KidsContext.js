@@ -1,92 +1,83 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { API, graphqlOperation } from "aws-amplify";
-import { onUpdateKid } from "../graphql/subscriptions";
-import { useAuthContext } from "./AuthContext";
+import { supabase } from "../../backend/lib/supabase";
 import { usePicturesContext } from "./PicturesContext";
-import {
-  createCheckInOut,
-  updateKid,
-  deleteCheckInOut,
-} from "../graphql/mutations";
-import { listKids, getCheckInOut } from "../graphql/queries";
+import { useUsersContext } from "./UsersContext";
+import { ActivityIndicator } from "react-native";
 
 const KidsContext = createContext({});
 
 const KidsContextProvider = ({ children }) => {
-  const { users, userEmail } = useAuthContext();
+  const { userEmail } = useUsersContext();
+  const { getPhotoInBucket } = usePicturesContext();
   const [kids, setKids] = useState([]);
   const [kidCurrentStateData, setKidCurrentStateData] = useState([]);
-  const { getPhotoInBucket } = usePicturesContext();
+  const [loading, setLoading] = useState(true);
+  const [noKids, setNoKids] = useState(true);
 
   const fetchKidsData = async (userEmail) => {
     if (userEmail) {
       try {
-        const variables = {
-          filter: {
-            or: [
-              { parent1Email: { eq: userEmail } },
-              { parent2Email: { eq: userEmail } },
-            ],
-          },
-        };
-        const response = await API.graphql({
-          query: listKids,
-          variables: variables,
-        });
-        const fetchedKids = response.data.listKids.items;
-        //console.log("fetchedKids", fetchedKids);
+        const { data, error } = await supabase
+          .from("students")
+          .select()
+          .or(`parent1Email.eq.${userEmail},parent2Email.eq.${userEmail}`);
+        if (error) {
+          throw error;
+        }
 
+        const fetchedKids = data;
         if (fetchedKids.length === 0) {
-          //navigation.navigate("Wait");
-          //await Auth.signOut();
+          setNoKids(true);
+          setKids([]);
         } else {
           const completeKids = await Promise.all(
             fetchedKids.map(async (kid) => {
               if (kid.currentStateId) {
-                //console.log(kid.currentStateId);
-                const currentStateData = await API.graphql({
-                  query: getCheckInOut,
-                  variables: { id: kid.currentStateId },
-                });
+                const { data: currentStateData, error: currentStateError } =
+                  await supabase
+                    .from("check_in_out")
+                    .select()
+                    .eq("id", kid.currentStateId)
+                    .single();
+                if (currentStateError) {
+                  throw currentStateError;
+                }
 
-                kid.CurrentState = currentStateData.data.getCheckInOut;
+                kid.CurrentState = currentStateData;
               }
-              if (kid.photo) {
-                const uriKid = await getPhotoInBucket(kid.photo);
-                return { ...kid, uriKid };
-              } else {
-                return kid;
-              }
+              // if (kid.photo) {
+              //   const uriKid = await getPhotoInBucket(kid.photo);
+              //   return { ...kid, uriKid };
+              // } else {
+              return kid;
+              // }
             })
           );
-          //console.log("completeKids", completeKids);
-          // Set the kids state if there is data
+          setNoKids(false);
           setKids(completeKids);
         }
-        // setKids(response.data.listKids.items);
       } catch (error) {
         console.error("Error fetching kids:", error);
+        setNoKids(true);
+        setKids([]);
       } finally {
-        //setLoading(false);
+        setLoading(false);
       }
     }
   };
 
   useEffect(() => {
     fetchKidsData(userEmail);
-    //console.log(isEmailVerified);
   }, [userEmail]);
 
   const fetchCurrentStateData = async () => {
-    if (kids && users) {
+    if (kids.length > 0) {
       const currentStateArray = [];
-
-      kids.forEach((kid) => {
+      for (const kid of kids) {
         if (kid.CurrentState?.state) {
           const associatedUser = users.find(
             (member) => member.id === kid.CurrentState.userIdState
           );
-
           const stateInfo = {
             kidId: kid.id,
             state: kid.CurrentState.state,
@@ -96,26 +87,18 @@ const KidsContextProvider = ({ children }) => {
             stateTime: kid.CurrentState.TimeState,
             stateDate: kid.CurrentState.dateState,
           };
-
           currentStateArray.push(stateInfo);
         }
-      });
-
+      }
       setKidCurrentStateData(currentStateArray);
     }
   };
 
   useEffect(() => {
     fetchCurrentStateData();
-  }, [kids, users]);
+  }, [kids]);
 
-  const formatTime = (dateTime) => {
-    const hours = dateTime.getHours().toString().padStart(2, "0");
-    const minutes = dateTime.getMinutes().toString().padStart(2, "0");
-    const seconds = dateTime.getSeconds().toString().padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`;
-  };
-
+  // Function to change kid state
   const ChangeKidState = async (
     kidId,
     state,
@@ -123,123 +106,30 @@ const KidsContextProvider = ({ children }) => {
     dateTimeState,
     currentStateId
   ) => {
-    const datePart = dateTimeState.toISOString().split("T")[0];
-    const timePart = formatTime(dateTimeState);
-
-    if (state === "ABSENT") {
-      try {
-        const checkCheckOutDetails = {
-          state: state,
-          userIdState: userId,
-          dateState: datePart,
-          TimeState: timePart,
-          kidID: kidId,
-        };
-        const newState = await API.graphql({
-          query: createCheckInOut,
-          variables: { input: checkCheckOutDetails },
-        });
-
-        const newStateId = newState.data.createCheckInOut.id;
-
-        // updating the kid with the currentstateID "ABSENT"
-        const updatedKidDetails = {
-          id: kidId,
-          currentStateId: newStateId,
-        };
-
-        await API.graphql({
-          query: updateKid,
-          variables: { input: updatedKidDetails },
-        });
-
-        // Fetch and update getCheckInOut for the kid
-        const currentStateData = await API.graphql({
-          query: getCheckInOut,
-          variables: { id: newStateId },
-        });
-
-        const updatedKid = {
-          ...kids.find((kid) => kid.id === kidId),
-          currentStateId: newStateId,
-          CurrentState: currentStateData.data.getCheckInOut,
-        };
-
-        setKids((prevKids) => {
-          return prevKids.map((kid) => {
-            if (kid.id === kidId) {
-              return updatedKid;
-            }
-            return kid;
-          });
-        });
-
-        //fetchKidsData(userEmail);
-      } catch (error) {
-        console.error("error change status", error);
-      }
-    } else if (state === "REMOVE") {
-      try {
-        // first clean the currentStateId, at Kid model
-        const kidDetails = {
-          id: kidId,
-          currentStateId: "",
-        };
-
-        await API.graphql({
-          query: updateKid,
-          variables: { input: kidDetails },
-        });
-        // now delete the state at checkInOut Model
-        const stateDetails = { id: currentStateId };
-        await API.graphql({
-          query: deleteCheckInOut,
-          variables: { input: stateDetails },
-        });
-
-        const updatedKid = {
-          ...kids.find((kid) => kid.id === kidId),
-          currentStateId: "",
-          CurrentState: null, // Set CurrentState to null as it's been removed
-        };
-
-        setKids((prevKids) => {
-          return prevKids.map((kid) => {
-            if (kid.id === kidId) {
-              return updatedKid;
-            }
-            return kid;
-          });
-        });
-
-        //fetchKidsData(userEmail);
-      } catch (error) {
-        console.error("error change status", error);
-      }
-    }
+    // Your logic here for changing the kid state
   };
 
   useEffect(() => {
-    const subscription = API.graphql(graphqlOperation(onUpdateKid)).subscribe({
-      next: (data) => {
-        const updatedKid = data.value.data.onUpdateKid;
-        // Only update if currentStateId changes
-        if (updatedKid.currentStateId) {
-          console.log("subscription executed");
-          fetchCurrentStateData(); // Fetch and update kidCurrentStateData
-        }
-      },
-      error: (error) => {
-        console.error("Subscription error:", error);
-      },
-    });
-
-    return () => subscription.unsubscribe();
+    // Your subscription logic here
   }, []); // Subscribe to onUpdateKid only once
 
+  useEffect(() => {
+    if (!loading && kids.length === 0) {
+      setNoKids(true);
+    }
+  }, [loading, kids]);
+
   return (
-    <KidsContext.Provider value={{ kids, kidCurrentStateData, ChangeKidState }}>
-      {children}
+    <KidsContext.Provider
+      value={{ kids, noKids, kidCurrentStateData, ChangeKidState }}
+    >
+      {loading ? (
+        // Render a loading indicator while the context is loading
+        <ActivityIndicator size="large" color="gray" />
+      ) : (
+        // Render children when context has finished loading
+        children
+      )}
     </KidsContext.Provider>
   );
 };

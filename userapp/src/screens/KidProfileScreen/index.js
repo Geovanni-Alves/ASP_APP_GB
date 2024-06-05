@@ -9,22 +9,21 @@ import {
   RefreshControl,
   TextInput,
 } from "react-native";
-import { API } from "aws-amplify";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { Entypo } from "@expo/vector-icons";
-import { listKids } from "../../graphql/queries";
-import { updateKid } from "../../graphql/mutations";
+import { supabase } from "../../../backend/lib/supabase";
 import { usePicturesContext } from "../../contexts/PicturesContext";
 import styles from "./styles";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import InfoModal from "../../components/InfoModal";
 import { SafeAreaView } from "react-native-safe-area-context";
+import RemoteImage from "../../components/RemoteImage";
 
 const KidProfileScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { savePhotoInBucket, getPhotoInBucket } = usePicturesContext();
+  const { savePhotoInBucket } = usePicturesContext();
 
   const kidId = route.params?.id;
 
@@ -47,7 +46,6 @@ const KidProfileScreen = () => {
 
   useEffect(() => {
     if (kidId) {
-      //console.log("fetching kid data...", kidId);
       fetchData();
     }
   }, []);
@@ -61,20 +59,25 @@ const KidProfileScreen = () => {
   const fetchKidData = async () => {
     if (kidId) {
       try {
-        const response = await API.graphql({
-          query: listKids,
-          variables: {
-            filter: { id: { eq: kidId } },
-          },
-        });
-        const fetchedKid = response.data.listKids.items[0];
-        //console.log("fetchedKid", fetchedKid);
+        let { data, error } = await supabase
+          .from("students")
+          .select("*")
+          .eq("id", kidId)
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        const fetchedKid = data;
+        //console.log(fetchedKid.photo);
         setKid(fetchedKid);
 
-        if (fetchedKid && fetchedKid.photo) {
-          const imageURL = await getPhotoInBucket(fetchedKid.photo);
-          setActualPhoto(imageURL);
-        }
+        // if (fetchedKid && fetchedKid.photo) {
+        //   //const imageURL = await getPhotoInBucket(fetchedKid.photo);
+
+        setActualPhoto(fetchedKid.photo);
+        // }
       } catch (error) {
         console.error("Error fetching kid:", error);
       }
@@ -89,10 +92,15 @@ const KidProfileScreen = () => {
     try {
       const updatedFields = Object.keys(formChanges);
       if (updatedFields.length > 0) {
-        await API.graphql({
-          query: updateKid,
-          variables: { input: formChanges },
-        });
+        const { error } = await supabase
+          .from("students")
+          .update(formChanges)
+          .eq("id", kidId);
+
+        if (error) {
+          throw error;
+        }
+
         await fetchData();
         setFormChanges({});
       }
@@ -111,13 +119,12 @@ const KidProfileScreen = () => {
   const handleChangePhoto = async () => {
     try {
       setLoading(true);
-      const { filename, result } = await savePhotoInBucket(
-        `kid-photo-${kidId}-${Date.now()}`
-      );
-      if (result) {
-        await updateKidImage(filename);
+      const imagePath = await savePhotoInBucket();
+      //const filename = imagePath.imagePath;
+      if (imagePath) {
+        await updateKidImage(imagePath);
         alert("Image successfully updated!");
-        await fetchData();
+        //await fetchData();
       } else {
         console.log("Image selection canceled or encountered an error");
       }
@@ -128,19 +135,35 @@ const KidProfileScreen = () => {
     }
   };
 
-  const updateKidImage = async (fileName) => {
+  const updateKidImage = async (filename) => {
     try {
+      if (!filename || !kidId) {
+        throw new Error("Filename or kidId is not defined");
+      }
+
       const kidDetails = {
-        id: kidId,
-        photo: fileName,
+        photo: filename,
       };
 
-      await API.graphql({
-        query: updateKid,
-        variables: { input: kidDetails },
-      });
+      // console.log(
+      //   "Updating kid image with details:",
+      //   kidDetails,
+      //   "for kidId:",
+      //   kidId
+      // );
+
+      const { data, error } = await supabase
+        .from("students")
+        .update(kidDetails)
+        .eq("id", kidId);
+
+      if (error) {
+        throw error;
+      }
+
+      //console.log("Kid image updated successfully:", data);
     } catch (error) {
-      console.error("Error updating kid's image:", error);
+      console.error("Error updating kid's image:", error.message);
     }
   };
 
@@ -150,7 +173,7 @@ const KidProfileScreen = () => {
 
   const handleChangeText = (key, value) => {
     setKid({ ...kid, [key]: value });
-    setFormChanges({ ...formChanges, [key]: value, id: kidId });
+    setFormChanges({ ...formChanges, [key]: value });
   };
 
   const renderKidDetailsItem = ({ item }) => {
@@ -169,8 +192,6 @@ const KidProfileScreen = () => {
   const renderItemSeparator = () => {
     return <View style={styles.separator} />;
   };
-
-  //console.log(actualPhoto);
 
   if (!kid) {
     return (
@@ -206,7 +227,7 @@ const KidProfileScreen = () => {
         <TouchableOpacity onPress={handleChangePhoto}>
           <View style={styles.imageContainer}>
             {actualPhoto ? (
-              <Image source={{ uri: actualPhoto }} style={styles.KidImage} />
+              <RemoteImage path={actualPhoto} style={styles.kidPhoto} />
             ) : (
               <View>
                 <Text style={styles.placeholderText}>
