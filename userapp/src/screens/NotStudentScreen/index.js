@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Button, Card, Title, Paragraph } from "react-native-paper";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import { supabase } from "../../../backend/lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 const NotStudentScreen = () => {
   const handleCall = () => {

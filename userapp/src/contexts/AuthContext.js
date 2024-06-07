@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import { supabase } from "../../backend/lib/supabase";
+import { supabase } from "../lib/supabase";
 import { ActivityIndicator } from "react-native-paper";
 
 const AuthContext = createContext({});

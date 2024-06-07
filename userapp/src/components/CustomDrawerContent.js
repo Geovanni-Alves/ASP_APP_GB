@@ -7,7 +7,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import ConfirmationModal from "./ConfirmationModal";
-import { supabase } from "../../backend/lib/supabase";
+import { supabase } from "../lib/supabase";
+import RemoteImage from "./RemoteImage";
 
 export default function CustomDrawerContent(props) {
   const { currentUserData } = props;
@@ -36,10 +37,13 @@ export default function CustomDrawerContent(props) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.userContent}>
-        <Image
-          source={{ uri: currentUserData?.uriUser }}
+        <RemoteImage
+          path={currentUserData?.photo}
+          name={currentUserData?.name}
+          //fallback=""
+          //source={{ uri: currentUserData?.uriUser }}
           style={styles.userPic}
-        ></Image>
+        />
         <Text style={styles.userName}>{currentUserData?.name}</Text>
       </View>
       <DrawerContentScrollView {...props}>

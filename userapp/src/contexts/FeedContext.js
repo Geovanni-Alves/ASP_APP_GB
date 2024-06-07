@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../../backend/lib/supabase";
+import { supabase } from "../lib/supabase";
 
 const FeedContext = createContext({});
 
@@ -22,24 +22,27 @@ const FeedContextProvider = ({ children }) => {
     };
 
     fetchFeeds();
-  }, []); // Empty dependency array means this effect runs only once, when component mounts
+  }, []);
 
-  // useEffect(() => {
-  //   // Subscribe to feed creation events
-  //   const subscription = supabase
-  //     .from("feeds")
-  //     .on("INSERT", (payload) => {
-  //       // Add the new feed to the feeds array
-  //       setFeeds((prevFeeds) => [...prevFeeds, payload.new]);
-  //       // Perform push notification here
-  //     })
-  //     .subscribe();
+  useEffect(() => {
+    // Subscribe to feed creation events
+    const feeds = supabase
+      .channel("custom-insert-channel")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "feeds" },
+        (payload) => {
+          console.log("new feed reveived!", payload);
+          const newFeeds = payload.new;
+          setFeeds((prevFeeds) => [...prevFeeds, newFeeds]);
+        }
+      )
+      .subscribe();
 
-  //   return () => {
-  //     // Clean-up function, unsubscribe from the subscription
-  //     subscription.unsubscribe();
-  //   };
-  // }, []);
+    return () => {
+      feeds.unsubscribe();
+    };
+  }, []);
 
   return (
     <FeedContext.Provider value={{ feeds }}>{children}</FeedContext.Provider>

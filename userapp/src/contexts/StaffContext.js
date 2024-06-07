@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../../backend/lib/supabase";
+import { supabase } from "../lib/supabase";
 
 const StaffContext = createContext({});
 
@@ -17,18 +17,8 @@ const StaffContextProvider = ({ children }) => {
       }
 
       const fetchedStaff = data;
-      const staffWithPhotos = await Promise.all(
-        fetchedStaff.map(async (staff) => {
-          if (staff.photo) {
-            const uriStaff = await getPhotoInBucket(staff.photo);
-            return { ...staff, uriStaff };
-          } else {
-            return staff;
-          }
-        })
-      );
 
-      setStaff(staffWithPhotos);
+      setStaff(fetchedStaff);
     } catch (error) {
       console.error("Error fetching staff data", error);
     }

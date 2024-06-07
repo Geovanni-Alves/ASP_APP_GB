@@ -26,14 +26,6 @@ const FeedScreen = () => {
   const [selectedKid, setSelectedKid] = useState(null);
   const [selectedKidFeeds, setSelectedKidFeeds] = useState([]);
 
-  const getInitials = (name) => {
-    const nameArray = name.split(" ");
-    return nameArray
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-  };
-
   const goBack = () => {
     navigation.goBack();
   };
@@ -182,15 +174,12 @@ const FeedScreen = () => {
               source={{ uri: selectedKid?.uriKid }}
               style={styles.KidImage}
             /> */}
-            {selectedKid.photo ? (
-              <RemoteImage path={selectedKid.photo} style={styles.KidImage} />
-            ) : (
-              <View style={styles.placeholderImage}>
-                <Text style={styles.placeholderText}>
-                  {getInitials(selectedKid.name)}
-                </Text>
-              </View>
-            )}
+
+            <RemoteImage
+              path={selectedKid.photo}
+              style={styles.KidImage}
+              name={selectedKid.name}
+            />
 
             <TouchableOpacity
               style={styles.profileButton}

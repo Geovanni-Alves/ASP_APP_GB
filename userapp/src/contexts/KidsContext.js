@@ -1,14 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../../backend/lib/supabase";
-import { usePicturesContext } from "./PicturesContext";
+import { supabase } from "../lib/supabase";
 import { useUsersContext } from "./UsersContext";
 import { ActivityIndicator } from "react-native";
 
 const KidsContext = createContext({});
 
 const KidsContextProvider = ({ children }) => {
-  const { userEmail } = useUsersContext();
-  const { getPhotoInBucket } = usePicturesContext();
+  const { userEmail, users } = useUsersContext();
   const [kids, setKids] = useState([]);
   const [kidCurrentStateData, setKidCurrentStateData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +19,7 @@ const KidsContextProvider = ({ children }) => {
           .from("students")
           .select()
           .or(`parent1Email.eq.${userEmail},parent2Email.eq.${userEmail}`);
+
         if (error) {
           throw error;
         }
@@ -45,10 +44,6 @@ const KidsContextProvider = ({ children }) => {
 
                 kid.CurrentState = currentStateData;
               }
-              // if (kid.photo) {
-              //   const uriKid = await getPhotoInBucket(kid.photo);
-              //   return { ...kid, uriKid };
-              // } else {
               return kid;
               // }
             })
@@ -96,9 +91,15 @@ const KidsContextProvider = ({ children }) => {
 
   useEffect(() => {
     fetchCurrentStateData();
-  }, [kids]);
+  }, [kids, users]);
 
-  // Function to change kid state
+  const formatTime = (dateTime) => {
+    const hours = dateTime.getHours().toString().padStart(2, "0");
+    const minutes = dateTime.getMinutes().toString().padStart(2, "0");
+    const seconds = dateTime.getSeconds().toString().padStart(2, "0");
+    return `${hours}:${minutes}:${seconds}`;
+  };
+
   const ChangeKidState = async (
     kidId,
     state,
@@ -106,12 +107,137 @@ const KidsContextProvider = ({ children }) => {
     dateTimeState,
     currentStateId
   ) => {
-    // Your logic here for changing the kid state
+    //console.log("kids", kids);
+    const datePart = dateTimeState.toISOString().split("T")[0];
+    const timePart = formatTime(dateTimeState);
+
+    if (state === "ABSENT") {
+      try {
+        const checkCheckOutDetails = {
+          state: state,
+          userIdState: userId,
+          dateState: datePart,
+          timeState: timePart,
+          studentId: kidId,
+        };
+
+        const { data, error } = await supabase
+          .from("check_in_out")
+          .insert(checkCheckOutDetails)
+          .select();
+
+        if (error) {
+          throw error;
+        }
+
+        const newState = data[0];
+        const newStateId = newState.id;
+
+        // updating the kid with the currentstateID "ABSENT"
+        const updatedKidDetails = {
+          currentStateId: newStateId,
+        };
+
+        const { data: updatedKidData, error: updateError } = await supabase
+          .from("students")
+          .update(updatedKidDetails)
+          .eq("id", kidId)
+          .select();
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // Fetch and update getCheckInOut for the kid
+        const { data: currentStateData, error: fetchError } = await supabase
+          .from("check_in_out")
+          .select()
+          .eq("id", newStateId)
+          .single();
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        const updatedKid = {
+          ...kids.find((kid) => kid.id === kidId),
+          currentStateId: newStateId,
+          CurrentState: currentStateData,
+        };
+
+        setKids((prevKids) => {
+          return prevKids.map((kid) => {
+            if (kid.id === kidId) {
+              return updatedKid;
+            }
+            return kid;
+          });
+        });
+      } catch (error) {
+        console.error("error change status", error);
+      }
+    } else if (state === "REMOVE") {
+      try {
+        // first clean the currentStateId in the students table
+        const updatedKidDetails = {
+          currentStateId: null,
+        };
+
+        const { error: updateError } = await supabase
+          .from("students")
+          .update(updatedKidDetails)
+          .eq("id", kidId);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        // now delete the state in the check_in_out table
+        const { error: deleteError } = await supabase
+          .from("check_in_out")
+          .delete()
+          .eq("id", currentStateId);
+
+        if (deleteError) {
+          throw deleteError;
+        }
+
+        const updatedKid = {
+          ...kids.find((kid) => kid.id === kidId),
+          currentStateId: null,
+          CurrentState: null,
+        };
+
+        setKids((prevKids) => {
+          return prevKids.map((kid) => {
+            if (kid.id === kidId) {
+              return updatedKid;
+            }
+            return kid;
+          });
+        });
+      } catch (error) {
+        console.error("error change status", error);
+      }
+    }
   };
 
   useEffect(() => {
-    // Your subscription logic here
-  }, []); // Subscribe to onUpdateKid only once
+    const check_in_out_Updates = supabase
+      .channel("custom-update-channel")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "check_in_out" },
+        (payload) => {
+          const newUpdates = payload.new;
+          // console.log("Change received!", payload);
+          fetchCurrentStateData();
+        }
+      )
+      .subscribe();
+
+    return () => check_in_out_Updates.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (!loading && kids.length === 0) {

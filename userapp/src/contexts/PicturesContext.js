@@ -1,6 +1,6 @@
 import React, { createContext, useContext } from "react";
 import * as ImagePicker from "expo-image-picker";
-import { supabase } from "../../backend/lib/supabase";
+import { supabase } from "../lib/supabase";
 import * as FileSystem from "expo-file-system";
 import { randomUUID } from "expo-crypto";
 import { decode } from "base64-arraybuffer";
@@ -8,48 +8,6 @@ import { decode } from "base64-arraybuffer";
 const PicturesContext = createContext({});
 
 const PicturesContextProvider = ({ children }) => {
-  // const uploadImage = async (uri, filename) => {
-  //   try {
-  //     if (!uri) {
-  //       throw new Error("Image URI is undefined");
-  //     }
-
-  //     const response = await fetch(uri);
-  //     const blob = await response.blob();
-  //     if (!blob) {
-  //       throw new Error("Failed to create blob.");
-  //     }
-
-  //     console.log("Uploading image to Supabase Storage...");
-  //     const { data, error } = await supabase.storage
-  //       .from("photos")
-  //       .upload(filename, blob, {
-  //         contentType: "image/jpeg",
-  //       });
-
-  //     if (error) {
-  //       throw error;
-  //     }
-
-  //     console.log("Image uploaded successfully.");
-
-  //     const { publicURL, error: urlError } = supabase.storage
-  //       .from("photos")
-  //       .getPublicUrl(filename);
-
-  //     if (urlError) {
-  //       throw urlError;
-  //     }
-
-  //     console.log("Image URL:", publicURL);
-
-  //     return publicURL;
-  //   } catch (error) {
-  //     console.error("Error uploading image:", error);
-  //     throw error;
-  //   }
-  // };
-
   const uploadImage = async (image) => {
     if (!image?.startsWith("file://")) {
       return;
@@ -69,7 +27,6 @@ const PicturesContextProvider = ({ children }) => {
     if (error) {
       throw error;
     }
-    //console.log("data", data);
 
     if (data) {
       return data.path;
@@ -108,24 +65,6 @@ const PicturesContextProvider = ({ children }) => {
       console.error("Error Saving  image:", error);
     }
   };
-
-  // const getPhotoInBucket = async (filename) => {
-  //   try {
-  //     const { publicURL, error } = supabase.storage
-  //       .from("photos")
-  //       .getPublicUrl(filename);
-
-  //     if (error) {
-  //       throw error;
-  //     }
-
-  //     //console.log("Image URL:", publicURL);
-  //     return publicURL;
-  //   } catch (error) {
-  //     console.error("Error getting image:", error);
-  //     throw error;
-  //   }
-  // };
 
   return (
     <PicturesContext.Provider value={{ savePhotoInBucket }}>

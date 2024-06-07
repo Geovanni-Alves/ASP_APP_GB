@@ -43,17 +43,6 @@ const PushNotificationsContextProvider = ({ children }) => {
     });
   }
 
-  // async function schedulePushNotification(title, body) {
-  //   await Notifications.scheduleNotificationAsync({
-  //     content: {
-  //       title: title, //"You've got mail! 📬",
-  //       body: body, //"Here is the notification body",
-  //       //data: { data: "goes here" },
-  //     },
-  //     trigger: { seconds: 2 },
-  //   });
-  // }
-
   async function registerForPushNotificationsAsync() {
     let token;
 

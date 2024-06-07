@@ -8,12 +8,13 @@ import {
   Keyboard,
   TouchableOpacity,
 } from "react-native";
-import { supabase } from "../../../backend/lib/supabase";
+import { supabase } from "../../lib/supabase";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import PhoneInput from "react-native-phone-number-input";
+//import PhoneInput from "react-native-phone-input";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import { useKidsContext } from "../../contexts/KidsContext";
@@ -94,7 +95,7 @@ const ProfileScreen = () => {
       for (const kid of kids) {
         // Determine the parent field to update
         const parentField =
-          kid.parent1Email === null ? "parent1Id" : "parent2Id";
+          kid.parent1Email === null ? "parent2Id" : "parent1Id";
 
         // Prepare the update data
         const updateData = {};
@@ -119,86 +120,13 @@ const ProfileScreen = () => {
     try {
       // Update the user and get the updated user object
       const newUser = await onCreateUser();
-
+      console.log("newUser", newUser);
       // Update the kids with the updated user object
       await updateKidUserID(newUser);
     } catch (e) {
       Alert.alert("Error", e.message);
     }
   };
-
-  // const updateKidUserID = async (newUser) => {
-  //   try {
-  //     //console.log(newUser);
-  //     //console.log(kids);
-  //     for (const kid of kids) {
-  //       //console.log("kid id", kid.id);
-  //       // Query your GraphQL API to find the kid by some unique identifier (e.g., name or ID).
-  //       const queryResult = await API.graphql({
-  //         query: getKid,
-  //         variables: { id: kid.id },
-  //       });
-
-  //       // Check if the query found a matching kid.
-  //       const foundKid = queryResult.data.getKid;
-  //       console.log("found??", foundKid);
-  //       if (foundKid) {
-  //         // If a matching kid was found, update their userID.
-  //         // if (kidparent1Email !== null) {
-
-  //         const parentField =
-  //           kid.parent1Email === null ? "Parent1ID" : "Parent2ID";
-
-  //         // console.log("parent 1 Email ", kid.parent1Email);
-  //         console.log("parent Field ", parentField);
-  //         //console.log(dbUser);
-  //         const variables = {
-  //           input: {
-  //             id: foundKid.id,
-  //           },
-  //         };
-
-  //         variables.input[parentField] = newUser.id;
-
-  //         const updateResult = await API.graphql({
-  //           query: updateKid,
-  //           variables: variables,
-  //         });
-  //       }
-  //     }
-  //   } catch (e) {
-  //     Alert.alert("Error updating kid", e.message);
-  //   }
-  // };
-
-  // const onCreateUser = async () => {
-  //   try {
-  //     const userDetails = {
-  //       sub,
-  //       name,
-  //       email: userEmail,
-  //       userType: "PARENT",
-  //       unitNumber,
-  //       address,
-  //       lng,
-  //       lat,
-  //       phoneNumber,
-  //       pushToken: expoPushToken.data,
-  //     };
-
-  //     const response = await API.graphql(
-  //       graphqlOperation(createUser, { input: userDetails })
-  //     );
-
-  //     const newUser = response.data.createUser; // Access the user data from the response
-  //     const userId = newUser.id; // Access the ID of the newly created user
-
-  //     await updateKidUserID(newUser);
-  //     setDbUser(newUser);
-  //   } catch (e) {
-  //     Alert.alert("Error saving new user", e.message);
-  //   }
-  // };
 
   return (
     <SafeAreaView>
@@ -240,7 +168,7 @@ const ProfileScreen = () => {
         style={styles.input}
       />
       <View style={styles.phoneInputContainer}>
-        {/* <PhoneInput
+        <PhoneInput
           ref={phoneInputRef}
           value={phoneNumber}
           //onChangeText={setPhoneNumber}
@@ -252,7 +180,7 @@ const ProfileScreen = () => {
           placeholder="Phone Number"
           style={styles.phoneInputField}
           //style={styles.phoneInput}
-        /> */}
+        />
         <TouchableOpacity
           style={styles.okButton}
           onPress={() => {

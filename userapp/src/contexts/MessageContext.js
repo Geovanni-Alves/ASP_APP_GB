@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../../backend/lib/supabase";
+import { supabase } from "../lib/supabase";
 
 const MessageContext = createContext({});
 
@@ -26,21 +26,61 @@ const MessageContextProvider = ({ children }) => {
     fetchUnreadMessages();
   }, []);
 
+  useEffect(() => {
+    const UpdatesOnMessages = supabase
+      .channel("custom-insert-channel")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "message" },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            //console.log("payload!", payload);
+            const newMessage = payload.new;
+            setNewMessages((prevMessages) => [...prevMessages, newMessage]);
+            setUnreadMessages((prevUnreadMessages) => [
+              ...prevUnreadMessages,
+              newMessage,
+            ]);
+          } else if (payload.eventType === "UPDATE") {
+            const updatedMessage = payload.new;
+            setUnreadMessages((unreadPrevMessages) => {
+              return unreadPrevMessages.map((msg) =>
+                msg.id === updatedMessage.id ? updatedMessage : msg
+              );
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      UpdatesOnMessages.unsubscribe();
+    };
+  }, []);
+
   // useEffect(() => {
-  //   const subscription = supabase
-  //     .from("message")
-  //     .on("INSERT", (payload) => {
-  //       const newMessage = payload.new;
-  //       setNewMessages((prevMessages) => [...prevMessages, newMessage]);
-  //       setUnreadMessages((prevUnreadMessages) => [
-  //         ...prevUnreadMessages,
-  //         newMessage,
-  //       ]);
-  //     })
+  //   //subscribe to check the new inserted messages
+
+  //   //subscribe to check the update the messages (mark as read)
+  //   const updatedMessages = supabase
+  //     .channel("custom-insert-channel")
+  //     .on(
+  //       "postgres_changes",
+  //       { event: "UPDATE", schema: "public", table: "message" },
+  //       (payload) => {
+  //         console.log("message updated!");
+  //         const updatedMessage = payload.new;
+  //         setUnreadMessages((unreadPrevMessages) => {
+  //           return unreadPrevMessages.map((msg) =>
+  //             msg.id === updatedMessage.id ? updatedMessage : msg
+  //           );
+  //         });
+  //       }
+  //     )
   //     .subscribe();
 
   //   return () => {
-  //     subscription.unsubscribe();
+  //     updatedMessages.unsubscribe();
   //   };
   // }, []);
 

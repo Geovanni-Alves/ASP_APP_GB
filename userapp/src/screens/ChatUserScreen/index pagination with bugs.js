@@ -5,8 +5,9 @@ import {
   ActivityIndicator,
   Text,
   SafeAreaView,
+  Dimensions,
 } from "react-native";
-import { Bubble, GiftedChat, Send } from "react-native-gifted-chat";
+import { Bubble, GiftedChat, Send, Day } from "react-native-gifted-chat";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
@@ -20,25 +21,47 @@ import { useKidsContext } from "../../contexts/KidsContext";
 import { supabase } from "../../lib/supabase";
 
 const ChatUserScreen = () => {
-  const timeZone = "America/Vancouver";
   const route = useRoute();
   const navigation = useNavigation();
   const kidID = route.params?.id;
   const { kids } = useKidsContext();
   const { staff } = useStaffContext();
-  const { newMessages, unreadMessages, sendAndNotifyMsg } = useMessageContext();
-  const [allMessages, setAllMessages] = useState(null);
+  const { newMessages, unreadMessages } = useMessageContext();
+  const [allMessages, setAllMessages] = useState([]);
   const { sendPushNotification } = usePushNotificationsContext();
   const [messages, setMessages] = useState([]);
-  const [pagination, setPagination] = useState({ limit: 20, offset: 0 });
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [currentKidData, setCurrentKidData] = useState(null);
   const [unreadOthersMessages, setUnreadOthersMessages] = useState([]);
   const [isMarkedAsRead, setIsMarkedAsRead] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const { height } = Dimensions.get("window");
+  //const [pagination, setPagination] = useState({ limit: 10, offset: 0 });
+  const [pagination, setPagination] = useState({
+    limit: calculatePaginationLimit(height),
+    offset: 0,
+  });
 
   const goBack = () => {
     navigation.goBack();
   };
+
+  // Calculate pagination limit based on device height
+  function calculatePaginationLimit(deviceHeight) {
+    if (deviceHeight < 600) {
+      return 6;
+    } else if (deviceHeight < 800) {
+      return 11;
+    } else {
+      return 16;
+    }
+  }
+
+  // useEffect(() => {
+  //   console.log("messages", messages);
+  //   console.log("all messages", allMessages);
+  //   console.log(pagination);
+  // }, [messages, allMessages, pagination]);
 
   useEffect(() => {
     if (unreadMessages.length > 0 && messages.length > 0) {
@@ -59,6 +82,17 @@ const ChatUserScreen = () => {
     }
   }, [unreadMessages]);
 
+  // Update Pagination State
+  const handleLoadMore = async () => {
+    if (hasMoreMessages && !loadingMore) {
+      setLoadingMore(true);
+      setPagination((prevPagination) => ({
+        ...prevPagination,
+        offset: prevPagination.offset + prevPagination.limit,
+      }));
+    }
+  };
+
   useEffect(() => {
     // Set current kid
     // Check if kids array and kidID are defined
@@ -74,25 +108,35 @@ const ChatUserScreen = () => {
   }, [kids, kidID]);
 
   // fetch all messages (filter by user (kid or staff))
+  const fetchMessagesByUser = async () => {
+    if (!currentKidData) return;
+
+    const id = currentKidData.id;
+    const { data, error } = await supabase
+      .from("message")
+      .select("*")
+      .or(`senderId.eq.${id},receiverIds.eq.${id}`)
+      .order("sentAt", { ascending: false })
+      .range(pagination.offset, pagination.offset + pagination.limit - 1);
+
+    if (error) {
+      throw error;
+    }
+    //console.log("data", data);
+    if (data.length < pagination.limit) {
+      setHasMoreMessages(false);
+    }
+
+    const fetchedMessages = data;
+    setAllMessages((prevMessages) => [...prevMessages, ...fetchedMessages]);
+    setLoadingMore(false);
+  };
+
   useEffect(() => {
-    const fetchMessagesByUser = async () => {
-      const id = currentKidData.id;
-      const { data, error } = await supabase
-        .from("message")
-        .select("*")
-        .or(`senderId.eq.${id},receiverIds.eq.${id}`);
-
-      if (error) {
-        throw error;
-      }
-      const fetchedMessages = data;
-
-      setAllMessages(fetchedMessages);
-    };
     if (currentKidData) {
       fetchMessagesByUser();
     }
-  }, [currentKidData]);
+  }, [currentKidData, pagination]);
 
   const getRemoteImageUri = async (path) => {
     try {
@@ -386,6 +430,27 @@ const ChatUserScreen = () => {
     );
   };
 
+  const renderDay = (props) => {
+    return <Day {...props} textStyle={{ color: "#2e64e5" }} />;
+  };
+
+  const renderLoading = () => {
+    if (loadingMore) {
+      return (
+        <View style={{ marginVertical: 10 }}>
+          <ActivityIndicator size="large" color="#2e64e5" />
+        </View>
+      );
+    }
+    return null;
+  };
+
+  // const renderLoading = () => (
+  //   <View style={styles.loadingContainer}>
+  //     <ActivityIndicator size="large" color="#6646ee" />
+  //   </View>
+  // );
+
   const scrollToBottomComponent = () => (
     <FontAwesome name="angle-double-down" size={22} color="#333" />
   );
@@ -417,7 +482,6 @@ const ChatUserScreen = () => {
             _id: kidID,
           }}
           renderBubble={(props) => renderBubble(props)}
-          //loadEarlier
           alwaysShowSend
           renderSend={renderSend}
           showUserAvatar
@@ -439,8 +503,11 @@ const ChatUserScreen = () => {
               </Text>
             </View>
           )}
-          // onLoadEarlier={handleLoadEarlier}
-          // isLoadingEarlier={isLoadingEarlier}
+          renderDay={renderDay}
+          renderLoading={renderLoading}
+          onLoadEarlier={handleLoadMore}
+          loadEarlier={hasMoreMessages}
+          isLoadingEarlier={loadingMore}
           scrollToBottom
           scrollToBottomComponent={scrollToBottomComponent}
         />

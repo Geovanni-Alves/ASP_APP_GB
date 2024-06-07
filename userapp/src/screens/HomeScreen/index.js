@@ -2,18 +2,16 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
-  Image,
   Linking,
   Pressable,
   ScrollView,
   ActivityIndicator,
   Animated,
 } from "react-native";
-import { supabase } from "../../../backend/lib/supabase";
+import { supabase } from "../../lib/supabase";
 import Swiper from "react-native-swiper";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import styles from "./styles";
-import { format } from "date-fns";
 import { AntDesign } from "@expo/vector-icons";
 import { Entypo } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -21,10 +19,10 @@ import InfoModal from "../../components/InfoModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import TextConfirmationModal from "../../components/TextConfirmationModal";
 import { useUsersContext } from "../../contexts/UsersContext";
-import { usePicturesContext } from "../../contexts/PicturesContext";
 import { useMessageContext } from "../../contexts/MessageContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 import RemoteImage from "../../components/RemoteImage";
+import { format } from "date-fns";
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -90,8 +88,8 @@ const HomeScreen = () => {
         const unreadForKid = unreadMessages?.filter(
           (message) =>
             !message.isRead &&
-            message.receiverIDs.includes(kid.id) &&
-            message.senderID !== kid.id
+            message.receiverIds.includes(kid.id) &&
+            message.senderId !== kid.id
         );
 
         // Store the count of unread messages for the current kid
@@ -122,16 +120,16 @@ const HomeScreen = () => {
 
   // Function to mark kid as absent or undo absence
   const toggleAbsent = async (kid, isAbsent) => {
-    currentTime = new Date();
-    const currentHour = currentTime.getHours();
-    const currentMinutes = currentTime.getMinutes();
-    console.log(currentHour, currentMinutes);
-    if (currentHour > 12 || (currentHour === 12 && currentMinutes >= 59)) {
-      console.log(
-        "Hi dear parent, the today's route is already closed, unfortunately we couldn't remove the absent for today!"
-      );
-      return;
-    }
+    // currentTime = new Date();
+    // const currentHour = currentTime.getHours();
+    // const currentMinutes = currentTime.getMinutes();
+    // console.log(currentHour, currentMinutes);
+    // if (currentHour > 12 || (currentHour === 12 && currentMinutes >= 59)) {
+    //   Alert.alert(
+    //     `Hi dear parent, the route for today is already closed!, unfortunately we can't ${isAbsent} remove the absent for today!`
+    //   );
+    //   return;
+    // }
 
     setKidAbsent({ kid, isAbsent });
     //console.log("kidAbsent", kidAbsent);
@@ -256,22 +254,36 @@ const HomeScreen = () => {
   };
 
   const handleSendMessage = async (message) => {
-    // console.log("Sending message:", message);
-    // console.log(kidAbsent);
     const kidID = kidAbsent.kid.id;
     const newMessage = message;
+    const currentTime = new Date();
+    const year = currentTime.getFullYear();
+    const month = String(currentTime.getMonth() + 1).padStart(2, "0");
+    const day = String(currentTime.getDate()).padStart(2, "0");
+    const hours = String(currentTime.getHours()).padStart(2, "0");
+    const minutes = String(currentTime.getMinutes()).padStart(2, "0");
+    const seconds = String(currentTime.getSeconds()).padStart(2, "0");
+
+    const formattedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     try {
-      await API.graphql(
-        graphqlOperation(createMessage, {
-          input: {
-            senderID: kidID,
-            receiverIDs: kidID,
+      const { data, error } = await supabase
+        .from("message") // Make sure 'messages' is the name of your table
+        .insert([
+          {
+            senderId: kidID,
+            receiverIds: kidID,
             content: newMessage,
-            sentAt: new Date().toISOString(),
+            sentAt: formattedTime,
             isRead: false,
           },
-        })
-      );
+        ])
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      console.log("Message sent:", data);
     } catch (error) {
       console.error("Error creating message:", error);
     }
@@ -340,14 +352,6 @@ const HomeScreen = () => {
   const today = new Date();
   const formattedDate = format(today, "EEEE, MMMM d");
 
-  const getInitials = (name) => {
-    const nameArray = name.split(" ");
-    return nameArray
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-  };
-
   if (!events || !kidCurrentStateData) {
     return <ActivityIndicator style={{ padding: 50 }} size={"large"} />;
   }
@@ -393,19 +397,13 @@ const HomeScreen = () => {
             <Pressable onPress={() => handleKidPress(kid)}>
               <View style={styles.kidItem}>
                 <View style={styles.kidImageContainer}>
-                  {kid.photo ? (
-                    <RemoteImage
-                      path={kid.photo}
-                      //source={{ uri: kid.uriKid }}
-                      style={styles.kidImage}
-                    />
-                  ) : (
-                    <View style={styles.placeholderImage}>
-                      <Text style={styles.placeholderText}>
-                        {getInitials(kid.name)}
-                      </Text>
-                    </View>
-                  )}
+                  {/* {kid.photo ? ( */}
+                  <RemoteImage
+                    path={kid.photo}
+                    name={kid.name}
+                    //source={{ uri: kid.uriKid }}
+                    style={styles.kidImage}
+                  />
                   <Text style={styles.kidName}>{kid.name}</Text>
                   <Entypo name="dot-single" size={20} color="black" />
                   <View style={styles.iconsContainer}>

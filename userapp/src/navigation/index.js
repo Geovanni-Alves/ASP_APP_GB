@@ -5,7 +5,7 @@ import {
   MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import CustomDrawerContent from "../components/CustomDrawerContent";
-import { supabase } from "../../backend/lib/supabase";
+import { supabase } from "../lib/supabase";
 import Auth from "../components/Auth";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -29,7 +29,7 @@ const RootNavigator = () => {
   const { session, loading } = useAuthContext();
   const { dbUser, currentUserData } = useUsersContext();
   const { isRouteInProgress } = useRouteContext();
-  const { kids, noKids } = useKidsContext();
+  const { noKids } = useKidsContext();
 
   //console.log(noKids);
 
@@ -139,6 +139,7 @@ const RootNavigator = () => {
   }
 
   if (!session) {
+    console.log(session);
     return <Auth />;
   }
 

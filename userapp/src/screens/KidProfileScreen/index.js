@@ -12,7 +12,7 @@ import {
 import { useRoute, useNavigation } from "@react-navigation/native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { Entypo } from "@expo/vector-icons";
-import { supabase } from "../../../backend/lib/supabase";
+import { supabase } from "../../lib/supabase";
 import { usePicturesContext } from "../../contexts/PicturesContext";
 import styles from "./styles";
 import ConfirmationModal from "../../components/ConfirmationModal";
@@ -35,14 +35,6 @@ const KidProfileScreen = () => {
   const [isConfirmationModalVisible, setConfirmationModalVisible] =
     useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-
-  const getInitials = (name) => {
-    const nameArray = name.split(" ");
-    return nameArray
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-  };
 
   useEffect(() => {
     if (kidId) {
@@ -226,15 +218,12 @@ const KidProfileScreen = () => {
       <SafeAreaView style={styles.topContainer}>
         <TouchableOpacity onPress={handleChangePhoto}>
           <View style={styles.imageContainer}>
-            {actualPhoto ? (
-              <RemoteImage path={actualPhoto} style={styles.kidPhoto} />
-            ) : (
-              <View>
-                <Text style={styles.placeholderText}>
-                  {getInitials(kid.name)}
-                </Text>
-              </View>
-            )}
+            <RemoteImage
+              path={actualPhoto}
+              style={styles.kidPhoto}
+              name={kid.name}
+            />
+
             <MaterialIcons name="add-a-photo" size={24} color="#FF7276" />
           </View>
         </TouchableOpacity>

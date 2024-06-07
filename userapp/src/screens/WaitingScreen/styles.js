@@ -5,19 +5,22 @@ export default StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#fff",
   },
   waveImage: {
     position: "absolute",
   },
   centeredTextWrapper: {
     marginHorizontal: 20,
-    marginTop: 20,
-    marginBottom: -40,
+    //marginTop: 10,
     position: "relative",
   },
   centeredText: {
     textAlign: "center",
     zIndex: 1,
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "black",
   },
   userText: {
     fontSize: 20,
@@ -33,22 +36,22 @@ export default StyleSheet.create({
   },
   parallelogram1: {
     backgroundColor: "rgb(2, 119, 247)",
-    transform: [{ skewY: "7deg" }],
     width: "100%",
-    height: 100,
-    marginTop: -160,
+    height: 80,
+    transform: [{ skewY: "-5deg" }],
   },
   parallelogram2: {
     width: "100%",
     height: 120,
-    marginTop: -125,
+    marginTop: -15,
   },
   callBtn: {
     display: "flex",
     flexDirection: "row",
     justifyContent: "flex-start",
     alignItems: "center",
-    backgroundColor: "rgb(2, 119, 247)",
+    //backgroundColor: "rgb(2, 119, 247)",
+    backgroundColor: "gray",
   },
   logoutButton: {
     backgroundColor: "red",
@@ -62,7 +65,6 @@ export default StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: 35,
-    top: 250,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: {

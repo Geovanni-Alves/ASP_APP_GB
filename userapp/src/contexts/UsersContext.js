@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import { ActivityIndicator } from "react-native";
-import { supabase } from "../../backend/lib/supabase";
+import { supabase } from "../lib/supabase";
 import { usePushNotificationsContext } from "./PushNotificationsContext";
 import { useAuthContext } from "./AuthContext";
 
@@ -13,6 +13,7 @@ const UsersContextProvider = ({ children }) => {
   const [userEmail, setUserEmail] = useState(null);
   const [currentUserData, setCurrentUserData] = useState(null);
   const { expoPushToken } = usePushNotificationsContext();
+  const [users, setUsers] = useState([]);
 
   useEffect(() => {
     if (session) {
@@ -59,7 +60,6 @@ const UsersContextProvider = ({ children }) => {
 
   useEffect(() => {
     if (authUser) {
-      //console.log("authUser", authUser);
       listUser(); //setDbUser
     }
   }, [authUser]);
@@ -104,16 +104,22 @@ const UsersContextProvider = ({ children }) => {
     checkPushToken();
   }, [currentUserData]);
 
-  // useEffect(() => {
-  //   console.log(dbUser);
-  //   if (authUser && dbUser && userEmail && currentUserData) {
-  //     setLoading(false);
-  //   }
-  // });
+  const getUsersData = async () => {
+    let { data, error } = await supabase.from("users").select("*");
+    if (error) {
+      throw error;
+    }
+    setUsers(data);
+  };
+
+  useEffect(() => {
+    getUsersData();
+  }, [authUser]);
 
   return (
     <UsersContext.Provider
       value={{
+        users,
         authUser,
         dbUser,
         setDbUser,
@@ -125,14 +131,6 @@ const UsersContextProvider = ({ children }) => {
     </UsersContext.Provider>
   );
 };
-
-// {loading ? (
-//   // Render a loading indicator while the context is loading
-//   <ActivityIndicator />
-// ) : (
-//   // Render children when context has finished loading
-//   children
-// )}
 
 export default UsersContextProvider;
 
