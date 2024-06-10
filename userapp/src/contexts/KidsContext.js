@@ -1,16 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useUsersContext } from "./UsersContext";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, View } from "react-native";
+import ProfileScreen from "../screens/ProfileScreen";
+import NotStudentScreen from "../screens/NotStudentScreen";
+//import { useAuthContext } from "./AuthContext";
 
 const KidsContext = createContext({});
 
 const KidsContextProvider = ({ children }) => {
-  const { userEmail, users } = useUsersContext();
+  const { userEmail, users, dbUser } = useUsersContext();
   const [kids, setKids] = useState([]);
   const [kidCurrentStateData, setKidCurrentStateData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [noKids, setNoKids] = useState(true);
+  //const { session } = useAuthContext();
 
   const fetchKidsData = async (userEmail) => {
     if (userEmail) {
@@ -224,14 +228,16 @@ const KidsContextProvider = ({ children }) => {
 
   useEffect(() => {
     const check_in_out_Updates = supabase
-      .channel("custom-update-channel")
+      .channel("custom-all-channel")
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "check_in_out" },
+        { event: "*", schema: "public", table: "check_in_out" },
         (payload) => {
-          const newUpdates = payload.new;
-          // console.log("Change received!", payload);
-          fetchCurrentStateData();
+          if (payload.eventType === "UPDATE") {
+            const newUpdates = payload.new;
+            // console.log("Change received!", payload);
+            fetchCurrentStateData();
+          }
         }
       )
       .subscribe();
@@ -245,16 +251,28 @@ const KidsContextProvider = ({ children }) => {
     }
   }, [loading, kids]);
 
+  // useEffect(() => {
+  //   if (!session) {
+  //     setLoading(false);
+  //   }
+  // }, [session]);
+
   return (
     <KidsContext.Provider
       value={{ kids, noKids, kidCurrentStateData, ChangeKidState }}
     >
       {loading ? (
-        // Render a loading indicator while the context is loading
-        <ActivityIndicator size="large" color="gray" />
-      ) : (
-        // Render children when context has finished loading
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+      ) : noKids ? (
+        <NotStudentScreen />
+      ) : dbUser ? (
         children
+      ) : (
+        <ProfileScreen kids={kids} />
       )}
     </KidsContext.Provider>
   );

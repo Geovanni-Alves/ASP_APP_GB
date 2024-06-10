@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import { supabase } from "../lib/supabase";
 import { usePushNotificationsContext } from "./PushNotificationsContext";
 import { useAuthContext } from "./AuthContext";
@@ -14,6 +14,7 @@ const UsersContextProvider = ({ children }) => {
   const [currentUserData, setCurrentUserData] = useState(null);
   const { expoPushToken } = usePushNotificationsContext();
   const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (session) {
@@ -28,13 +29,14 @@ const UsersContextProvider = ({ children }) => {
       const { data, error } = await supabase
         .from("users")
         .update({ pushToken: updatedPushToken })
-        .eq("id", id);
+        .eq("id", id)
+        .select();
 
       if (error) {
         throw error;
       }
 
-      console.log("Push token updated successfully:", data);
+      console.log("Push token updated successfully:");
     } catch (error) {
       console.log("Error updating push token:", error);
     }
@@ -55,6 +57,8 @@ const UsersContextProvider = ({ children }) => {
       //}
     } catch (error) {
       console.error("Error fetching user:", error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -127,7 +131,15 @@ const UsersContextProvider = ({ children }) => {
         currentUserData,
       }}
     >
-      {children}
+      {loading ? ( // Show loading indicator while loading
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator size="large" color="#0000ff" />
+        </View>
+      ) : (
+        children
+      )}
     </UsersContext.Provider>
   );
 };

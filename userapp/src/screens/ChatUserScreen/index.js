@@ -10,7 +10,7 @@ import { Bubble, GiftedChat, Send } from "react-native-gifted-chat";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
-import { Entypo } from "@expo/vector-icons";
+//import { Entypo } from "@expo/vector-icons";
 import styles from "./styles";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { useMessageContext } from "../../contexts/MessageContext";
@@ -20,25 +20,39 @@ import { useKidsContext } from "../../contexts/KidsContext";
 import { supabase } from "../../lib/supabase";
 
 const ChatUserScreen = () => {
-  const timeZone = "America/Vancouver";
   const route = useRoute();
-  const navigation = useNavigation();
+  const from = route.params?.from;
   const kidID = route.params?.id;
+  const title = route.params?.title;
+  const navigation = useNavigation();
   const { kids } = useKidsContext();
   const { staff } = useStaffContext();
   const { newMessages, unreadMessages, sendAndNotifyMsg } = useMessageContext();
   const [allMessages, setAllMessages] = useState(null);
   const { sendPushNotification } = usePushNotificationsContext();
   const [messages, setMessages] = useState([]);
-  const [pagination, setPagination] = useState({ limit: 20, offset: 0 });
-  const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [currentKidData, setCurrentKidData] = useState(null);
   const [unreadOthersMessages, setUnreadOthersMessages] = useState([]);
   const [isMarkedAsRead, setIsMarkedAsRead] = useState(false);
 
   const goBack = () => {
-    navigation.goBack();
+    if (from === "Home") {
+      navigation.navigate("Home");
+    } else {
+      navigation.navigate("Chat");
+    }
   };
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: title,
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [route]);
 
   useEffect(() => {
     if (unreadMessages.length > 0 && messages.length > 0) {
@@ -396,7 +410,7 @@ const ChatUserScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
+      {/* <View style={styles.headerContainer}>
         <View style={styles.containerMenu}>
           <TouchableOpacity style={styles.goBackIcon} onPress={() => goBack()}>
             <Entypo name="chevron-left" size={30} color="white" />
@@ -405,7 +419,7 @@ const ChatUserScreen = () => {
             <Text style={styles.kidNameText}>{currentKidData?.name}</Text>
           </View>
         </View>
-      </View>
+      </View> */}
       <SafeAreaView style={{ flex: 1 }}>
         <GiftedChat
           messages={messages}

@@ -7,8 +7,6 @@ import {
   Image,
   TouchableOpacity,
   Linking,
-  Modal,
-  Pressable,
 } from "react-native";
 // import { Auth } from "aws-amplify";
 import styles from "./styles";

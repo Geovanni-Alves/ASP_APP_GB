@@ -27,7 +27,8 @@ const ChatScreen = () => {
   }, [kids]);
 
   const onUserPress = (user) => {
-    navigation.navigate("ChatUser", { id: user.id });
+    const title = `${user.name} Chat`;
+    navigation.navigate("ChatUser", { id: user.id, title, from: "Chat" });
   };
 
   const renderUserItem = ({ item: user }) => {

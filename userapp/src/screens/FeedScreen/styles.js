@@ -1,119 +1,124 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet, Dimensions } from "react-native";
 
-export default StyleSheet.create({
+const { width, height } = Dimensions.get("window");
+
+const styles = StyleSheet.create({
   container: {
-    //flex: 1,
-    backgroundColor: "#fff",
-    height: "100%",
-  },
-  safeAreaContainer: {
-    backgroundColor: "#FF7276",
-    //flex: 1,
+    flex: 1,
+    backgroundColor: "#ffff",
   },
   headerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FF7276",
-    padding: 16,
-  },
-  containerMenu: {
     justifyContent: "space-between",
     alignItems: "center",
     flexDirection: "row",
     backgroundColor: "#FF7276",
-    //padding: 5,
-    maxHeight: "25%",
-    paddingTop: 43,
-    //gap: "100%",
+    padding: 20,
+    //paddingTop: 10,
+  },
+  containerMenu: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   goBackIcon: {
-    position: "absolute",
-    //marginRight: 2,
-    //top: 10,
-    // right: 12,
-    top: 28,
+    marginRight: 10,
+    top: 15,
     left: -15,
-    zIndex: 1,
   },
   titleContainer: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
   },
   kidNameText: {
-    color: "white",
-    fontSize: 18,
+    color: "#ffff",
+    fontSize: 17,
     fontWeight: "bold",
-    textAlign: "center",
-    //top: 10,
-    zIndex: 1,
     position: "absolute",
   },
   kidDetailsContainer: {
     alignItems: "center",
-    marginBottom: 10,
-    backgroundColor: "#2287f4",
-    padding: 20,
+    //marginVertical: 20,
+    padding: 12,
+    //borderRadius: 10,
+    overflow: "hidden", // Ensure children don't overflow outside the container
   },
   KidImage: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     borderRadius: 50,
-  },
-  placeholderImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "lightgray",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  placeholderText: {
-    color: "white",
-  },
-  feedItemContainer: {
     marginBottom: 10,
   },
-  dateContainer: {
-    backgroundColor: "gray",
-    padding: 3,
-    alignSelf: "stretch",
-    borderRadius: 5,
-    marginBottom: 10,
+  profileButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
   },
-  dateText: {
+  profileButtonText: {
     color: "white",
     fontWeight: "bold",
+    textAlign: "center",
+  },
+  dateText: {
+    fontSize: 12,
+    color: "#757575",
+    marginTop: 5,
+  },
+  feedItemContainer: {
+    padding: 10,
+    backgroundColor: "#f7f7f0",
+    marginVertical: 2,
+    borderRadius: 20,
+    //flexDirection: "row",
+    alignItems: "center",
   },
   itemContent: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 10,
   },
   iconContainer: {
     marginRight: 10,
   },
   icon: {
-    marginRight: 10,
+    width: 30,
+    height: 30,
   },
-  itemText: {
+  textContainer: {
     flex: 1,
   },
-  image: {
-    width: 100,
-    height: 100,
-    resizeMode: "cover",
-  },
-  profileButton: {
-    marginLeft: 20,
-    padding: 10,
-    backgroundColor: "#FF7276",
-    borderRadius: 5,
-  },
-  profileButtonText: {
-    color: "white",
+  itemText: {
     fontSize: 16,
-    fontWeight: "bold",
+    color: "#212121",
+  },
+  image: {
+    width: width - 20,
+    height: 300,
+    borderRadius: 10,
+    alignSelf: "center",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 30,
+    right: 20,
+  },
+  fullImage: {
+    width: width - 20,
+    height: height - 20,
+    resizeMode: "contain",
+  },
+  separator: {
+    height: 3,
+    backgroundColor: "lightgrey",
+  },
+  contentContainer: {
+    flex: 1,
   },
 });
+
+export default styles;

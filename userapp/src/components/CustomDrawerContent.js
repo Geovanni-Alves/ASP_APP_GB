@@ -7,13 +7,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import ConfirmationModal from "./ConfirmationModal";
-import { supabase } from "../lib/supabase";
 import RemoteImage from "./RemoteImage";
+import { useAuthContext } from "../contexts/AuthContext";
 
 export default function CustomDrawerContent(props) {
   const { currentUserData } = props;
   const [isConfirmationModalVisible, setConfirmationModalVisible] =
     useState(false);
+  const { logout } = useAuthContext();
 
   const handleLogout = async () => {
     setConfirmationModalVisible(true);
@@ -21,8 +22,8 @@ export default function CustomDrawerContent(props) {
 
   const confirmLogout = async () => {
     try {
-      // Sign out the user using Amplify Auth
-      await supabase.auth.signOut();
+      // Sign out the user using supabase Auth
+      await logout(); //supabase.auth.signOut();
     } catch (error) {
       console.error("Logout error:", error);
     } finally {

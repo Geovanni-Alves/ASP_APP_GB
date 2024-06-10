@@ -17,11 +17,11 @@ import PhoneInput from "react-native-phone-number-input";
 //import PhoneInput from "react-native-phone-input";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
-import { useKidsContext } from "../../contexts/KidsContext";
+//import { useKidsContext } from "../../contexts/KidsContext";
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ kids }) => {
   const { setDbUser, dbUser, userEmail, authUser } = useUsersContext();
-  const { kids } = useKidsContext();
+  //const { kids } = useKidsContext();
   const { expoPushToken } = usePushNotificationsContext();
 
   const [name, setName] = useState(dbUser?.name || "");
@@ -120,7 +120,7 @@ const ProfileScreen = () => {
     try {
       // Update the user and get the updated user object
       const newUser = await onCreateUser();
-      console.log("newUser", newUser);
+      //console.log("newUser", newUser);
       // Update the kids with the updated user object
       await updateKidUserID(newUser);
     } catch (e) {
@@ -129,7 +129,7 @@ const ProfileScreen = () => {
   };
 
   return (
-    <SafeAreaView>
+    <SafeAreaView style={{ marginTop: 50 }}>
       <Text style={styles.title}>Complete your Profile</Text>
       <TextInput
         value={name}

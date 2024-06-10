@@ -27,7 +27,7 @@ import { format } from "date-fns";
 const HomeScreen = () => {
   const navigation = useNavigation();
   const { currentUserData } = useUsersContext();
-  const { unreadMessages } = useMessageContext();
+  const { unreadMessages, newMessage } = useMessageContext();
   const { kids, kidCurrentStateData, ChangeKidState } = useKidsContext();
   //
   const [events, setEvents] = useState(null);
@@ -203,7 +203,8 @@ const HomeScreen = () => {
 
   const handleMsgPress = (kid) => {
     const idUserChat = kid.id;
-    navigation.navigate("ChatUser", { id: idUserChat });
+    const title = `${kid.name} Chat`;
+    navigation.navigate("ChatUser", { id: idUserChat, title, from: "Home" });
   };
 
   useEffect(() => {
@@ -229,7 +230,8 @@ const HomeScreen = () => {
   };
 
   const handleKidPress = (kid) => {
-    navigation.navigate("Feed", { id: kid.id });
+    const title = `${kid.name} Updates`;
+    navigation.navigate("Feed", { id: kid.id, title });
   };
 
   const renderEvent = (item) => {
@@ -283,7 +285,7 @@ const HomeScreen = () => {
         throw error;
       }
 
-      console.log("Message sent:", data);
+      //console.log("Message sent:", data);
     } catch (error) {
       console.error("Error creating message:", error);
     }
@@ -353,7 +355,11 @@ const HomeScreen = () => {
   const formattedDate = format(today, "EEEE, MMMM d");
 
   if (!events || !kidCurrentStateData) {
-    return <ActivityIndicator style={{ padding: 50 }} size={"large"} />;
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
   }
 
   return (
@@ -378,7 +384,7 @@ const HomeScreen = () => {
       </View>
       <Text style={styles.welcomeText}>Welcome, {currentUserData?.name} </Text>
       <View style={styles.kidsContainer}>
-        <Text style={styles.sectionTitle}>Your Kids</Text>
+        <Text style={styles.sectionTitle}>My children</Text>
         {kids.map((kid, index) => (
           <Swipeable
             ref={(ref) => (swipeableRefs.current[index] = ref)}

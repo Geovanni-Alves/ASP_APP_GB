@@ -10,7 +10,7 @@ const FeedContextProvider = ({ children }) => {
     const fetchFeeds = async () => {
       try {
         // Retrieve feeds from Supabase
-        const { data, error } = await supabase.from("feeds").select("*");
+        const { data, error } = await supabase.from("kidFeeds").select("*");
         if (error) {
           throw error;
         }
@@ -26,21 +26,27 @@ const FeedContextProvider = ({ children }) => {
 
   useEffect(() => {
     // Subscribe to feed creation events
-    const feeds = supabase
-      .channel("custom-insert-channel")
+    //console.log("subscribe to new feeds");
+    const newFeedsSubscription = supabase
+      .channel("custom-all-channel")
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "feeds" },
+        { event: "*", schema: "public", table: "kidFeeds" },
         (payload) => {
-          console.log("new feed reveived!", payload);
-          const newFeeds = payload.new;
-          setFeeds((prevFeeds) => [...prevFeeds, newFeeds]);
+          console.log("changes on feeds table!", payload);
+          if (payload.eventType === "INSERT") {
+            console.log("new feed reveived!", payload);
+            const newFeeds = payload.new;
+            setFeeds((prevFeeds) => [...prevFeeds, newFeeds]);
+          }
         }
       )
       .subscribe();
+    //console.log("newFeedsSubscription", newFeedsSubscription);
 
     return () => {
-      feeds.unsubscribe();
+      //console.log("subscribe stopped!");
+      newFeedsSubscription.unsubscribe();
     };
   }, []);
 

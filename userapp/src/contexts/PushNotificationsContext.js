@@ -17,7 +17,7 @@ const PushNotificationsContextProvider = ({ children }) => {
   });
 
   const [expoPushToken, setExpoPushToken] = useState("");
-  const [notification, setNotification] = useState(false);
+  //const [notification, setNotification] = useState(false);
   const [permissionMessage, setPermissionMessage] = useState(false);
   const notificationListener = useRef();
   const responseListener = useRef();

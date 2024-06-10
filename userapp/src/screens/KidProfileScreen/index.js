@@ -3,15 +3,14 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   FlatList,
   ActivityIndicator,
   RefreshControl,
   TextInput,
 } from "react-native";
+import { FontAwesome } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import { Entypo } from "@expo/vector-icons";
 import { supabase } from "../../lib/supabase";
 import { usePicturesContext } from "../../contexts/PicturesContext";
 import styles from "./styles";
@@ -23,18 +22,33 @@ import RemoteImage from "../../components/RemoteImage";
 const KidProfileScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { savePhotoInBucket } = usePicturesContext();
-
   const kidId = route.params?.id;
-
+  const title = route.params?.title;
   const [kid, setKid] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [photoChangeLoading, setPhotoChangeLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [actualPhoto, setActualPhoto] = useState(null);
   const [formChanges, setFormChanges] = useState({});
   const [isConfirmationModalVisible, setConfirmationModalVisible] =
     useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const { savePhotoInBucket } = usePicturesContext();
+
+  const goBack = () => {
+    const title = `${kid?.name} Updates`;
+    navigation.navigate("Feed", { id: kid?.id, title });
+  };
+
+  useEffect(() => {
+    navigation.setOptions({
+      title: title,
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack} style={styles.goBackIcon}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [route]);
 
   useEffect(() => {
     if (kidId) {
@@ -62,14 +76,8 @@ const KidProfileScreen = () => {
         }
 
         const fetchedKid = data;
-        //console.log(fetchedKid.photo);
         setKid(fetchedKid);
-
-        // if (fetchedKid && fetchedKid.photo) {
-        //   //const imageURL = await getPhotoInBucket(fetchedKid.photo);
-
         setActualPhoto(fetchedKid.photo);
-        // }
       } catch (error) {
         console.error("Error fetching kid:", error);
       }
@@ -110,20 +118,18 @@ const KidProfileScreen = () => {
 
   const handleChangePhoto = async () => {
     try {
-      setLoading(true);
+      setPhotoChangeLoading(true);
       const imagePath = await savePhotoInBucket();
-      //const filename = imagePath.imagePath;
-      if (imagePath) {
+      if (imagePath.assets !== null) {
         await updateKidImage(imagePath);
         alert("Image successfully updated!");
-        //await fetchData();
       } else {
         console.log("Image selection canceled or encountered an error");
       }
     } catch (error) {
       console.error("Error saving image to storage", error);
     } finally {
-      setLoading(false);
+      setPhotoChangeLoading(false);
     }
   };
 
@@ -137,13 +143,6 @@ const KidProfileScreen = () => {
         photo: filename,
       };
 
-      // console.log(
-      //   "Updating kid image with details:",
-      //   kidDetails,
-      //   "for kidId:",
-      //   kidId
-      // );
-
       const { data, error } = await supabase
         .from("students")
         .update(kidDetails)
@@ -152,15 +151,9 @@ const KidProfileScreen = () => {
       if (error) {
         throw error;
       }
-
-      //console.log("Kid image updated successfully:", data);
     } catch (error) {
       console.error("Error updating kid's image:", error.message);
     }
-  };
-
-  const goBack = () => {
-    navigation.goBack();
   };
 
   const handleChangeText = (key, value) => {
@@ -180,9 +173,42 @@ const KidProfileScreen = () => {
       </View>
     );
   };
-
-  const renderItemSeparator = () => {
-    return <View style={styles.separator} />;
+  const renderHeader = () => {
+    return (
+      <View style={styles.headerContainer}>
+        {photoChangeLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0000ff" />
+            <Text style={styles.loadingText}>Changing Photo...</Text>
+          </View>
+        )}
+        <SafeAreaView style={styles.topContainer}>
+          <TouchableOpacity onPress={handleChangePhoto}>
+            <View style={styles.imageContainer}>
+              <RemoteImage
+                path={actualPhoto}
+                style={styles.kidPhoto}
+                name={kid.name}
+              />
+            </View>
+            <View style={styles.cameraIcon}>
+              <Text
+                style={{
+                  position: "absolute",
+                  bottom: -10,
+                  right: 3,
+                  fontSize: 15,
+                  fontWeight: "500",
+                }}
+              >
+                Edit
+              </Text>
+              <MaterialIcons name="photo-camera" size={32} color="#FF7276" />
+            </View>
+          </TouchableOpacity>
+        </SafeAreaView>
+      </View>
+    );
   };
 
   if (!kid) {
@@ -205,34 +231,11 @@ const KidProfileScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <View style={styles.containerMenu}>
-          <TouchableOpacity style={styles.goBackIcon} onPress={() => goBack()}>
-            <Entypo name="chevron-left" size={30} color="white" />
-          </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={styles.kidNameText}>{kid?.name}'s Profile</Text>
-          </View>
-        </View>
-      </View>
-      <SafeAreaView style={styles.topContainer}>
-        <TouchableOpacity onPress={handleChangePhoto}>
-          <View style={styles.imageContainer}>
-            <RemoteImage
-              path={actualPhoto}
-              style={styles.kidPhoto}
-              name={kid.name}
-            />
-
-            <MaterialIcons name="add-a-photo" size={24} color="#FF7276" />
-          </View>
-        </TouchableOpacity>
-      </SafeAreaView>
       <FlatList
+        ListHeaderComponent={renderHeader}
         data={detailsData}
         renderItem={renderKidDetailsItem}
         keyExtractor={(item, index) => index.toString()}
-        ItemSeparatorComponent={renderItemSeparator}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={fetchData} />
         }

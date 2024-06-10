@@ -11,11 +11,16 @@ import PicturesContextProvider from "./src/contexts/PicturesContext";
 import MessageContextProvider from "./src/contexts/MessageContext";
 import StaffContextProvider from "./src/contexts/StaffContext";
 import FeedContextProvider from "./src/contexts/FeedContext";
+//import { LogBox } from "react-native";
 
 // Supabase
 // import { supabase } from "./backend/lib/supabase";
 
 function App() {
+  // LogBox.ignoreLogs([
+  //   "Support for defaultProps will be removed from function components in a future major release.",
+  // ]);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationContainer>

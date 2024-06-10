@@ -8,9 +8,12 @@ import {
 } from "react-native";
 import { Button, Card, Title, Paragraph } from "react-native-paper";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import { supabase } from "../../lib/supabase";
+import { useAuthContext } from "../../contexts/AuthContext";
+//import { supabase } from "../../lib/supabase";
 
 const NotStudentScreen = () => {
+  const { logout } = useAuthContext();
+
   const handleCall = () => {
     const phoneNumber = "+12368652297";
     const phoneNumberWithPrefix = `tel:${phoneNumber}`;
@@ -44,7 +47,7 @@ const NotStudentScreen = () => {
           </View>
         </Card.Content>
         <Card.Actions>
-          <Button mode="contained" onPress={() => supabase.auth.signOut()}>
+          <Button mode="contained" onPress={() => logout()}>
             Back to Login
           </Button>
         </Card.Actions>
