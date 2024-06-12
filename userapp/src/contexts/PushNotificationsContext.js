@@ -16,7 +16,7 @@ const PushNotificationsContextProvider = ({ children }) => {
     }),
   });
 
-  const [expoPushToken, setExpoPushToken] = useState("");
+  const [expoPushToken, setExpoPushToken] = useState(null);
   //const [notification, setNotification] = useState(false);
   const [permissionMessage, setPermissionMessage] = useState(false);
   const notificationListener = useRef();
@@ -93,7 +93,7 @@ const PushNotificationsContextProvider = ({ children }) => {
       token = await Notifications.getExpoPushTokenAsync({
         projectId: Constants.expoConfig.extra.eas.projectId,
       });
-      //console.log("token", token);
+      console.log("token", token);
     } else {
       alert("Must use a physical device for Push Notifications");
       return;

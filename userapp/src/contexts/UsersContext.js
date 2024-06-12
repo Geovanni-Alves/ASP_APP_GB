@@ -7,14 +7,14 @@ import { useAuthContext } from "./AuthContext";
 const UsersContext = createContext({});
 
 const UsersContextProvider = ({ children }) => {
-  const { session } = useAuthContext();
   const [authUser, setAuthUser] = useState(null);
   const [dbUser, setDbUser] = useState(null);
   const [userEmail, setUserEmail] = useState(null);
   const [currentUserData, setCurrentUserData] = useState(null);
-  const { expoPushToken } = usePushNotificationsContext();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { session } = useAuthContext();
+  const { expoPushToken } = usePushNotificationsContext();
 
   useEffect(() => {
     if (session) {
@@ -93,20 +93,18 @@ const UsersContextProvider = ({ children }) => {
 
   useEffect(() => {
     const checkPushToken = async () => {
-      if (currentUserData) {
-        if (currentUserData.pushToken) {
-          const actualPushToken = currentUserData.pushToken;
-          if (
-            actualPushToken !== expoPushToken.data ||
-            actualPushToken === null
-          ) {
-            await updatePushToken(currentUserData.id, expoPushToken.data);
-          }
+      if (currentUserData && expoPushToken) {
+        const actualPushToken = currentUserData.pushToken;
+        if (
+          actualPushToken !== expoPushToken.data ||
+          actualPushToken === null
+        ) {
+          await updatePushToken(currentUserData.id, expoPushToken.data);
         }
       }
     };
     checkPushToken();
-  }, [currentUserData]);
+  }, [expoPushToken]);
 
   const getUsersData = async () => {
     let { data, error } = await supabase.from("users").select("*");

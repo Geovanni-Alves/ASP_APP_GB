@@ -17,6 +17,7 @@ import { useMessageContext } from "../../contexts/MessageContext";
 import { useStaffContext } from "../../contexts/StaffContext";
 import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import { useKidsContext } from "../../contexts/KidsContext";
+import { useUsersContext } from "../../contexts/UsersContext";
 import { supabase } from "../../lib/supabase";
 
 const ChatUserScreen = () => {
@@ -27,6 +28,7 @@ const ChatUserScreen = () => {
   const navigation = useNavigation();
   const { kids } = useKidsContext();
   const { staff } = useStaffContext();
+  const { currentUserData } = useUsersContext();
   const { newMessages, unreadMessages, sendAndNotifyMsg } = useMessageContext();
   const [allMessages, setAllMessages] = useState(null);
   const { sendPushNotification } = usePushNotificationsContext();
@@ -93,7 +95,7 @@ const ChatUserScreen = () => {
       const id = currentKidData.id;
       const { data, error } = await supabase
         .from("message")
-        .select("*")
+        .select(`*, users(*)`)
         .or(`senderId.eq.${id},receiverIds.eq.${id}`);
 
       if (error) {
@@ -143,7 +145,7 @@ const ChatUserScreen = () => {
         allMessages.map(async (message) => {
           const avatar =
             message.senderId === currentKidData?.id
-              ? await getRemoteImageUri(currentKidData?.photo)
+              ? await getRemoteImageUri(message.users?.photo)
               : await getRemoteImageUri(
                   staff.find(
                     (staffMember) => staffMember.id === message.senderId
@@ -193,9 +195,10 @@ const ChatUserScreen = () => {
     if (messagesForMe.length > 0) {
       const formattedNewMessages = await Promise.all(
         messagesForMe.map(async (message) => {
+          console.log("new message", message);
           const avatar =
             message.senderId === currentKidData?.id
-              ? await getRemoteImageUri(currentKidData.photo)
+              ? await getRemoteImageUri(message.users?.photo)
               : await getRemoteImageUri(
                   staff.find(
                     (staffMember) => staffMember.id === message.senderId
@@ -339,6 +342,7 @@ const ChatUserScreen = () => {
           content: newMessage.text,
           sentAt: formattedTime, //new Date().toISOString(),
           isRead: false,
+          parentId: currentUserData.id,
         };
         const { data, error } = await supabase
           .from("message")

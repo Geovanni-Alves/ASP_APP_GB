@@ -11,7 +11,7 @@ const MessageContextProvider = ({ children }) => {
     try {
       const { data: unreadMessages, error } = await supabase
         .from("message")
-        .select("*")
+        .select(`*, users(*)`)
         .eq("isRead", false);
       if (error) {
         throw error;
