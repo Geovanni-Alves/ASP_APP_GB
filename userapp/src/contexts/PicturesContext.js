@@ -33,21 +33,40 @@ const PicturesContextProvider = ({ children }) => {
     }
   };
 
-  const savePhotoInBucket = async () => {
+  const savePhotoInBucket = async (useCamera) => {
     try {
-      const permissionResult =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      let permissionResult;
+      if (useCamera) {
+        permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      } else {
+        permissionResult =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+
       if (permissionResult.granted === false) {
-        console.log("Permission to access camera roll is required!");
+        console.log(
+          `Permission to access ${
+            useCamera ? "camera" : "camera roll"
+          } is required!`
+        );
         return null; // Return null for permission denied
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
-      });
+      let result;
+      if (useCamera) {
+        result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 1,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 1,
+        });
+      }
 
       if (!result.canceled) {
         if (result.assets && result.assets.length > 0) {
@@ -62,7 +81,7 @@ const PicturesContextProvider = ({ children }) => {
         return result;
       }
     } catch (error) {
-      console.error("Error Saving  image:", error);
+      console.error("Error saving image:", error);
     }
   };
 

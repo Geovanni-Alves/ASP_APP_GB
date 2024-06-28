@@ -14,7 +14,10 @@ import ChatScreen from "../screens/ChatScreen";
 import ChatUserScreen from "../screens/ChatUserScreen";
 import GalleryScreen from "../screens/GalleryScreen";
 import FeedScreen from "../screens/FeedScreen";
+import AddAddressScreen from "../screens/AddAddressScreen";
+import AddressListScreen from "../screens/AddressListScreen";
 import KidProfileScreen from "../screens/KidProfileScreen";
+import ProfileScreen from "../screens/ProfileScreen";
 import { useRouteContext } from "../contexts/RouteContext";
 import { useUsersContext } from "../contexts/UsersContext";
 
@@ -110,6 +113,17 @@ const RootNavigator = () => {
         component={GalleryScreen}
       />
       <Drawer.Screen
+        name="Profile"
+        options={{
+          drawerLabel: "Profile",
+          title: "Profile",
+          drawerIcon: () => (
+            <FontAwesome5 name="user" size={20} color="#808080" />
+          ),
+        }}
+        component={ProfileScreen}
+      />
+      <Drawer.Screen
         name="Feed"
         options={{
           drawerItemStyle: { display: "none" },
@@ -128,6 +142,22 @@ const RootNavigator = () => {
       <Drawer.Screen
         name="KidProfile"
         component={KidProfileScreen}
+        options={{
+          drawerItemStyle: { display: "none" },
+          headerShown: true,
+        }}
+      />
+      <Drawer.Screen
+        name="AddAddress"
+        component={AddAddressScreen}
+        options={{
+          drawerItemStyle: { display: "none" },
+          headerShown: true,
+        }}
+      />
+      <Drawer.Screen
+        name="AddressList"
+        component={AddressListScreen}
         options={{
           drawerItemStyle: { display: "none" },
           headerShown: true,

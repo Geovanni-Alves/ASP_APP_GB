@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,23 +7,28 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { supabase } from "../../lib/supabase";
-import { usePicturesContext } from "../../contexts/PicturesContext";
 import styles from "./styles";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import InfoModal from "../../components/InfoModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import RemoteImage from "../../components/RemoteImage";
+import PhotoOptionsModal from "../../components/PhotoOptionsModal";
+
+// import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
+// import { GOOGLE_MAPS_APIKEY } from "@env";
 
 const KidProfileScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const kidId = route.params?.id;
-  const title = route.params?.title;
+  const { id: kidId, title } = route.params;
   const [kid, setKid] = useState(null);
   const [photoChangeLoading, setPhotoChangeLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,7 +37,10 @@ const KidProfileScreen = () => {
   const [isConfirmationModalVisible, setConfirmationModalVisible] =
     useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
-  const { savePhotoInBucket } = usePicturesContext();
+  const [isPhotoOptionsModalVisible, setPhotoModalVisible] = useState(false);
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+  const [addresses, setAddresses] = useState(kid?.addresses || []);
+  const [newAddress, setNewAddress] = useState("");
 
   const goBack = () => {
     const title = `${kid?.name} Updates`;
@@ -49,12 +57,6 @@ const KidProfileScreen = () => {
       ),
     });
   }, [route]);
-
-  useEffect(() => {
-    if (kidId) {
-      fetchData();
-    }
-  }, []);
 
   const fetchData = async () => {
     setRefreshing(true);
@@ -76,6 +78,7 @@ const KidProfileScreen = () => {
         }
 
         const fetchedKid = data;
+        //console.log("kids", fetchedKid);
         setKid(fetchedKid);
         setActualPhoto(fetchedKid.photo);
       } catch (error) {
@@ -83,6 +86,12 @@ const KidProfileScreen = () => {
       }
     }
   };
+
+  useEffect(() => {
+    if (kidId) {
+      fetchData();
+    }
+  }, [kidId]);
 
   const handleUpdateKid = async () => {
     setConfirmationModalVisible(true);
@@ -116,15 +125,13 @@ const KidProfileScreen = () => {
     setConfirmationModalVisible(false);
   };
 
-  const handleChangePhoto = async () => {
+  const handleNewPhoto = async (imagePath) => {
+    setPhotoChangeLoading(true);
+
     try {
-      setPhotoChangeLoading(true);
-      const imagePath = await savePhotoInBucket();
-      if (imagePath.assets !== null) {
+      if (imagePath) {
         await updateKidImage(imagePath);
-        alert("Image successfully updated!");
-      } else {
-        console.log("Image selection canceled or encountered an error");
+        setActualPhoto(imagePath);
       }
     } catch (error) {
       console.error("Error saving image to storage", error);
@@ -156,60 +163,134 @@ const KidProfileScreen = () => {
     }
   };
 
-  const handleChangeText = (key, value) => {
-    setKid({ ...kid, [key]: value });
-    setFormChanges({ ...formChanges, [key]: value });
-  };
-
-  const renderKidDetailsItem = ({ item }) => {
-    return (
-      <View style={styles.detailItemContainer}>
-        <Text style={styles.detailLabel}>{item.label}</Text>
-        <TextInput
-          style={styles.detailTextInput}
-          value={kid[item.key] || ""}
-          onChangeText={(text) => handleChangeText(item.key, text)}
-        />
-      </View>
-    );
-  };
-  const renderHeader = () => {
+  const renderHeader = useMemo(() => {
     return (
       <View style={styles.headerContainer}>
-        {photoChangeLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#0000ff" />
-            <Text style={styles.loadingText}>Changing Photo...</Text>
-          </View>
-        )}
         <SafeAreaView style={styles.topContainer}>
-          <TouchableOpacity onPress={handleChangePhoto}>
-            <View style={styles.imageContainer}>
-              <RemoteImage
-                path={actualPhoto}
-                style={styles.kidPhoto}
-                name={kid.name}
-              />
-            </View>
-            <View style={styles.cameraIcon}>
-              <Text
-                style={{
-                  position: "absolute",
-                  bottom: -10,
-                  right: 3,
-                  fontSize: 15,
-                  fontWeight: "500",
-                }}
-              >
-                Edit
-              </Text>
-              <MaterialIcons name="photo-camera" size={32} color="#FF7276" />
-            </View>
-          </TouchableOpacity>
+          <View style={styles.imageWrapper}>
+            <TouchableOpacity onPress={() => setPhotoModalVisible(true)}>
+              <View style={styles.imageContainer}>
+                <RemoteImage
+                  path={actualPhoto}
+                  style={styles.kidPhoto}
+                  name={kid?.name}
+                />
+              </View>
+              <View style={styles.cameraIcon}>
+                <Text
+                  style={{
+                    position: "absolute",
+                    bottom: -10,
+                    right: 3,
+                    fontSize: 15,
+                    fontWeight: "500",
+                  }}
+                >
+                  Edit
+                </Text>
+                <MaterialIcons name="photo-camera" size={32} color="#FF7276" />
+              </View>
+            </TouchableOpacity>
+            {photoChangeLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#0000ff" />
+              </View>
+            )}
+          </View>
         </SafeAreaView>
       </View>
     );
+  }, [actualPhoto, photoChangeLoading]);
+
+  const handleChangeText = useCallback((key, value) => {
+    setFormChanges((prevFormChanges) => ({
+      ...prevFormChanges,
+      [key]: value,
+    }));
+  }, []);
+
+  const handleConfirmDate = (date) => {
+    setFormChanges((prevFormChanges) => ({
+      ...prevFormChanges,
+      birthDate: date.toISOString().split("T")[0],
+    }));
+    setDatePickerVisible(false);
   };
+
+  const renderKidDetailsItem = ({ item }) => {
+    if (item.type === "address") {
+      return (
+        <View style={styles.detailItemContainer}>
+          <Text style={styles.detailLabel}>{item.label}</Text>
+          {addresses.map((address, index) => (
+            <Text key={index} style={styles.detailTextInput}>
+              {address}
+            </Text>
+          ))}
+
+          <View style={styles.addAddressContainer}>
+            <TextInput
+              style={styles.input}
+              value={newAddress}
+              onChangeText={setNewAddress}
+              placeholder="Enter new address"
+            />
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                const title = `${kid.name} Addresses`;
+                navigation.navigate("AddressList", {
+                  id: kid.id,
+                  name: kid.name,
+                  title,
+                });
+              }}
+            >
+              <FontAwesome name="plus-circle" size={24} color="#007BFF" />
+              <Text style={styles.addButtonText}>Add Address</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    } else if (item.key === "birthDate") {
+      return (
+        <View style={styles.detailItemContainer}>
+          <Text style={styles.detailLabel}>{item.label}</Text>
+          <TouchableOpacity onPress={() => setDatePickerVisible(true)}>
+            <Text style={styles.detailTextInput}>
+              {formChanges.birthDate || kid?.birthDate || "Select Date"}
+            </Text>
+          </TouchableOpacity>
+          <DateTimePickerModal
+            isVisible={isDatePickerVisible}
+            mode="date"
+            onConfirm={handleConfirmDate}
+            onCancel={() => setDatePickerVisible(false)}
+          />
+        </View>
+      );
+    } else {
+      return (
+        <View style={styles.detailItemContainer}>
+          <Text style={styles.detailLabel}>{item.label}</Text>
+          <TextInput
+            style={styles.detailTextInput}
+            defaultValue={kid[item.key] || ""}
+            onChangeText={(text) => handleChangeText(item.key, text)}
+          />
+        </View>
+      );
+    }
+  };
+
+  const detailsData = [
+    { label: "Full Name:", key: "name" },
+    { label: "Address", key: "address", type: "address" },
+    { label: "Birthday:", key: "birthDate" },
+    { label: "Notes:", key: "notes" },
+    { label: "Allergies:", key: "allergies" },
+    { label: "Medicine:", key: "medicine" },
+  ];
 
   if (!kid) {
     return (
@@ -220,55 +301,87 @@ const KidProfileScreen = () => {
     );
   }
 
-  const detailsData = [
-    { label: "Full Name:", key: "name" },
-    { label: "Birthday:", key: "birthDate" },
-    { label: "Notes:", key: "notes" },
-    { label: "Allergies:", key: "allergies" },
-    { label: "Medicine:", key: "medicine" },
-    { label: "Address:", key: "dropOffAddress" },
-  ];
-
   return (
-    <View style={styles.container}>
-      <FlatList
-        ListHeaderComponent={renderHeader}
-        data={detailsData}
-        renderItem={renderKidDetailsItem}
-        keyExtractor={(item, index) => index.toString()}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={fetchData} />
-        }
-      />
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          onPress={handleUpdateKid}
-          disabled={Object.keys(formChanges).length === 0}
-          style={[
-            styles.saveButton,
-            Object.keys(formChanges).length === 0 && styles.disabledButton,
-          ]}
-        >
-          <Text style={styles.saveButtonText}>Save Changes</Text>
-        </TouchableOpacity>
-      </View>
-      <ConfirmationModal
-        isVisible={isConfirmationModalVisible}
-        onConfirm={confirmUpdateKid}
-        onCancel={cancelUpdateKid}
-        questionText={"Confirm all updates?"}
-      />
-      {showConfirmationModal && (
-        <InfoModal
-          isVisible={true}
-          onClose={() => setShowConfirmationModal(false)}
-          infoItems={[
-            { label: "All Done ✅", value: "Kid Updated successfully!" },
-          ]}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
+      <View style={styles.container}>
+        <FlatList
+          ListHeaderComponent={renderHeader}
+          data={detailsData}
+          renderItem={renderKidDetailsItem}
+          keyExtractor={(item, index) => index.toString()}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={fetchData} />
+          }
         />
-      )}
-    </View>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            onPress={handleUpdateKid}
+            disabled={Object.keys(formChanges).length === 0}
+            style={[
+              styles.saveButton,
+              Object.keys(formChanges).length === 0 && styles.disabledButton,
+            ]}
+          >
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          </TouchableOpacity>
+        </View>
+        <PhotoOptionsModal
+          isVisible={isPhotoOptionsModalVisible}
+          onClose={() => setPhotoModalVisible(false)}
+          onSelectOption={handleNewPhoto}
+        />
+        <ConfirmationModal
+          isVisible={isConfirmationModalVisible}
+          onConfirm={confirmUpdateKid}
+          onCancel={cancelUpdateKid}
+          questionText={"Confirm all updates?"}
+        />
+
+        {showConfirmationModal && (
+          <InfoModal
+            isVisible={true}
+            onClose={() => setShowConfirmationModal(false)}
+            infoItems={[
+              { label: "All Done ✅", value: "Kid Updated successfully!" },
+            ]}
+          />
+        )}
+      </View>
+    </KeyboardAvoidingView>
   );
 };
 
 export default KidProfileScreen;
+
+{
+  /* <GooglePlacesAutocomplete
+query={{
+  key: GOOGLE_MAPS_APIKEY,
+  language: "en",
+  components: "country:ca",
+}}
+nearbyPlacesAPI="GooglePlacesSearch"
+placeholder="Address"
+onPress={(data, details) => {
+  console.log("pressed");
+  if (details) {
+    console.log(data, details);
+  }
+  // setAddress(details.formatted_address);
+  // const address = details.formatted_address || "";
+  // handleChangeText(item.key, address);
+}}
+listViewDisplayed="auto"
+debounce={400}
+minLength={2}
+onFail={(error) => console.log(error)}
+onNotFound={() => console.log("no results")}
+enablePoweredByContainer={false}
+fetchDetails={true}
+styles={googleAutoCompleteStyles}
+/> */
+}

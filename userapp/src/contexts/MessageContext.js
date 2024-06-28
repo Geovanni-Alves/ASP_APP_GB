@@ -34,15 +34,34 @@ const MessageContextProvider = ({ children }) => {
         { event: "*", schema: "public", table: "message" },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            //console.log("payload!", payload);
-            const newMessage = payload.new;
-            setNewMessages((prevMessages) => [...prevMessages, newMessage]);
-            setUnreadMessages((prevUnreadMessages) => [
-              ...prevUnreadMessages,
-              newMessage,
-            ]);
+            const handleInsert = async () => {
+              //console.log("payload!", payload);
+              const newMessage = payload.new;
+              try {
+                const { data, error } = await supabase
+                  .from("message")
+                  .select(`*,users(*)`)
+                  .eq("id", newMessage.id)
+                  .single();
+
+                if (error) {
+                  console.error("Error fetching related user data", error);
+                  return;
+                }
+
+                setNewMessages((prevMessages) => [...prevMessages, data]);
+                setUnreadMessages((prevUnreadMessages) => [
+                  ...prevUnreadMessages,
+                  data,
+                ]);
+              } catch (error) {
+                console.error("Error fetching new message details:", error);
+              }
+            };
+            handleInsert();
           } else if (payload.eventType === "UPDATE") {
             const updatedMessage = payload.new;
+            console.log("update on messages");
             setUnreadMessages((unreadPrevMessages) => {
               return unreadPrevMessages.map((msg) =>
                 msg.id === updatedMessage.id ? updatedMessage : msg
@@ -57,32 +76,6 @@ const MessageContextProvider = ({ children }) => {
       UpdatesOnMessages.unsubscribe();
     };
   }, []);
-
-  // useEffect(() => {
-  //   //subscribe to check the new inserted messages
-
-  //   //subscribe to check the update the messages (mark as read)
-  //   const updatedMessages = supabase
-  //     .channel("custom-insert-channel")
-  //     .on(
-  //       "postgres_changes",
-  //       { event: "UPDATE", schema: "public", table: "message" },
-  //       (payload) => {
-  //         console.log("message updated!");
-  //         const updatedMessage = payload.new;
-  //         setUnreadMessages((unreadPrevMessages) => {
-  //           return unreadPrevMessages.map((msg) =>
-  //             msg.id === updatedMessage.id ? updatedMessage : msg
-  //           );
-  //         });
-  //       }
-  //     )
-  //     .subscribe();
-
-  //   return () => {
-  //     updatedMessages.unsubscribe();
-  //   };
-  // }, []);
 
   const getAllMessagesByUser = async (filter, limit) => {
     try {

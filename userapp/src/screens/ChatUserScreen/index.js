@@ -5,8 +5,15 @@ import {
   ActivityIndicator,
   Text,
   SafeAreaView,
+  Alert,
 } from "react-native";
-import { Bubble, GiftedChat, Send } from "react-native-gifted-chat";
+import {
+  Bubble,
+  GiftedChat,
+  Send,
+  Avatar,
+  Message,
+} from "react-native-gifted-chat";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
@@ -36,6 +43,14 @@ const ChatUserScreen = () => {
   const [currentKidData, setCurrentKidData] = useState(null);
   const [unreadOthersMessages, setUnreadOthersMessages] = useState([]);
   const [isMarkedAsRead, setIsMarkedAsRead] = useState(false);
+  const [userId, setUserId] = useState(null);
+  //const [senderId, setSenderId] = useState([]);
+
+  useEffect(() => {
+    if (currentUserData) {
+      setUserId(currentUserData.id);
+    }
+  }, [currentUserData]);
 
   const goBack = () => {
     if (from === "Home") {
@@ -91,12 +106,13 @@ const ChatUserScreen = () => {
 
   // fetch all messages (filter by user (kid or staff))
   useEffect(() => {
-    const fetchMessagesByUser = async () => {
+    const fetchMessagesByKid = async () => {
       const id = currentKidData.id;
       const { data, error } = await supabase
         .from("message")
         .select(`*, users(*)`)
-        .or(`senderId.eq.${id},receiverIds.eq.${id}`);
+        .eq("receiverIds", id);
+      //.or(`senderId.eq.${id},receiverIds.eq.${id}`);
 
       if (error) {
         throw error;
@@ -106,14 +122,16 @@ const ChatUserScreen = () => {
       setAllMessages(fetchedMessages);
     };
     if (currentKidData) {
-      fetchMessagesByUser();
+      fetchMessagesByKid();
     }
   }, [currentKidData]);
 
   const getRemoteImageUri = async (path) => {
+    //console.log("user name", name);
     try {
-      if (!path) return null;
-
+      if (!path) {
+        return; //getInitials(name);
+      }
       const { data, error } = await supabase.storage
         .from("photos")
         .download(path);
@@ -135,7 +153,7 @@ const ChatUserScreen = () => {
       }
     } catch (error) {
       console.error(error);
-      return null;
+      return; //getInitials(name);
     }
   };
 
@@ -143,14 +161,15 @@ const ChatUserScreen = () => {
     try {
       const formattedMessages = await Promise.all(
         allMessages.map(async (message) => {
-          const avatar =
-            message.senderId === currentKidData?.id
-              ? await getRemoteImageUri(message.users?.photo)
-              : await getRemoteImageUri(
-                  staff.find(
-                    (staffMember) => staffMember.id === message.senderId
-                  )?.photo
-                );
+          const avatar = await getRemoteImageUri(message.users.photo);
+
+          // message.senderId === currentKidData?.id
+          //   ? await getRemoteImageUri(message.users?.photo)
+          //   : await getRemoteImageUri(
+          //       staff.find(
+          //         (staffMember) => staffMember.id === message.senderId
+          //       )?.photo
+          //     );
 
           return {
             _id: message.id,
@@ -159,16 +178,17 @@ const ChatUserScreen = () => {
             user: {
               _id: message.senderId,
               avatar: avatar,
-              name: staff.find(
-                (staffMember) => staffMember.id === message.senderId
-              )?.name,
+              name: message.users.name,
+              // name: staff.find(
+              //   (staffMember) => staffMember.id === message.senderId
+              // )?.name,
             },
-            received: message.isRead && message.senderId === kidID,
-            sent: message.sentAt && message.senderId === kidID,
+            received: message.isRead && message.senderId === userId,
+            sent: message.sentAt && message.senderId === userId,
           };
         })
       );
-
+      //console.log("formattedMessages", formattedMessages);
       // Sort messages by createdAt timestamp in ascending order
       const sortedMessages = formattedMessages
         .sort((a, b) => a.createdAt - b.createdAt)
@@ -191,19 +211,18 @@ const ChatUserScreen = () => {
     const messagesForMe = newMessages.filter((message) => {
       return message.receiverIds.includes(kidID);
     });
-
     if (messagesForMe.length > 0) {
       const formattedNewMessages = await Promise.all(
         messagesForMe.map(async (message) => {
-          console.log("new message", message);
-          const avatar =
-            message.senderId === currentKidData?.id
-              ? await getRemoteImageUri(message.users?.photo)
-              : await getRemoteImageUri(
-                  staff.find(
-                    (staffMember) => staffMember.id === message.senderId
-                  )?.photo
-                );
+          const avatar = await getRemoteImageUri(message.users.photo);
+          // const avatar =
+          //   message.senderId === currentKidData?.id
+          //     ? await getRemoteImageUri(message.users?.photo)
+          //     : await getRemoteImageUri(
+          //         staff.find(
+          //           (staffMember) => staffMember.id === message.senderId
+          //         )?.photo
+          //       );
           return {
             _id: message.id,
             text: message.content,
@@ -211,12 +230,13 @@ const ChatUserScreen = () => {
             user: {
               _id: message.senderId,
               avatar: avatar,
-              name: staff.find(
-                (staffMember) => staffMember.id === message.senderId
-              )?.name,
+              name: message.users.name,
+              // name: staff.find(
+              //   (staffMember) => staffMember.id === message.senderId
+              // )?.name,
             },
-            received: message.isRead && message.senderId === kidID,
-            sent: message.sentAt && message.senderId === kidID,
+            received: message.isRead && message.senderId === userId,
+            sent: message.sentAt && message.senderId === userId,
           };
         })
       );
@@ -290,16 +310,16 @@ const ChatUserScreen = () => {
     }
   };
 
-  useEffect(() => {
-    // Call the function to start marking messages as read if there are unread messages
-    if (unreadOthersMessages.length !== 0 && !isMarkedAsRead) {
-      const messageIds = unreadOthersMessages
-        .filter((message) => message.senderId !== kidID)
-        .map((message) => message.id);
-      updateMessagesAsRead(messageIds);
-      setIsMarkedAsRead(true);
-    }
-  }, [unreadOthersMessages, isMarkedAsRead]);
+  // useEffect(() => {
+  //   // Call the function to start marking messages as read if there are unread messages
+  //   if (unreadOthersMessages.length !== 0 && !isMarkedAsRead) {
+  //     const messageIds = unreadOthersMessages
+  //       .filter((message) => message.senderId !== kidID)
+  //       .map((message) => message.id);
+  //     updateMessagesAsRead(messageIds);
+  //     setIsMarkedAsRead(true);
+  //   }
+  // }, [unreadOthersMessages, isMarkedAsRead]);
 
   const sendNotificationToAllStaff = async (msg, currentKid, staffData) => {
     // Send notifications to parent in kid chat
@@ -314,7 +334,7 @@ const ChatUserScreen = () => {
 
   // on send new message
   const onSend = useCallback(
-    async (newMessages = [], currentKidData, staffData) => {
+    async (newMessages = [], currentKidData, staffData, userId) => {
       const newMessage = newMessages[0];
 
       //await sendAndNotifyMsg(newMessage, currentKidData, staffData);
@@ -324,7 +344,6 @@ const ChatUserScreen = () => {
         currentKidData,
         staffData
       );
-
       try {
         const currentTime = new Date();
         const year = currentTime.getFullYear();
@@ -337,21 +356,25 @@ const ChatUserScreen = () => {
         const formattedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 
         const newMessageDetails = {
-          senderId: kidID,
+          senderId: userId,
           receiverIds: kidID,
           content: newMessage.text,
-          sentAt: formattedTime, //new Date().toISOString(),
+          sentAt: formattedTime,
           isRead: false,
           parentId: currentUserData.id,
+          readyBy: [],
         };
         const { data, error } = await supabase
           .from("message")
           .insert(newMessageDetails)
-          .select();
+          .select(`*, users(*)`);
 
         if (error) {
           throw error;
         }
+
+        // Alert.alert("New Message Created", `Message: ${newMessage.text}`);
+        // console.log(newMessage);
       } catch (error) {
         console.error("Error creating message:", error);
       }
@@ -385,6 +408,33 @@ const ChatUserScreen = () => {
     );
   };
 
+  // const renderBubble = (props) => {
+  //   const { currentMessage } = props;
+  //   const isKidMessage = currentMessage.user._id === kidID;
+  //   return (
+  //     <View
+  //       style={{ flex: 1, justifyContent: "flex-start", flexDirection: "row" }}
+  //     >
+  //       <Bubble
+  //         {...props}
+  //         wrapperStyle={{
+  //           right: {
+  //             backgroundColor: "#FF7276",
+  //           },
+  //         }}
+  //         textStyle={{
+  //           right: {
+  //             color: "#fff",
+  //           },
+  //         }}
+  //         renderTicks={renderTicks}
+  //         usernameStyle={{ color: isKidMessage ? "#fff" : "gray" }}
+  //         position={isKidMessage ? "right" : "left"}
+  //       ></Bubble>
+  //     </View>
+  //   );
+  // };
+
   const renderBubble = (props) => {
     return (
       <Bubble
@@ -408,7 +458,7 @@ const ChatUserScreen = () => {
     <FontAwesome name="angle-double-down" size={22} color="#333" />
   );
 
-  if (!currentKidData) {
+  if (!currentKidData || !userId) {
     return <ActivityIndicator style={{ padding: 50 }} size={"large"} />;
   }
 
@@ -429,11 +479,11 @@ const ChatUserScreen = () => {
           messages={messages}
           infiniteScroll={true}
           //inverted={false}
-          onSend={(messages) => onSend(messages, currentKidData, staff)}
-          renderUsernameOnMessage={true}
+          onSend={(messages) => onSend(messages, currentKidData, staff, userId)}
           user={{
-            _id: kidID,
+            _id: userId, //currentUserData.id,
           }}
+          renderUsernameOnMessage={true}
           renderBubble={(props) => renderBubble(props)}
           //loadEarlier
           alwaysShowSend

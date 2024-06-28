@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useUsersContext } from "./UsersContext";
 import { ActivityIndicator, View } from "react-native";
-import ProfileScreen from "../screens/ProfileScreen";
+import CompleteProfileScreen from "../screens/CompleteProfileScreen";
 import NotStudentScreen from "../screens/NotStudentScreen";
 //import { useAuthContext } from "./AuthContext";
 
@@ -272,7 +272,7 @@ const KidsContextProvider = ({ children }) => {
       ) : dbUser ? (
         children
       ) : (
-        <ProfileScreen kids={kids} />
+        <CompleteProfileScreen kids={kids} />
       )}
     </KidsContext.Provider>
   );

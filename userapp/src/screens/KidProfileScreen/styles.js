@@ -6,15 +6,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7F7F7",
   },
   headerContainer: {
-    //flex: 1,
-    //justifyContent: "center",
+    // Uncomment if needed
+    // flex: 1,
+    // justifyContent: "center",
   },
   topContainer: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     marginBottom: 8,
   },
   goBackIcon: {
     marginLeft: 10,
+  },
+  imageWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   imageContainer: {
     width: 120,
@@ -34,7 +41,7 @@ const styles = StyleSheet.create({
   addPhotoIcon: {},
   detailItemContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    //justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -86,13 +93,16 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   loadingContainer: {
-    flex: 1,
+    position: "absolute",
+    right: 40,
+    top: 50,
     justifyContent: "center",
     alignItems: "center",
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
+    // Uncomment if needed
+    // marginTop: 10,
+    fontSize: 13,
     color: "#000",
   },
   cameraIcon: {

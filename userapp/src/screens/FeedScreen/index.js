@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Modal,
-  Animated,
 } from "react-native";
 import { FontAwesome, Entypo } from "@expo/vector-icons";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -20,9 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 const FeedScreen = () => {
   const route = useRoute();
-  //const from = route.params?.from;
-  const kidID = route.params?.id;
-  const title = route.params?.title;
+  const { id: kidID, title } = route.params;
   const navigation = useNavigation();
   const { kids } = useKidsContext();
   const { feeds } = useFeedContext();
@@ -195,7 +192,7 @@ const FeedScreen = () => {
                 onPress={() => {
                   const title = `${selectedKid.name} Profile`;
                   navigation.navigate("KidProfile", {
-                    id: selectedKid?.id,
+                    id: selectedKid.id,
                     title,
                   });
                 }}

@@ -231,7 +231,7 @@ const HomeScreen = () => {
 
   const handleKidPress = (kid) => {
     const title = `${kid.name} Updates`;
-    navigation.navigate("Feed", { id: kid.id, title });
+    navigation.navigate("Feed", { id: kid.id, title: title });
   };
 
   const renderEvent = (item) => {
