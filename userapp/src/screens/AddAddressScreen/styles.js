@@ -2,7 +2,18 @@ import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
+    padding: 16,
+    backgroundColor: "#f5f5f5",
+  },
+  headerContainer: {
+    backgroundColor: "#ffffff",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  contentContainer: {
+    flexGrow: 1,
     padding: 16,
     backgroundColor: "#f5f5f5",
   },
@@ -86,6 +97,9 @@ const styles = StyleSheet.create({
     right: 10,
     fontSize: 20,
     color: "gold",
+  },
+  disabledButton: {
+    backgroundColor: "#ccc", // Color for disabled button
   },
 });
 

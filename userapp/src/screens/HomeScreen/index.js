@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Animated,
+  RefreshControl,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 import Swiper from "react-native-swiper";
@@ -28,10 +29,11 @@ const HomeScreen = () => {
   const navigation = useNavigation();
   const { currentUserData } = useUsersContext();
   const { unreadMessages, newMessage } = useMessageContext();
-  const { kids, kidCurrentStateData, ChangeKidState } = useKidsContext();
-  //
+  const { kids, kidCurrentStateData, ChangeKidState, RefreshKidsData } =
+    useKidsContext();
+
   const [events, setEvents] = useState(null);
-  // const [currentTime, setCurrentTime] = useState("");
+  const [refresing, setRefresing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [unreadCounts, setUnreadCounts] = useState({});
   const swiperRef = useRef(null);
@@ -202,9 +204,10 @@ const HomeScreen = () => {
   };
 
   const handleMsgPress = (kid) => {
+    //console.log("kid", kid);
     const idUserChat = kid.id;
-    const title = `${kid.name} Chat`;
-    navigation.navigate("ChatUser", { id: idUserChat, title, from: "Home" });
+    //const title = `${kid.name} Chat`;
+    navigation.navigate("ChatUser", { id: idUserChat, from: "Home" });
   };
 
   useEffect(() => {
@@ -230,8 +233,8 @@ const HomeScreen = () => {
   };
 
   const handleKidPress = (kid) => {
-    const title = `${kid.name} Updates`;
-    navigation.navigate("Feed", { id: kid.id, title: title });
+    //const title = `${kid.name} Updates`;
+    navigation.navigate("Feed", { id: kid.id });
   };
 
   const renderEvent = (item) => {
@@ -351,6 +354,12 @@ const HomeScreen = () => {
   //   return () => clearInterval(interval);
   // }, []);
 
+  const onRefresh = async () => {
+    setRefresing(true);
+    await RefreshKidsData();
+    setRefresing(false);
+  };
+
   const today = new Date();
   const formattedDate = format(today, "EEEE, MMMM d");
 
@@ -363,7 +372,12 @@ const HomeScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.welcomeContainer}>
+    <ScrollView
+      refreshControl={
+        <RefreshControl refreshing={refresing} onRefresh={onRefresh} />
+      }
+      style={styles.welcomeContainer}
+    >
       {showTextConfirmationModal && (
         <TextConfirmationModal
           isVisible={true}

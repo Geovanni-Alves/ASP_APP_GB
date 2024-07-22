@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Text,
   View,
@@ -9,7 +9,7 @@ import {
   Modal,
 } from "react-native";
 import { FontAwesome, Entypo } from "@expo/vector-icons";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import styles from "./styles";
 import { useFeedContext } from "../../contexts/FeedContext";
@@ -19,7 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 const FeedScreen = () => {
   const route = useRoute();
-  const { id: kidID, title } = route.params;
+  const { id: kidID } = route.params;
   const navigation = useNavigation();
   const { kids } = useKidsContext();
   const { feeds } = useFeedContext();
@@ -35,17 +35,7 @@ const FeedScreen = () => {
   };
 
   useEffect(() => {
-    navigation.setOptions({
-      title: title,
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [route]);
-
-  useEffect(() => {
+    //console.log("KidID on useEffect", kidID);
     if (kidID) {
       const foundKid = kids.find((kid) => kid.id === kidID);
       if (foundKid) {
@@ -53,6 +43,21 @@ const FeedScreen = () => {
       }
     }
   }, [kidID, kids]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+        </TouchableOpacity>
+      ),
+    });
+    if (selectedKid) {
+      navigation.setOptions({
+        title: `${selectedKid?.name} Updates`,
+      });
+    }
+  }, [route, selectedKid]);
 
   useEffect(() => {
     const fetchSelectedKidFeeds = async () => {
@@ -169,7 +174,7 @@ const FeedScreen = () => {
         </View>
       );
     }
-    return null; // Ensure it returns something, even if it's null
+    return null;
   };
 
   const renderHeader = () => {
@@ -178,7 +183,7 @@ const FeedScreen = () => {
         <LinearGradient
           colors={["#1e40c7", "#f7f8fa"]}
           //locations={[0.3, 0.8]}
-          style={styles.kidDetailsContainer}
+          style={styles.gradientContainer}
         >
           <View>
             <View>
@@ -187,18 +192,41 @@ const FeedScreen = () => {
                 style={styles.KidImage}
                 name={selectedKid.name}
               />
-              <TouchableOpacity
-                style={styles.profileButton}
-                onPress={() => {
-                  const title = `${selectedKid.name} Profile`;
-                  navigation.navigate("KidProfile", {
-                    id: selectedKid.id,
-                    title,
-                  });
-                }}
-              >
-                <Text style={styles.profileButtonText}>Profile</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={styles.profileButton}
+                  onPress={() => {
+                    navigation.navigate("KidProfile", {
+                      id: selectedKid.id,
+                    });
+                  }}
+                >
+                  <MaterialIcons
+                    name="child-care"
+                    size={24}
+                    color="#fff"
+                    style={styles.buttonIcon}
+                  />
+                  <Text style={styles.profileButtonText}>Profile</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.galleryButton}
+                  onPress={() => {
+                    navigation.navigate("Gallery", {
+                      id: selectedKid.id,
+                      name: selectedKid.name,
+                    });
+                  }}
+                >
+                  <MaterialIcons
+                    name="photo-library"
+                    size={24}
+                    color="#fff"
+                    style={styles.buttonIcon}
+                  />
+                  <Text style={styles.galleryButtonText}>Gallery</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </LinearGradient>

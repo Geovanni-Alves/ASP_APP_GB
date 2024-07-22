@@ -118,6 +118,10 @@ const UsersContextProvider = ({ children }) => {
     getUsersData();
   }, [authUser]);
 
+  const RefreshCurrentUserData = async () => {
+    await getCurrentUserData();
+  };
+
   return (
     <UsersContext.Provider
       value={{
@@ -127,6 +131,7 @@ const UsersContextProvider = ({ children }) => {
         setDbUser,
         userEmail,
         currentUserData,
+        RefreshCurrentUserData,
       }}
     >
       {loading ? ( // Show loading indicator while loading

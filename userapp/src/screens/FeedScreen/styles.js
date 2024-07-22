@@ -7,39 +7,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#ffff",
   },
-  headerContainer: {
-    justifyContent: "space-between",
+  gradientContainer: {
     alignItems: "center",
-    flexDirection: "row",
-    backgroundColor: "#FF7276",
     padding: 20,
-    //paddingTop: 10,
-  },
-  containerMenu: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  goBackIcon: {
-    marginRight: 10,
-    top: 15,
-    left: -15,
-  },
-  titleContainer: {
-    flex: 1,
-    alignItems: "center",
-  },
-  kidNameText: {
-    color: "#ffff",
-    fontSize: 17,
-    fontWeight: "bold",
-    position: "absolute",
-  },
-  kidDetailsContainer: {
-    alignItems: "center",
-    //marginVertical: 20,
-    padding: 12,
-    //borderRadius: 10,
-    overflow: "hidden", // Ensure children don't overflow outside the container
+    overflow: "hidden",
   },
   KidImage: {
     width: 100,
@@ -47,15 +18,35 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginBottom: 10,
   },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   profileButton: {
-    backgroundColor: "#4CAF50",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1e40c7",
+    padding: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  galleryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1e40c7",
+    padding: 10,
+    borderRadius: 5,
   },
   profileButtonText: {
     color: "white",
+    margin: 2,
     fontWeight: "bold",
+    textAlign: "center",
+  },
+  galleryButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    margin: 2,
     textAlign: "center",
   },
   dateText: {

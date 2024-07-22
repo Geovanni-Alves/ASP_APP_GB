@@ -97,21 +97,7 @@ const RootNavigator = () => {
         }}
         component={isRouteInProgress ? DropOffRouteScreen : WaitingScreen}
       />
-      <Drawer.Screen
-        name="Gallery"
-        options={{
-          drawerLabel: "Gallery",
-          title: "Kid Gallery",
-          drawerIcon: () => (
-            <MaterialCommunityIcons
-              name="view-gallery"
-              size={20}
-              color="#808080"
-            />
-          ),
-        }}
-        component={GalleryScreen}
-      />
+
       <Drawer.Screen
         name="Profile"
         options={{
@@ -161,6 +147,23 @@ const RootNavigator = () => {
         options={{
           drawerItemStyle: { display: "none" },
           headerShown: true,
+        }}
+      />
+      <Drawer.Screen
+        name="Gallery"
+        component={GalleryScreen}
+        options={{
+          drawerItemStyle: { display: "none" },
+          headerShown: true,
+          //drawerLabel: "Gallery",
+          //title: "Kid Gallery",
+          // drawerIcon: () => (
+          //   <MaterialCommunityIcons
+          //     name="view-gallery"
+          //     size={20}
+          //     color="#808080"
+          //   />
+          // ),
         }}
       />
     </Drawer.Navigator>

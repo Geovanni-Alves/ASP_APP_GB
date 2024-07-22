@@ -1,85 +1,114 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native";
+import {
+  Text,
+  View,
+  FlatList,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  Modal,
+} from "react-native";
+import { FontAwesome } from "@expo/vector-icons";
+import { useFeedContext } from "../../contexts/FeedContext";
+import RemoteImage from "../../components/RemoteImage";
 import styles from "./styles";
-//import SideDrawer from "../SideDrawer/SideDrawer";
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import { useNavigation } from "@react-navigation/native";
 
-const GalleryScreen = () => {
-  //const [isSideDrawerVisible, setSideDrawerVisible] = useState(false);
-  // Dummy data
-  const kid = {
-    name: "Davi",
-    profilePicture: "https://i.ibb.co/H7L0jbj/profile.jpg",
-    pictures: [
-      { uri: "https://i.ibb.co/9gkbCw1/picture1.jpg", date: "2024-02-20" },
-      { uri: "https://i.ibb.co/gdsTwXk/picture2.jpg", date: "2024-02-21" },
-      { uri: "https://i.ibb.co/NsZBJv6/picture3.jpg", date: "2024-02-22" },
-    ],
+const GalleryScreen = ({ route }) => {
+  const navigation = useNavigation();
+  const { feeds } = useFeedContext();
+  const { id, name } = route.params;
+  const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+
+  const goBack = () => {
+    navigation.navigate("Feed", { id: id });
   };
 
-  // const handleLogout = async () => {
-  //   try {
-  //     await Auth.signOut();
-  //   } catch (error) {
-  //     console.error("Logout error:", error);
-  //   } finally {
-  //     setSideDrawerVisible(false);
-  //   }
-  // };
+  useEffect(() => {
+    setLoading(false);
+  }, [feeds]);
 
-  // const toggleSideDrawer = () => {
-  //   setSideDrawerVisible(!isSideDrawerVisible);
-  // };
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack} style={styles.goBackIcon}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" />
+        </TouchableOpacity>
+      ),
+    });
+    // if (kid) {
+    navigation.setOptions({
+      title: `${name} Gallery`,
+    });
+    // }
+  }, [route]);
+
+  const handleImagePress = (image) => {
+    setSelectedImage(image);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedImage(null);
+  };
+
+  const renderPhotoItem = ({ item }) => {
+    return (
+      <TouchableOpacity
+        onPress={() => handleImagePress(item.photoName)}
+        style={styles.imageContainer}
+      >
+        <RemoteImage path={item.photoName} style={styles.image} />
+      </TouchableOpacity>
+    );
+  };
+
+  const ListEmptyComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>No photos available</Text>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <ActivityIndicator
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        size={"large"}
+      />
+    );
+  }
+
+  const filteredFeeds = feeds.filter(
+    (feed) => feed.studentId === id && feed.photoName
+  );
 
   return (
-    <View style={styles.container}>
-      {/* <View style={styles.containerMenu}>
-        <TouchableOpacity onPress={toggleSideDrawer}>
-          <MaterialIcons name="menu" size={30} color="white" />
-        </TouchableOpacity>
-
-        <SideDrawer
-          isVisible={isSideDrawerVisible}
-          onClose={toggleSideDrawer}
-          onLogout={handleLogout}
-        />
-      </View> */}
-      {/* Profile Section */}
-      <View style={styles.profileContainer}>
-        <Image
-          source={{ uri: kid.profilePicture }}
-          style={styles.profileImage}
-        />
-        <View style={styles.profileInfoContainer}>
-          <Text style={styles.profileName}>{kid.name}</Text>
-          <View style={{ flexDirection: "row", marginTop: 10 }}>
-            <TouchableOpacity style={styles.actionButton}>
-              <MaterialIcons name="call" size={32} color="#FF7276" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <MaterialIcons name="info" size={32} color="#FF7276" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <MaterialIcons name="report-problem" size={32} color="#FF7276" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
-              <MaterialIcons name="healing" size={32} color="#FF7276" />
-            </TouchableOpacity>
-          </View>
+    <SafeAreaView style={styles.container}>
+      <FlatList
+        data={filteredFeeds}
+        renderItem={renderPhotoItem}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={ListEmptyComponent}
+        numColumns={3}
+      />
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalContainer}>
+          <RemoteImage path={selectedImage} style={styles.fullImage} />
+          <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+            <Text style={{ fontSize: 30, color: "white" }}>✕</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Pictures Section */}
-      <Text style={styles.picturesHeader}>Gallery</Text>
-      <ScrollView style={{ marginBottom: 20 }}>
-        {kid.pictures.map((picture, index) => (
-          <View key={index} style={styles.pictureContainer}>
-            <Image source={{ uri: picture.uri }} style={styles.pictureImage} />
-            <Text style={styles.pictureDate}>Date: {picture.date}</Text>
-          </View>
-        ))}
-      </ScrollView>
-    </View>
+      </Modal>
+    </SafeAreaView>
   );
 };
 

@@ -5,15 +5,8 @@ import {
   ActivityIndicator,
   Text,
   SafeAreaView,
-  Alert,
 } from "react-native";
-import {
-  Bubble,
-  GiftedChat,
-  Send,
-  Avatar,
-  Message,
-} from "react-native-gifted-chat";
+import { Bubble, GiftedChat, Send } from "react-native-gifted-chat";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
@@ -31,7 +24,7 @@ const ChatUserScreen = () => {
   const route = useRoute();
   const from = route.params?.from;
   const kidID = route.params?.id;
-  const title = route.params?.title;
+  //const title = route.params?.title;
   const navigation = useNavigation();
   const { kids } = useKidsContext();
   const { staff } = useStaffContext();
@@ -62,7 +55,7 @@ const ChatUserScreen = () => {
 
   useEffect(() => {
     navigation.setOptions({
-      title: title,
+      //title: title,
       headerLeft: () => (
         <TouchableOpacity onPress={goBack}>
           <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
@@ -162,6 +155,8 @@ const ChatUserScreen = () => {
       const formattedMessages = await Promise.all(
         allMessages.map(async (message) => {
           const avatar = await getRemoteImageUri(message.users.photo);
+
+          //console.log("message", message);
 
           // message.senderId === currentKidData?.id
           //   ? await getRemoteImageUri(message.users?.photo)
@@ -334,7 +329,7 @@ const ChatUserScreen = () => {
 
   // on send new message
   const onSend = useCallback(
-    async (newMessages = [], currentKidData, staffData, userId) => {
+    async (newMessages = [], currentKidData, staffData, userId, kidID) => {
       const newMessage = newMessages[0];
 
       //await sendAndNotifyMsg(newMessage, currentKidData, staffData);
@@ -364,6 +359,7 @@ const ChatUserScreen = () => {
           parentId: currentUserData.id,
           readyBy: [],
         };
+
         const { data, error } = await supabase
           .from("message")
           .insert(newMessageDetails)
@@ -479,7 +475,9 @@ const ChatUserScreen = () => {
           messages={messages}
           infiniteScroll={true}
           //inverted={false}
-          onSend={(messages) => onSend(messages, currentKidData, staff, userId)}
+          onSend={(messages) =>
+            onSend(messages, currentKidData, staff, userId, kidID)
+          }
           user={{
             _id: userId, //currentUserData.id,
           }}

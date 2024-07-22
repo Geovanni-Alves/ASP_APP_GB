@@ -30,6 +30,20 @@ const styles = StyleSheet.create({
       fontSize: 16,
     },
   },
+  autoCompleteTextInputContainer: {
+    flex: 1,
+    paddingBottom: 20, // Adjust as needed
+  },
+  autoCompleteTextInput: {
+    height: 40,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 4,
+  },
+  autoCompleteListView: {
+    maxHeight: 200, // Adjust as needed to fit the screen
+  },
   phoneInputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -57,6 +71,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     margin: 10,
     alignItems: "center",
+  },
+  saveButtonDisabled: {
+    backgroundColor: "gray",
   },
   saveButtonText: {
     color: "white",

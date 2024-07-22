@@ -21,6 +21,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1,
     elevation: 3,
+    borderWidth: 2,
   },
   addressTitle: {
     fontSize: 16,
@@ -72,7 +73,6 @@ const styles = StyleSheet.create({
   defaultButton: {
     marginTop: 10,
     padding: 10,
-    backgroundColor: "#2196F3",
     borderRadius: 8,
     alignItems: "center",
   },
@@ -86,6 +86,31 @@ const styles = StyleSheet.create({
     right: 10,
     fontSize: 20,
     color: "gold",
+  },
+  defaultAddressItem: {
+    borderColor: "gold",
+  },
+  defaultButtonActive: {
+    backgroundColor: "#2196F3",
+  },
+  defaultButtonInactive: {
+    backgroundColor: "gray",
+  },
+  currentButton: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  currentButtonActive: {
+    backgroundColor: "#4CAF50",
+  },
+  currentButtonInactive: {
+    backgroundColor: "gray",
+  },
+  currentButtonText: {
+    fontSize: 16,
+    color: "#fff",
   },
 });
 

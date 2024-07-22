@@ -1,70 +1,57 @@
-// GalleryStyles.js
+import { StyleSheet, Dimensions } from "react-native";
 
-import { StyleSheet } from "react-native";
+const { width, height } = Dimensions.get("window");
 
-const primaryColor = "#FF7276";
+const imageSize = (width - 20) / 3; // 3 columns, with 10px margin on each side
 
 export default StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F8F8F8",
   },
-  containerMenu: {
-    justifyContent: "space-between",
-    alignItems: "center",
-    flexDirection: "row",
-    backgroundColor: "#FF7276",
-    padding: 20,
-    maxHeight: "25%",
-    paddingTop: 40,
+  goBackIcon: {
+    marginLeft: 10,
   },
-  profileContainer: {
-    alignItems: "center",
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  profileImage: {
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    borderWidth: 5,
-    borderColor: "white",
-    backgroundColor: "white",
-  },
-  profileInfoContainer: {
-    marginTop: 10,
+  imageContainer: {
+    //flex: 1,
+    margin: 2,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    justifyContent: "center",
     alignItems: "center",
   },
-  profileName: {
-    fontSize: 25,
-    fontWeight: "bold",
-    marginTop: 10,
+  image: {
+    width: imageSize,
+    height: imageSize,
+    borderRadius: 0,
   },
-  actionButton: {
-    marginRight: 15,
+  listContent: {
+    paddingHorizontal: 5,
   },
-  reportButton: {
-    color: "red",
-  },
-  picturesHeader: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 20,
-    marginLeft: 20,
-    textAlign: "center",
-  },
-  pictureContainer: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    marginBottom: 30,
   },
-  pictureImage: {
-    width: 350,
-    height: 350,
-    borderRadius: 10,
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  pictureDate: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#666",
+  closeButton: {
+    position: "absolute",
+    top: 25,
+    right: 10,
+    zIndex: 9999, // Ensure the close button is on top
+  },
+  fullImage: {
+    width: width - 20,
+    height: height - 20,
+    resizeMode: "contain",
+  },
+  emptyText: {
+    fontSize: 18,
+    color: "#757575",
   },
 });

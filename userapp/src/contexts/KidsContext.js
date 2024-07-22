@@ -69,6 +69,11 @@ const KidsContextProvider = ({ children }) => {
     fetchKidsData(userEmail);
   }, [userEmail]);
 
+  const RefreshKidsData = async () => {
+    await fetchKidsData(userEmail);
+    await fetchCurrentStateData();
+  };
+
   const fetchCurrentStateData = async () => {
     if (kids.length > 0) {
       const currentStateArray = [];
@@ -251,15 +256,15 @@ const KidsContextProvider = ({ children }) => {
     }
   }, [loading, kids]);
 
-  // useEffect(() => {
-  //   if (!session) {
-  //     setLoading(false);
-  //   }
-  // }, [session]);
-
   return (
     <KidsContext.Provider
-      value={{ kids, noKids, kidCurrentStateData, ChangeKidState }}
+      value={{
+        kids,
+        noKids,
+        kidCurrentStateData,
+        ChangeKidState,
+        RefreshKidsData,
+      }}
     >
       {loading ? (
         <View

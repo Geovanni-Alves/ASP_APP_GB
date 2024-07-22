@@ -5,20 +5,10 @@ import {
   View,
   KeyboardAvoidingView,
   Platform,
-  AppState,
   Image,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 import { TextInput, Button, Card, Title, Paragraph } from "react-native-paper";
-
-// // Register AppState listener for session auto-refresh
-// AppState.addEventListener("change", (state) => {
-//   if (state === "active") {
-//     supabase.auth.startAutoRefresh();
-//   } else {
-//     supabase.auth.stopAutoRefresh();
-//   }
-// });
 
 export default function Auth() {
   const [email, setEmail] = useState("");

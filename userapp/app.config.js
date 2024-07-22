@@ -2,6 +2,14 @@ import "dotenv/config";
 
 export default {
   name: "APP_ASP_USER",
+  plugins: [
+    [
+      "react-native-vision-camera",
+      {
+        cameraPermissionText: "$(PRODUCT_NAME) needs access to your Camera.",
+      },
+    ],
+  ],
   slug: "asp-app-user",
   scheme: "your-app-scheme",
   version: "1.0.0",
