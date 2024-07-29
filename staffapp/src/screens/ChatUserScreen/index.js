@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, SafeAreaView, ActivityIndicator } from "react-native";
 import { GiftedChat, Send, Bubble } from "react-native-gifted-chat";
-import { API, graphqlOperation } from "aws-amplify";
-import { createMessage, updateMessage } from "../../graphql/mutations";
-import { listMessages } from "../../graphql/queries";
-import { useAuthContext } from "../../contexts/AuthContext";
+//import { API, graphqlOperation } from "aws-amplify";
+//import { createMessage, updateMessage } from "../../graphql/mutations";
+//import { listMessages } from "../../graphql/queries";
+//import { useAuthContext } from "../../contexts/AuthContext";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { useRoute } from "@react-navigation/native";
@@ -13,13 +13,14 @@ import { useKidsContext } from "../../contexts/KidsContext";
 import { useStaffContext } from "../../contexts/StaffContext";
 import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import FontAwesome from "react-native-vector-icons/FontAwesome";
+import { useUsersContext } from "../../contexts/UsersContext";
 
-const ChatUserScreen = ({ navigation }) => {
+const ChatUserScreen = () => {
   const route = useRoute();
   const kidID = route.params?.id;
   const { newMessages, setNewMessages, unreadMessages, setUnreadMessages } =
     useMessageContext();
-  const { currentUserData } = useAuthContext();
+  const { currentUserData } = useUsersContext();
   const { staff } = useStaffContext();
   const { kids } = useKidsContext();
   const { sendPushNotification } = usePushNotificationsContext();

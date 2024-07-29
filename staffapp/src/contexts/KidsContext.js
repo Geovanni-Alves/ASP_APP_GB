@@ -1,50 +1,57 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator } from "react-native";
-import { API } from "aws-amplify";
-import { listKids, getUser } from "../graphql/queries";
-import { usePicturesContext } from "./PicturesContext";
+import { supabase } from "../lib/supabase";
+//import { usePicturesContext } from "./PicturesContext";
 
 const KidsContext = createContext({});
 
 const KidsContextProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [kids, setKids] = useState([]);
-  const { getPhotoInBucket } = usePicturesContext();
+  //const { getPhotoInBucket } = usePicturesContext();
 
   const fetchKidsData = async () => {
     try {
-      const response = await API.graphql({ query: listKids });
-      const fetchedKids = response.data.listKids.items;
-      //console.log("fetchedKids", fetchedKids);
+      const { data: fetchedKids, error: kidsError } = await supabase
+        .from("students")
+        .select("*");
 
-      const kidsWithPhotos = await Promise.all(
-        fetchedKids.map(async (kid) => {
-          if (kid.Parent1ID !== null) {
-            const parent1Data = await API.graphql({
-              query: getUser,
-              variables: { id: kid.Parent1ID },
-            });
-            kid.Parent1 = parent1Data.data.getUser;
-          }
+      if (kidsError) throw kidsError;
 
-          if (kid.Parent2ID !== null) {
-            const parent2Data = await API.graphql({
-              query: getUser,
-              variables: { id: kid.Parent2ID },
-            });
-            kid.Parent2 = parent2Data.data.getUser;
-          }
-          if (kid.photo) {
-            const uriKid = await getPhotoInBucket(kid.photo);
-            return { ...kid, uriKid };
-          } else {
-            return kid;
-          }
-        })
-      );
-      //console.log("kids with photos", kidsWithPhotos);
+      //console.log("kids", fetchedKids);
 
-      setKids(kidsWithPhotos);
+      // const kidsWithPhotos = await Promise.all(
+      //   fetchedKids.map(async (kid) => {
+      //     if (kid.Parent1Id !== null) {
+      //       const { data: parent1Data, error: parent1Error } = await supabase
+      //         .from("users")
+      //         .select("*")
+      //         .eq("id", kid.Parent1Id)
+      //         .single();
+      //       if (parent1Error) throw parent1Error;
+      //       kid.Parent1 = parent1Data;
+      //     }
+
+      //     if (kid.Parent2Id !== null) {
+      //       const { data: parent2Data, error: parent2Error } = await supabase
+      //         .from("users")
+      //         .select("*")
+      //         .eq("id", kid.Parent2Id)
+      //         .single();
+      //       if (parent2Error) throw parent2Error;
+      //       kid.Parent2 = parent2Data;
+      //     }
+
+      //     if (kid.photo) {
+      //       const uriKid = await getPhotoInBucket(kid.photo);
+      //       return { ...kid, uriKid };
+      //     } else {
+      //       return kid;
+      //     }
+      //   })
+      // );
+
+      setKids(fetchedKids);
     } catch (error) {
       console.error("Error fetching kids data", error);
     }
@@ -54,7 +61,6 @@ const KidsContextProvider = ({ children }) => {
     fetchKidsData();
   }, []);
 
-  // Check if all necessary data has been fetched, then set loading to false
   useEffect(() => {
     if (kids) {
       setLoading(false);
@@ -63,13 +69,7 @@ const KidsContextProvider = ({ children }) => {
 
   return (
     <KidsContext.Provider value={{ kids }}>
-      {loading ? (
-        // Render a loading indicator while the context is loading
-        <ActivityIndicator />
-      ) : (
-        // Render children when context has finished loading
-        children
-      )}
+      {loading ? <ActivityIndicator /> : children}
     </KidsContext.Provider>
   );
 };

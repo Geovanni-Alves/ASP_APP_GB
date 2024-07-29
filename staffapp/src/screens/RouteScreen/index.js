@@ -15,22 +15,23 @@ import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetFlatList } from "@gorhom/bottom-sheet";
 import { FontAwesome5, FontAwesome } from "@expo/vector-icons";
 import styles from "./styles";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import { useRoute } from "@react-navigation/native";
 import RouteInfoComponent from "../../components/RouteInfo";
-import { API } from "aws-amplify";
-import { getUser, listAddressLists, getKid } from "../../graphql/queries";
-import { updateRoute, updateAddressList } from "../../graphql/mutations";
+//import { API } from "aws-amplify";
+//import { getUser, listAddressLists, getKid } from "../../graphql/queries";
+//import { updateRoute, updateAddressList } from "../../graphql/mutations";
 import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import * as Location from "expo-location";
 import { useRouteContext } from "../../contexts/RouteContext";
 import LocationTrackingComponent from "../../components/LocationTrackingComponent";
 import { useBackgroundTaskContext } from "../../contexts/BackgroundTaskContext";
 import ShowMessage from "../../components/ShowMessage";
-import { useAuthContext } from "../../contexts/AuthContext";
+import { useUsersContext } from "../../contexts/UsersContext";
 import { useNavigation } from "@react-navigation/native";
+import { supabase } from "../../lib/supabase";
 
 //
 
@@ -75,7 +76,7 @@ const RouteScreen = () => {
   const { sendPushNotification, expoPushToken } = usePushNotificationsContext();
   const { routesData } = useRouteContext();
   const { locationEmitter } = useBackgroundTaskContext();
-  const { currentUserData } = useAuthContext();
+  const { currentUserData } = useUsersContext();
   const [showArrivedModal, setShowArrivedModal] = useState(false);
   const [arrivedAddress, setArrivedAddress] = useState(null);
   const [foregroundLocationPermission, setForegroundLocationPermission] =
@@ -88,8 +89,11 @@ const RouteScreen = () => {
       await Location.requestForegroundPermissionsAsync();
     if (foregroundStatus === "granted") {
       setForegroundLocationPermission(true);
+      console.log("Requesting background location permissions...");
       const { status: backgroundStatus } =
         await Location.requestBackgroundPermissionsAsync();
+      console.log("Background location status:", backgroundStatus);
+      //console.log(backgroundStatus);
       if (backgroundStatus === "granted") {
         setBackgroundLocationPermission(true);
       } else {
@@ -257,28 +261,34 @@ const RouteScreen = () => {
 
   const getOrderAddress = async () => {
     try {
-      const variables = {
-        filter: {
-          routeID: { eq: currentRouteData.id },
-        },
-      };
-      const responseListAddress = await API.graphql({
-        query: listAddressLists,
-        variables: variables,
-      });
-      const AddressListsData = responseListAddress.data.listAddressLists.items;
+      // Fetch the address list filtered by routeID
+      const { data: AddressListsData, error: addressError } = await supabase
+        .from("address_list")
+        .select("*")
+        .eq("routeId", currentRouteData.id);
+
+      if (addressError) {
+        throw addressError;
+      }
+
+      // Sort the address list by order
       const sortedAddressList = AddressListsData.sort(
         (a, b) => a.order - b.order
       );
-
+      // Fetch kid data for each address and combine them
       const addressListWithKids = await Promise.all(
         sortedAddressList.map(async (addressListItem) => {
           try {
-            const responseGetKid = await API.graphql({
-              query: getKid,
-              variables: { id: addressListItem.addressListKidId },
-            });
-            const kidData = responseGetKid.data.getKid;
+            const { data: kidData, error: kidError } = await supabase
+              .from("students")
+              .select("*")
+              .eq("id", addressListItem.studentId)
+              .single();
+
+            if (kidError) {
+              console.error("Error fetching Kid data", kidError);
+              return addressListItem;
+            }
 
             return {
               ...addressListItem,
@@ -291,6 +301,7 @@ const RouteScreen = () => {
         })
       );
 
+      // Group addresses by their latitude and longitude
       const groupedAddressList = new Map();
 
       addressListWithKids.forEach((address) => {
@@ -307,12 +318,14 @@ const RouteScreen = () => {
         }
 
         const groupedAddress = groupedAddressList.get(locationKey);
-        // groupedAddress.AddressList.push(address);
         groupedAddress.Kid.push(address.Kid);
       });
 
+      // Convert the grouped addresses map to an array
       const uniqueAddressList = Array.from(groupedAddressList.values());
 
+      // Update the state with the processed address list
+      //console.log("uniqueAddressList", uniqueAddressList);
       setAddressList(uniqueAddressList);
     } catch (error) {
       console.error("Error fetching getOrderAddress: ", error);
@@ -370,38 +383,59 @@ const RouteScreen = () => {
   };
 
   const fetchParentsInfoForKid = async (kid) => {
-    if (kid.Parent1ID !== null) {
-      const parent1Data = await API.graphql({
-        query: getUser,
-        variables: { id: kid.Parent1ID },
-      });
-      kid.Parent1 = parent1Data.data.getUser;
-    }
+    try {
+      if (kid.parent1Id !== null) {
+        const { data: parent1Data, error: parent1Error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", kid.parent1Id)
+          .single();
 
-    if (kid.Parent2ID !== null) {
-      const parent2Data = await API.graphql({
-        query: getUser,
-        variables: { id: kid.Parent2ID },
-      });
-      kid.Parent2 = parent2Data.data.getUser;
+        if (parent1Error) {
+          throw parent1Error;
+        }
+
+        kid.Parent1 = parent1Data;
+      }
+      if (kid.parent2Id !== null) {
+        const { data: parent2Data, error: parent2Error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", kid.parent2Id)
+          .single();
+
+        if (parent2Error) {
+          throw parent2Error;
+        }
+
+        kid.Parent2 = parent2Data;
+      }
+    } catch (error) {
+      console.error("Error fetching parents info: ", error);
     }
   };
 
   const getStaffInfo = async () => {
-    if (currentRouteData.driver) {
-      const driverData = await API.graphql({
-        query: getUser,
-        variables: { id: currentRouteData.driver },
-      });
-      setDriver(driverData.data.getUser);
-      if (currentRouteData.helper !== null) {
-        const helperData = await API.graphql({
-          query: getUser,
-          variables: { id: currentRouteData.helper },
-        });
-        setHelper(helperData.data.getUser);
-      }
+    if (currentRouteData.driverUser) {
+      setDriver(currentRouteData.driverUser);
     }
+    if (currentRouteData.helperUser) {
+      setHelper(currentRouteData.helperUser);
+    }
+    // if (currentRouteData.driver) {
+    //   const driverData = await API.graphql({
+    //     query: getUser,
+    //     variables: { id: currentRouteData.driver },
+    //   });
+    //   setDriver(driverData.data.getUser);
+    //   if (currentRouteData.helper !== null) {
+    //     const helperData = await API.graphql({
+    //       query: getUser,
+    //       variables: { id: currentRouteData.helper },
+    //     });
+    //     setHelper(helperData.data.getUser);
+    //   }
+    // }
   };
 
   const showDriveConfirmationMessage = () => {
@@ -814,19 +848,20 @@ const RouteScreen = () => {
   function generateMarkerDescription(kids) {
     return kids.map((kid) => kid.dropOffAddress).join("\n");
   }
+
+  //
   /// jsx return
+  //
 
   return (
-    <SafeAreaView style={styles.mapContainer}>
-      <LocationTrackingComponent
-        locationEmitter={locationEmitter}
-        routeID={currentRouteData.id}
-      />
+    <View style={styles.mapContainer}>
       <MapView
         ref={mapRef}
         //provider={PROVIDER_GOOGLE}
-        style={{ width, height }}
+        style={{ width, height: "88%" }}
         //showsUserLocation={true}
+        showsMyLocationButton={true}
+        showsCompass={false}
         //followsUserLocation={true}
         initialRegion={{
           latitude: busLocation.latitude,
@@ -916,6 +951,11 @@ const RouteScreen = () => {
           </Marker>
         ))}
       </MapView>
+
+      <LocationTrackingComponent
+        locationEmitter={locationEmitter}
+        routeID={currentRouteData.id}
+      />
 
       <RouteInfoComponent
         currentRoute={currentRouteData}
@@ -1161,7 +1201,7 @@ const RouteScreen = () => {
           />
         </View>
       </BottomSheet>
-    </SafeAreaView>
+    </View>
   );
 };
 

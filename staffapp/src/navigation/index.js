@@ -1,39 +1,125 @@
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { useAuthContext } from "../contexts/AuthContext";
-import { ActivityIndicator } from "react-native";
-import HomeScreen from "../screens/HomeScreen";
+import React from "react";
+import { SimpleLineIcons, FontAwesome5 } from "@expo/vector-icons";
+import { createDrawerNavigator } from "@react-navigation/drawer";
+import { TouchableOpacity } from "react-native";
+import { useNavigation } from "@react-navigation/native";
+import DropOffRouteScreen from "../screens/DropOffRouteScreen";
+import CompleteProfileScreen from "../screens/CompleteProfileScreen";
+import ChatScreen from "../screens/ChatScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import RouteScreen from "../screens/RouteScreen";
-import ChatScreen from "../screens/ChatScreen";
 import ChatUserScreen from "../screens/ChatUserScreen";
-import CheckIn from "../../src/screens/CheckIn/CheckIn";
-import Incidents from "../screens/Incidents/Incidents";
-//import LoginScreen from "../screens/LoginScreen";
+import CheckIn from "../screens/CheckIn";
+import { useUsersContext } from "../contexts/UsersContext";
+import CustomDrawerContent from "../components/CustomDrawerContent";
 
-const Stack = createNativeStackNavigator();
+const Drawer = createDrawerNavigator();
+
+const CustomHamburgerMenu = () => {
+  const navigation = useNavigation();
+  return (
+    <TouchableOpacity
+      onPress={() => navigation.openDrawer()}
+      style={{ paddingLeft: 20 }}
+    >
+      <SimpleLineIcons name="menu" size={23} color="#fff" />
+    </TouchableOpacity>
+  );
+};
+
+const DrawerNavigator = ({ currentUserData }) => (
+  <Drawer.Navigator
+    drawerContent={(props) => (
+      <CustomDrawerContent {...props} currentUserData={currentUserData} />
+    )}
+    screenOptions={{
+      drawerStyle: {
+        backgroundColor: "#fff",
+        width: 190,
+      },
+      headerStyle: { backgroundColor: "#ff7276" },
+      headerTintColor: "#fff",
+      headerTitleStyle: {
+        fontWeight: "700",
+        letterSpacing: "1.5",
+      },
+      drawerActiveTintColor: "blue",
+      drawerLabelStyle: {
+        color: "#111",
+      },
+      headerLeft: () => <CustomHamburgerMenu />,
+    }}
+  >
+    <Drawer.Screen
+      name="DropOff"
+      options={{
+        drawerLabel: "Drop off",
+        title: "Drop off Route",
+        drawerIcon: () => (
+          <SimpleLineIcons name="home" size={20} color="#808080" />
+        ),
+      }}
+      component={DropOffRouteScreen}
+    />
+    <Drawer.Screen
+      name="Chat"
+      options={{
+        drawerLabel: "Chat",
+        title: "Chat",
+        drawerIcon: () => (
+          <SimpleLineIcons name="bubbles" size={20} color="#808080" />
+        ),
+      }}
+      component={ChatScreen}
+    />
+    <Drawer.Screen
+      name="Profile"
+      options={{
+        drawerLabel: "Profile",
+        title: "Profile",
+        drawerIcon: () => (
+          <FontAwesome5 name="user" size={20} color="#808080" />
+        ),
+      }}
+      component={ProfileScreen}
+    />
+    <Drawer.Screen
+      name="Route"
+      options={{
+        drawerItemStyle: { display: "none" },
+        headerShown: true,
+      }}
+      component={RouteScreen}
+    />
+    <Drawer.Screen
+      name="ChatUser"
+      options={{
+        drawerItemStyle: { display: "none" },
+        headerShown: true,
+      }}
+      component={ChatUserScreen}
+    />
+    <Drawer.Screen
+      name="CheckIn"
+      options={{
+        drawerLabel: "Check In",
+        title: "Check In",
+        drawerIcon: () => (
+          <SimpleLineIcons name="check" size={20} color="#808080" />
+        ),
+      }}
+      component={CheckIn}
+    />
+  </Drawer.Navigator>
+);
 
 const RootNavigator = () => {
-  const { dbUser, loading, isDriver, userEmail } = useAuthContext();
+  const { dbUser, currentUserData } = useUsersContext();
 
-  //console.log(dbUser);
-  if (loading) {
-    return <ActivityIndicator size="large" color="gray" />;
-  }
-
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {dbUser ? (
-        //<Stack.Screen name="Chat" component={ChatScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
-      ) : (
-        <Stack.Screen name="StaffLogin" component={ProfileScreen} />
-      )}
-      <Stack.Screen name="Route" component={RouteScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
-      <Stack.Screen name="ChatUser" component={ChatUserScreen} />
-      <Stack.Screen name="CheckIn" component={CheckIn} />
-      <Stack.Screen name="Incidents" component={Incidents} />
-    </Stack.Navigator>
+  return dbUser ? (
+    <DrawerNavigator currentUserData={currentUserData} />
+  ) : (
+    <CompleteProfileScreen />
   );
 };
 

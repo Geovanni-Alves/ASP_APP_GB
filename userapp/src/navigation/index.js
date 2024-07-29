@@ -1,7 +1,6 @@
 import {
   SimpleLineIcons,
   FontAwesome5,
-  MaterialCommunityIcons,
 } from "@expo/vector-icons";
 import { TouchableOpacity } from "react-native";
 import CustomDrawerContent from "../components/CustomDrawerContent";

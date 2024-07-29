@@ -1,68 +1,78 @@
-import { createContext, useContext } from "react";
+import React, { createContext, useContext } from "react";
 import * as ImagePicker from "expo-image-picker";
-//import * as FileSystem from "expo-file-system";
-import { Storage } from "aws-amplify";
+import { supabase } from "../lib/supabase";
+import * as FileSystem from "expo-file-system";
+import { randomUUID } from "expo-crypto";
+import { decode } from "base64-arraybuffer";
 
 const PicturesContext = createContext({});
 
 const PicturesContextProvider = ({ children }) => {
-  const uploadImage = async (uri, filename) => {
-    try {
-      // console.log("uri", uri);
-      // console.log("filename", filename);
-      if (!uri) {
-        throw new Error("Image URI is undefined");
-      }
+  const uploadImage = async (image) => {
+    if (!image?.startsWith("file://")) {
+      return;
+    }
 
-      //console.log("Fetching image from:", uri);
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      if (!blob) {
-        throw new Error("Failed to create blob.");
-      }
+    const base64 = await FileSystem.readAsStringAsync(image, {
+      encoding: "base64",
+    });
 
-      console.log("Uploading image to S3...");
-      //const filename = `kid-photo-${kidID}-${Date.now()}`;
+    const filePath = `${randomUUID()}.png`;
+    const contentType = "image/png";
 
-      // console.log(filename);
-      await Storage.put(filename, blob, {
-        contentType: "image/jpeg",
-      });
+    const { data, error } = await supabase.storage
+      .from("photos")
+      .upload(filePath, decode(base64), { contentType });
 
-      console.log("Image uploaded successfully.");
-      /// setPhotoName(filename);
-
-      const imageURL = await Storage.get(filename);
-      console.log("Image URL:", imageURL);
-
-      return imageURL;
-    } catch (error) {
-      console.error("Error uploading image:", error);
+    if (error) {
       throw error;
+    }
+
+    if (data) {
+      return data.path;
     }
   };
 
-  // save photo in storage bucket just pass the filename and return the filename stored
-  const savePhotoInBucket = async (filename) => {
+  const savePhotoInBucket = async (useCamera) => {
     try {
-      const permissionResult =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      let permissionResult;
+      if (useCamera) {
+        permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      } else {
+        permissionResult =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
+
       if (permissionResult.granted === false) {
-        console.log("Permission to access camera roll is required!");
+        console.log(
+          `Permission to access ${
+            useCamera ? "camera" : "camera roll"
+          } is required!`
+        );
         return null; // Return null for permission denied
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 1,
-      });
+      let result;
+      if (useCamera) {
+        result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 1,
+        });
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 1,
+        });
+      }
 
       if (!result.canceled) {
         if (result.assets && result.assets.length > 0) {
-          const imageURL = await uploadImage(result.assets[0].uri, filename);
-          return { filename, result };
+          const image = result.assets[0].uri;
+          const imagePath = await uploadImage(image);
+          return imagePath;
         } else {
           console.error("Image assets not found in the result.");
           return null;
@@ -71,23 +81,12 @@ const PicturesContextProvider = ({ children }) => {
         return result;
       }
     } catch (error) {
-      console.error("Error picking image:", error);
-    }
-  };
-
-  const getPhotoInBucket = async (filename) => {
-    try {
-      const imageURL = await Storage.get(filename, { expires: 1800 });
-      //console.log("Image URL:", imageURL);
-      return imageURL;
-    } catch (error) {
-      console.error("Error getting image:", error);
-      throw error;
+      console.error("Error saving image:", error);
     }
   };
 
   return (
-    <PicturesContext.Provider value={{ savePhotoInBucket, getPhotoInBucket }}>
+    <PicturesContext.Provider value={{ savePhotoInBucket }}>
       {children}
     </PicturesContext.Provider>
   );

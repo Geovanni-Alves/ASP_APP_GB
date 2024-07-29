@@ -1,7 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { API, graphqlOperation } from "aws-amplify";
-import { onCreateMessage, onUpdateMessage } from "../graphql/subscriptions";
-import { listMessages } from "../graphql/queries";
+import { supabase } from "../lib/supabase";
 
 const MessageContext = createContext({});
 
@@ -9,67 +7,97 @@ const MessageContextProvider = ({ children }) => {
   const [newMessages, setNewMessages] = useState([]);
   const [unreadMessages, setUnreadMessages] = useState([]);
 
-  // check all unreadMessages and setUnreadMessages
-  useEffect(() => {
-    const fetchUnreadMessages = async () => {
-      const response = await API.graphql({
-        query: listMessages,
-        variables: { filter: { isRead: { eq: false } } },
-      });
-      const fetchedMessages = response.data.listMessages.items;
-      setUnreadMessages(fetchedMessages);
-    };
-
-    fetchUnreadMessages();
-    // }
-  }, []);
-
-  const getAllMessagesByUser = async (filter, limit) => {
-    const variables = { filter, limit };
-
-    const response = await API.graphql({
-      query: listMessages,
-      variables: variables,
-    });
-    const fetchedMessages = response.data.listMessages.items;
-    return fetchedMessages;
+  const fetchUnreadMessages = async () => {
+    try {
+      const { data: unreadMessages, error } = await supabase
+        .from("message")
+        .select(`*, users(*)`)
+        .eq("isRead", false);
+      if (error) {
+        throw error;
+      }
+      setUnreadMessages(unreadMessages);
+    } catch (error) {
+      console.error("Error fetching unread messages:", error);
+    }
   };
 
   useEffect(() => {
-    // subscribe to get new messages
-    const subscription = API.graphql(
-      graphqlOperation(onCreateMessage)
-    ).subscribe({
-      next: ({ provider, value }) => {
-        const newMessage = value.data.onCreateMessage;
-        // Update newMessages state with the new message
-        setNewMessages((prevMessages) => [...prevMessages, newMessage]);
-        setUnreadMessages((prevUnreadMessages) => [
-          ...prevUnreadMessages,
-          newMessage,
-        ]);
-      },
-      error: (error) => console.error("Subscription error:", error),
-    });
+    fetchUnreadMessages();
+  }, []);
 
-    const updateSubscription = API.graphql({
-      query: onUpdateMessage,
-    }).subscribe({
-      next: ({ provider, value }) => {
-        const updatedMessage = value.data.onUpdateMessage;
-        setUnreadMessages((unreadPrevMessages) => {
-          return unreadPrevMessages.map((msg) =>
-            msg.id === updatedMessage.id ? updatedMessage : msg
-          );
-        });
-      },
-    });
+  useEffect(() => {
+    const UpdatesOnMessages = supabase
+      .channel("custom-all-channel")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "message" },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const handleInsert = async () => {
+              //console.log("payload!", payload);
+              const newMessage = payload.new;
+              try {
+                const { data, error } = await supabase
+                  .from("message")
+                  .select(`*,users(*)`)
+                  .eq("id", newMessage.id)
+                  .single();
+
+                if (error) {
+                  console.error("Error fetching related user data", error);
+                  return;
+                }
+
+                setNewMessages((prevMessages) => [...prevMessages, data]);
+                setUnreadMessages((prevUnreadMessages) => [
+                  ...prevUnreadMessages,
+                  data,
+                ]);
+              } catch (error) {
+                console.error("Error fetching new message details:", error);
+              }
+            };
+            handleInsert();
+          } else if (payload.eventType === "UPDATE") {
+            const updatedMessage = payload.new;
+            console.log("update on messages");
+            setUnreadMessages((unreadPrevMessages) => {
+              return unreadPrevMessages.map((msg) =>
+                msg.id === updatedMessage.id ? updatedMessage : msg
+              );
+            });
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      subscription.unsubscribe();
-      updateSubscription.unsubscribe();
+      UpdatesOnMessages.unsubscribe();
     };
   }, []);
+
+  const getAllMessagesByUser = async (filter, limit) => {
+    try {
+      const { data: messages, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq(filter.field, filter.value)
+        .limit(limit);
+      if (error) {
+        throw error;
+      }
+      return messages;
+    } catch (error) {
+      console.error("Error fetching messages by user:", error);
+      return [];
+    }
+  };
+
+  const sendAndNotifyMsg = async (msg, kidData) => {
+    // Send notifications to all staffs in kid chat
+    // Implement your notification logic here
+  };
 
   return (
     <MessageContext.Provider
@@ -79,6 +107,7 @@ const MessageContextProvider = ({ children }) => {
         setUnreadMessages,
         setNewMessages,
         getAllMessagesByUser,
+        sendAndNotifyMsg,
       }}
     >
       {children}

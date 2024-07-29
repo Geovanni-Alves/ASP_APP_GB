@@ -1,13 +1,6 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import { useAuthContext } from "./AuthContext";
-import { API } from "aws-amplify";
-import {
-  listRoutes,
-  kidsByRouteID,
-  getVan,
-  getUser,
-} from "../../src/graphql/queries";
-import { Auth } from "aws-amplify";
+import { useUsersContext } from "./UsersContext";
+import { supabase } from "../lib/supabase";
 import { useNavigation } from "@react-navigation/native";
 
 const RouteContext = createContext({});
@@ -16,7 +9,7 @@ const RouteContextProvider = ({ children }) => {
   const navigation = useNavigation();
   const [routesData, setRoutesData] = useState(null);
   const [currentRouteData, setCurrentRouteData] = useState(null);
-  const { dbUser, isDriver, currentUserData, userEmail } = useAuthContext();
+  const { dbUser, isDriver, currentUserData, userEmail } = useUsersContext();
   const [refreshing, setRefreshing] = useState(false);
 
   const updateRoutesData = async () => {
@@ -25,97 +18,117 @@ const RouteContextProvider = ({ children }) => {
     try {
       // Fetch new data and update the routesData state
       const success = await getRoutesData();
-      if (success) {
-        // Data fetching was successful
-        setRefreshing(false); // Stop refreshing indicator
-      } else {
-        // Handle the case where data fetching failed
-        setRefreshing(false); // Stop refreshing indicator
-      }
+      setRefreshing(!success); // Stop refreshing indicator based on success
     } catch (error) {
       console.error("Error updating data:", error);
       setRefreshing(false); // Stop refreshing indicator
     }
   };
 
+  const fetchParentsInfoForKid = async (kid) => {
+    try {
+      if (kid.parent1Id) {
+        const { data: parent1Data, error: parent1Error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", kid.parent1Id)
+          .single();
+
+        if (parent1Error) throw parent1Error;
+        kid.Parent1 = parent1Data;
+      }
+
+      if (kid.parent2Id) {
+        const { data: parent2Data, error: parent2Error } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", kid.parent2Id)
+          .single();
+
+        if (parent2Error) throw parent2Error;
+        kid.Parent2 = parent2Data;
+      }
+    } catch (error) {
+      console.error("Error fetching parents info for kid:", error);
+    }
+  };
+
   const getRoutesData = async () => {
     try {
-      //console.log("isDriver? ", isDriver);
-      const variables = {
-        filter: {
-          or: [
-            { status: { eq: "WAITING_TO_START" } },
-            { status: { eq: "IN_PROGRESS" } }, //status: { eq: "IN_PROGRESS" }, //
-            { status: { eq: "PAUSED" } }, //status: { eq: "IN_PROGRESS" }, //
-          ],
-        },
-      };
+      const { data: routeData, error: routeError } = await supabase
+        .from("route")
+        .select("*")
+        .or(
+          "status.eq.WAITING_TO_START,status.eq.IN_PROGRESS,status.eq.PAUSED"
+        );
 
-      // Fetch route data
-      const responseListRoutes = await API.graphql({
-        query: listRoutes,
-        variables: variables,
-      });
-      const routeData = responseListRoutes.data.listRoutes.items;
-      //console.log(routeData);
+      if (routeError) throw routeError;
 
-      // Fetch kids data for each route
       const mergedData = await Promise.all(
         routeData.map(async (route) => {
-          const responseKidsByRouteID = await API.graphql({
-            query: kidsByRouteID,
-            variables: { routeID: route.id },
-          });
-          const kidsData = responseKidsByRouteID.data.kidsByRouteID.items;
-          // fetch the van
-          const responseGetVan = await API.graphql({
-            query: getVan,
-            variables: { id: route.routeVanId },
-          });
-          const vansData = responseGetVan.data.getVan;
+          const { data: studentsData, error: kidsError } = await supabase
+            .from("students")
+            .select("*")
+            .eq("routeId", route.id);
+
+          if (kidsError) throw kidsError;
+
+          // Fetch parents info for each kid
+          await Promise.all(studentsData.map(fetchParentsInfoForKid));
+
+          const { data: vansData, error: vanError } = await supabase
+            .from("vans")
+            .select("*")
+            .eq("id", route.vanId)
+            .single();
+
+          if (vanError) throw vanError;
 
           let driverUser = null;
           let helperUser = null;
 
-          // Fetch the driver's user data
-
           if (route.driver) {
-            const responseGetDriverUser = await API.graphql({
-              query: getUser,
-              variables: { id: route.driver },
-            });
-            driverUser = responseGetDriverUser.data.getUser;
+            const { data: driverData, error: driverError } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", route.driver)
+              .single();
+
+            if (driverError) throw driverError;
+            driverUser = driverData;
           }
-          // Fetch the helper's user data
+
           if (route.helper) {
-            const responseGetHelperUser = await API.graphql({
-              query: getUser,
-              variables: { id: route.helper },
-            });
-            helperUser = responseGetHelperUser.data.getUser;
+            const { data: helperData, error: helperError } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", route.helper)
+              .single();
+
+            if (helperError) throw helperError;
+            helperUser = helperData;
           }
+
           return {
             ...route,
-            Kid: kidsData,
+            Kid: studentsData,
             Van: vansData,
             driverUser,
             helperUser,
           };
         })
       );
-      //console.log("merged Data", mergedData);
+
       setRoutesData(mergedData);
       return true;
     } catch (error) {
-      console.error("Error fetching data getROutesData: ", error);
+      console.error("Error fetching data getRoutesData:", error);
+      return false;
     }
-    return false;
   };
-  //
 
   const callCheckStaffInRoutes = async () => {
     const isUserOnRoute = await checkStaffInRoutes();
-    //console.log(isUserOnRoute);
     if (!isUserOnRoute) {
       navigation.navigate("Home");
     }
@@ -124,20 +137,13 @@ const RouteContextProvider = ({ children }) => {
   const checkStaffInRoutes = async () => {
     if (routesData) {
       const roleToCheck = isDriver ? "driver" : "helper";
-      //console.log(roleToCheck);
-      //console.log(routesData);
-      const routeWithMatchingRole = routesData.find((item) => {
-        if (item[roleToCheck] && item[roleToCheck] === dbUser?.id) {
-          return true;
-        }
-        return false;
-      });
+      const routeWithMatchingRole = routesData.find(
+        (item) => item[roleToCheck] && item[roleToCheck] === dbUser?.id
+      );
       if (routeWithMatchingRole) {
-        // Update the state variable with the route that has matching role
         setCurrentRouteData(routeWithMatchingRole);
         return true;
       } else {
-        // Handle case when no matching route is found
         console.log(
           `No route found for ${roleToCheck} with user ID ${dbUser?.id}`
         );
@@ -145,16 +151,12 @@ const RouteContextProvider = ({ children }) => {
     }
     return false;
   };
-  ///
-  // Starting the useEffects
-  ///
+
   useEffect(() => {
     if (dbUser && userEmail) {
-      // Fetch initial data when the component mounts
       const fetchInitialData = async () => {
         await getRoutesData();
       };
-
       fetchInitialData();
     }
   }, [dbUser]);
@@ -164,7 +166,6 @@ const RouteContextProvider = ({ children }) => {
       value={{
         routesData,
         updateRoutesData,
-        //currentRouteData,
       }}
     >
       {children}
