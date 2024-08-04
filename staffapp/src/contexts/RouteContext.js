@@ -56,7 +56,7 @@ const RouteContextProvider = ({ children }) => {
   const getRoutesData = async () => {
     try {
       const { data: routeData, error: routeError } = await supabase
-        .from("route")
+        .from("drop_off_route")
         .select("*")
         .or(
           "status.eq.WAITING_TO_START,status.eq.IN_PROGRESS,status.eq.PAUSED"
@@ -66,15 +66,15 @@ const RouteContextProvider = ({ children }) => {
 
       const mergedData = await Promise.all(
         routeData.map(async (route) => {
-          const { data: studentsData, error: kidsError } = await supabase
-            .from("students")
-            .select("*")
-            .eq("routeId", route.id);
+          // const { data: studentsData, error: kidsError } = await supabase
+          //   .from("students")
+          //   .select("*")
+          //   .eq("dropOffRouteId", route.id);
 
-          if (kidsError) throw kidsError;
+          // if (kidsError) throw kidsError;
 
-          // Fetch parents info for each kid
-          await Promise.all(studentsData.map(fetchParentsInfoForKid));
+          // // Fetch parents info for each kid
+          // await Promise.all(studentsData.map(fetchParentsInfoForKid));
 
           const { data: vansData, error: vanError } = await supabase
             .from("vans")
@@ -111,7 +111,7 @@ const RouteContextProvider = ({ children }) => {
 
           return {
             ...route,
-            Kid: studentsData,
+            //Kid: studentsData,
             Van: vansData,
             driverUser,
             helperUser,

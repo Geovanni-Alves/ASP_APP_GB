@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 export const updateLocation = async (routeId, latitude, longitude) => {
   try {
     const { data, error } = await supabase
-      .from("route")
+      .from("drop_off_route")
       .update({ lat: latitude, lng: longitude })
       .eq("id", routeId);
 

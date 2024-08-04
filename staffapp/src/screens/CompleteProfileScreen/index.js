@@ -15,7 +15,7 @@ import { useNavigation } from "@react-navigation/native";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import { GOOGLE_MAPS_APIKEY } from "@env";
 import PhoneInput from "react-native-phone-number-input";
-import { supabase } from "../../lib/supabase"; // Ensure this is the correct path to your Supabase client
+import { supabase } from "../../lib/supabase";
 
 const ProfileScreen = () => {
   const { authUser, setDbUser, dbUser, userEmail } = useUsersContext();

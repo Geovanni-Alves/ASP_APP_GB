@@ -1,17 +1,19 @@
 import React from "react";
 import { SimpleLineIcons, FontAwesome5 } from "@expo/vector-icons";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { TouchableOpacity } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import DropOffListScreen from "../screens/DropOffListScreen";
 import DropOffRouteScreen from "../screens/DropOffRouteScreen";
 import CompleteProfileScreen from "../screens/CompleteProfileScreen";
 import ChatScreen from "../screens/ChatScreen";
 import ProfileScreen from "../screens/ProfileScreen";
-import RouteScreen from "../screens/RouteScreen";
 import ChatUserScreen from "../screens/ChatUserScreen";
+import HomeScreen from "../screens/HomeScreen";
 import CheckIn from "../screens/CheckIn";
-import { useUsersContext } from "../contexts/UsersContext";
 import CustomDrawerContent from "../components/CustomDrawerContent";
+import { useUsersContext } from "../contexts/UsersContext";
 
 const Drawer = createDrawerNavigator();
 
@@ -50,16 +52,25 @@ const DrawerNavigator = ({ currentUserData }) => (
       headerLeft: () => <CustomHamburgerMenu />,
     }}
   >
-    <Drawer.Screen
-      name="DropOff"
+    {/* <Drawer.Screen
+      name="Home"
       options={{
-        drawerLabel: "Drop off",
-        title: "Drop off Route",
+        drawerLabel: "Home",
+        title: "Home Screen",
         drawerIcon: () => (
           <SimpleLineIcons name="home" size={20} color="#808080" />
         ),
       }}
-      component={DropOffRouteScreen}
+      component={HomeScreen}
+    /> */}
+    <Drawer.Screen
+      name="DropOffList"
+      options={{
+        drawerLabel: "Drop off",
+        title: "Drop off List",
+        drawerIcon: () => <FontAwesome name="bus" size={20} color="#808080" />,
+      }}
+      component={DropOffListScreen}
     />
     <Drawer.Screen
       name="Chat"
@@ -84,12 +95,12 @@ const DrawerNavigator = ({ currentUserData }) => (
       component={ProfileScreen}
     />
     <Drawer.Screen
-      name="Route"
+      name="DropOffRoute"
       options={{
         drawerItemStyle: { display: "none" },
         headerShown: true,
       }}
-      component={RouteScreen}
+      component={DropOffRouteScreen}
     />
     <Drawer.Screen
       name="ChatUser"
