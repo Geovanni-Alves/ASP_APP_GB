@@ -1,24 +1,21 @@
-import {
-  SimpleLineIcons,
-  FontAwesome5,
-} from "@expo/vector-icons";
+import { SimpleLineIcons, FontAwesome5 } from "@expo/vector-icons";
 import { TouchableOpacity } from "react-native";
 import CustomDrawerContent from "../components/CustomDrawerContent";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { useNavigation } from "@react-navigation/native";
+import { useRouteContext } from "../contexts/RouteContext";
+import { useUsersContext } from "../contexts/UsersContext";
 import HomeScreen from "../screens/HomeScreen";
 import DropOffRouteScreen from "../screens/DropOffRouteScreen";
 import WaitingScreen from "../screens/WaitingScreen";
 import ChatScreen from "../screens/ChatScreen";
 import ChatUserScreen from "../screens/ChatUserScreen";
-import GalleryScreen from "../screens/GalleryScreen";
-import FeedScreen from "../screens/FeedScreen";
+import StudentGalleryScreen from "../screens/StudentGalleryScreen";
+import StudentFeedScreen from "../screens/StudentFeedScreen";
+import StudentProfileScreen from "../screens/StudentProfileScreen";
 import AddAddressScreen from "../screens/AddAddressScreen";
 import AddressListScreen from "../screens/AddressListScreen";
-import KidProfileScreen from "../screens/KidProfileScreen";
 import ProfileScreen from "../screens/ProfileScreen";
-import { useRouteContext } from "../contexts/RouteContext";
-import { useUsersContext } from "../contexts/UsersContext";
 
 const RootNavigator = () => {
   const { currentUserData } = useUsersContext();
@@ -114,7 +111,7 @@ const RootNavigator = () => {
           drawerItemStyle: { display: "none" },
           headerShown: true,
         }}
-        component={FeedScreen}
+        component={StudentFeedScreen}
       />
       <Drawer.Screen
         name="ChatUser"
@@ -126,7 +123,7 @@ const RootNavigator = () => {
       />
       <Drawer.Screen
         name="KidProfile"
-        component={KidProfileScreen}
+        component={StudentProfileScreen}
         options={{
           drawerItemStyle: { display: "none" },
           headerShown: true,
@@ -150,7 +147,7 @@ const RootNavigator = () => {
       />
       <Drawer.Screen
         name="Gallery"
-        component={GalleryScreen}
+        component={StudentGalleryScreen}
         options={{
           drawerItemStyle: { display: "none" },
           headerShown: true,

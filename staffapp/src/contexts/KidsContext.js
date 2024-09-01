@@ -8,50 +8,66 @@ const KidsContext = createContext({});
 const KidsContextProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [kids, setKids] = useState([]);
-  //const { getPhotoInBucket } = usePicturesContext();
+  const [kidCurrentStateData, setKidCurrentStateData] = useState([]);
+
+  const fetchCurrentStateData = async () => {
+    if (kids.length > 0) {
+      const currentStateArray = [];
+      for (const kid of kids) {
+        if (kid.CurrentState?.state) {
+          const associatedUser = users.find(
+            (member) => member.id === kid.CurrentState.userIdState
+          );
+          const stateInfo = {
+            kidId: kid.id,
+            state: kid.CurrentState.state,
+            userId: kid.CurrentState.userIdState,
+            userName: associatedUser?.name,
+            kidName: kid.name,
+            stateTime: kid.CurrentState.TimeState,
+            stateDate: kid.CurrentState.dateState,
+          };
+          currentStateArray.push(stateInfo);
+        }
+      }
+      setKidCurrentStateData(currentStateArray);
+    }
+  };
 
   const fetchKidsData = async () => {
     try {
       const { data: fetchedKids, error: kidsError } = await supabase
         .from("students")
-        .select("*");
+        .select("*")
+        .order("name", { ascending: true });
 
       if (kidsError) throw kidsError;
 
-      //console.log("kids", fetchedKids);
+      const kidsWithParents = await Promise.all(
+        fetchedKids.map(async (kid) => {
+          if (kid.parent1Id !== null) {
+            const { data: parent1Data, error: parent1Error } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", kid.parent1Id)
+              .single();
+            if (parent1Error) throw parent1Error;
+            kid.Parent1 = parent1Data;
+          }
+          if (kid.parent2Id !== null) {
+            const { data: parent2Data, error: parent2Error } = await supabase
+              .from("users")
+              .select("*")
+              .eq("id", kid.parent2Id)
+              .single();
+            if (parent2Error) throw parent2Error;
+            kid.Parent2 = parent2Data;
+          }
+          return kid;
+        })
+      );
 
-      // const kidsWithPhotos = await Promise.all(
-      //   fetchedKids.map(async (kid) => {
-      //     if (kid.Parent1Id !== null) {
-      //       const { data: parent1Data, error: parent1Error } = await supabase
-      //         .from("users")
-      //         .select("*")
-      //         .eq("id", kid.Parent1Id)
-      //         .single();
-      //       if (parent1Error) throw parent1Error;
-      //       kid.Parent1 = parent1Data;
-      //     }
-
-      //     if (kid.Parent2Id !== null) {
-      //       const { data: parent2Data, error: parent2Error } = await supabase
-      //         .from("users")
-      //         .select("*")
-      //         .eq("id", kid.Parent2Id)
-      //         .single();
-      //       if (parent2Error) throw parent2Error;
-      //       kid.Parent2 = parent2Data;
-      //     }
-
-      //     if (kid.photo) {
-      //       const uriKid = await getPhotoInBucket(kid.photo);
-      //       return { ...kid, uriKid };
-      //     } else {
-      //       return kid;
-      //     }
-      //   })
-      // );
-
-      setKids(fetchedKids);
+      setKids(kidsWithParents);
     } catch (error) {
       console.error("Error fetching kids data", error);
     }
@@ -61,6 +77,11 @@ const KidsContextProvider = ({ children }) => {
     fetchKidsData();
   }, []);
 
+  const RefreshKidsData = async () => {
+    await fetchKidsData();
+    await fetchCurrentStateData();
+  };
+
   useEffect(() => {
     if (kids) {
       setLoading(false);
@@ -68,7 +89,7 @@ const KidsContextProvider = ({ children }) => {
   }, [kids]);
 
   return (
-    <KidsContext.Provider value={{ kids }}>
+    <KidsContext.Provider value={{ kids, RefreshKidsData }}>
       {loading ? <ActivityIndicator /> : children}
     </KidsContext.Provider>
   );

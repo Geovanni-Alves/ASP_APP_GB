@@ -9,14 +9,19 @@ import {
 } from "react-native";
 import { usePicturesContext } from "../contexts/PicturesContext";
 
-const PhotoOptionsModal = ({ isVisible, onClose, onSelectOption }) => {
+const PhotoOptionsModal = ({
+  isVisible,
+  onClose,
+  onSelectOption,
+  isUpload = false,
+}) => {
   const [loading, setLoading] = useState(false);
   const { savePhotoInBucket } = usePicturesContext();
 
   const handlePhotoChange = async (useCamera) => {
     try {
       setLoading(true);
-      const imagePath = await savePhotoInBucket(useCamera);
+      const imagePath = await savePhotoInBucket(useCamera, "profilePhotos");
 
       if (imagePath.assets !== null) {
         onSelectOption(imagePath);
@@ -44,7 +49,9 @@ const PhotoOptionsModal = ({ isVisible, onClose, onSelectOption }) => {
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#0000ff" />
-              <Text style={styles.loadingText}>Changing Photo...</Text>
+              <Text style={styles.loadingText}>
+                {isUpload ? "Upload Photo..." : "Changing Photo..."}
+              </Text>
             </View>
           ) : (
             <>

@@ -1,4 +1,6 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet, Dimensions } from "react-native";
+
+const { width, height } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   title: {
@@ -111,6 +113,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     zIndex: 9999,
+    backgroundColor: "white",
+    borderRadius: 15,
+    padding: 1,
   },
   inputContainer: {
     marginBottom: 5,
@@ -131,6 +136,22 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FF7276",
     backgroundColor: "#FFF",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 30,
+    right: 20,
+  },
+  fullImage: {
+    width: width - 20,
+    height: height - 20,
+    resizeMode: "contain",
   },
 });
 
