@@ -41,7 +41,6 @@ export default function CustomDrawerContent(props) {
         <RemoteImage
           path={currentUserData?.photo}
           name={currentUserData?.name}
-          bucketName="profilePhotos"
           //fallback=""
           //source={{ uri: currentUserData?.uriUser }}
           style={styles.userPic}

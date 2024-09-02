@@ -1,4 +1,3 @@
-import styles from "./styles";
 import { useRef, useMemo, useState, useEffect } from "react";
 import {
   View,
@@ -9,25 +8,31 @@ import {
   Linking,
   Pressable,
   Modal,
+  SafeAreaView,
   Alert,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { BottomSheetFlatList } from "@gorhom/bottom-sheet";
 import { FontAwesome5, FontAwesome } from "@expo/vector-icons";
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import styles from "./styles";
 import MapView, { Marker } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import { GOOGLE_MAPS_APIKEY } from "@env";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 import RouteInfoComponent from "../../components/RouteInfo";
+//import { API } from "aws-amplify";
+//import { getUser, listAddressLists, getKid } from "../../graphql/queries";
+//import { updateRoute, updateAddressList } from "../../graphql/mutations";
+import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import * as Location from "expo-location";
+import { useRouteContext } from "../../contexts/RouteContext";
 import LocationTrackingComponent from "../../components/LocationTrackingComponent";
 import { useBackgroundTaskContext } from "../../contexts/BackgroundTaskContext";
 import ShowMessage from "../../components/ShowMessage";
-import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import { useUsersContext } from "../../contexts/UsersContext";
-import { useRouteContext } from "../../contexts/RouteContext";
+import { useNavigation } from "@react-navigation/native";
+import { supabase } from "../../lib/supabase";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 //
 
@@ -264,7 +269,7 @@ const DropOffRouteScreen = () => {
   const getOrderAddress = async () => {
     try {
       // Fetch the address list filtered by routeId
-      const { data: addressListsData, error: addressError } = await supabase
+      const { data: AddressListsData, error: addressError } = await supabase
         .from("drop_off_address_order")
         .select("*")
         .eq("routeId", currentRouteData.id);
@@ -272,8 +277,9 @@ const DropOffRouteScreen = () => {
       if (addressError) {
         throw addressError;
       }
+
       // Sort the address list by order
-      const sortedAddressList = addressListsData.sort(
+      const sortedAddressList = AddressListsData.sort(
         (a, b) => a.order - b.order
       );
       // Fetch kid data for each address and combine them
@@ -306,9 +312,7 @@ const DropOffRouteScreen = () => {
       const groupedAddressList = new Map();
 
       addressListWithKids.forEach((address) => {
-        //console.log("addressListWithKids", addressListWithKids);
-        const latitude = address.Kid.students_address[0].lat;
-        const longitude = address.Kid.students_address[0].lng;
+        const { latitude, longitude } = address;
         const locationKey = `${latitude}_${longitude}`;
 
         if (!groupedAddressList.has(locationKey)) {
@@ -329,7 +333,6 @@ const DropOffRouteScreen = () => {
 
       // Update the state with the processed address list
       //console.log("uniqueAddressList", uniqueAddressList);
-
       setAddressList(uniqueAddressList);
     } catch (error) {
       console.error("Error fetching getOrderAddress: ", error);
@@ -511,7 +514,7 @@ const DropOffRouteScreen = () => {
             {
               text: "OK",
               onPress: () => {
-                navigation.navigate("DropOffList");
+                navigation.navigate("Home");
               },
             },
           ]
@@ -672,7 +675,7 @@ const DropOffRouteScreen = () => {
 
   const goBack = () => {
     if (driverAction !== "Drive") {
-      navigation.navigate("DropOffList");
+      navigation.goBack();
     } else {
       // Display a confirmation prompt
       Alert.alert(
@@ -688,7 +691,7 @@ const DropOffRouteScreen = () => {
             onPress: async () => {
               // User confirmed, navigate back
               setDriverAction("Waiting");
-              navigation.navigate("DropOffList");
+              navigation.goBack();
             },
           },
         ]
@@ -698,7 +701,7 @@ const DropOffRouteScreen = () => {
 
   useEffect(() => {
     navigation.setOptions({
-      title: "Drop off map",
+      //title: title,
       headerLeft: () => (
         <TouchableOpacity onPress={goBack}>
           <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />

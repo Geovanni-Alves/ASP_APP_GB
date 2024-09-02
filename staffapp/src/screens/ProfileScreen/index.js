@@ -9,10 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
-  Modal,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
-import { Entypo } from "@expo/vector-icons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -22,8 +20,7 @@ import PhoneInput from "react-native-phone-number-input";
 import { useUsersContext } from "../../contexts/UsersContext";
 import styles from "./styles";
 import RemoteImage from "../../components/RemoteImage";
-import OpenCamera from "../../components/OpenCamera";
-//import PhotoOptionsModal from "../../components/PhotoOptionsModal";
+import PhotoOptionsModal from "../../components/PhotoOptionsModal";
 
 const ProfileScreen = () => {
   const { setDbUser, dbUser, RefreshCurrentUserData } = useUsersContext();
@@ -36,10 +33,7 @@ const ProfileScreen = () => {
   const phoneInputRef = useRef(null);
   const [lat, setLat] = useState(dbUser?.lat || null);
   const [lng, setLng] = useState(dbUser?.lng || null);
-  //const [isPhotoOptionsModalVisible, setPhotoModalVisible] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [callOpenCamera, setCallOpenCamera] = useState(false);
+  const [isPhotoOptionsModalVisible, setPhotoModalVisible] = useState(false);
   const [actualPhoto, setActualPhoto] = useState(dbUser?.photo || null);
 
   const navigation = useNavigation();
@@ -64,16 +58,6 @@ const ProfileScreen = () => {
     }
   };
 
-  const handleImagePress = (image) => {
-    setModalVisible(true);
-    setSelectedImage(image);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedImage(null);
-  };
-
   const handleNewPhoto = async (imagePath) => {
     try {
       if (imagePath) {
@@ -84,10 +68,6 @@ const ProfileScreen = () => {
     } catch (error) {
       console.error("Error saving image to storage", error);
     }
-  };
-
-  const handlePhotoTaken = (photo) => {
-    setCallOpenCamera(false);
   };
 
   const updateUserImage = async (filename) => {
@@ -149,48 +129,34 @@ const ProfileScreen = () => {
     <View style={{ flex: 1, padding: 16 }}>
       <View style={styles.headerContainer}>
         <View style={styles.imageWrapper}>
-          <TouchableOpacity onPress={() => setCallOpenCamera(true)}>
-            <TouchableOpacity
-              style={styles.imageContainer}
-              onPress={() => handleImagePress(actualPhoto)}
-            >
+          <TouchableOpacity onPress={() => setPhotoModalVisible(true)}>
+            <View style={styles.imageContainer}>
               <RemoteImage
                 path={actualPhoto}
                 style={styles.userPhoto}
                 name={dbUser?.name}
-                bucketName="profilePhotos"
               />
-            </TouchableOpacity>
+            </View>
             <View style={styles.cameraIcon}>
               <Text
                 style={{
                   position: "absolute",
-                  bottom: -12,
+                  bottom: -10,
                   right: 3,
                   fontSize: 15,
-                  fontWeight: "600",
-                  color: "blue",
+                  fontWeight: "500",
                 }}
               >
                 Edit
               </Text>
-              <MaterialIcons name="photo-camera" size={32} color="gray" />
+              <MaterialIcons name="photo-camera" size={32} color="#FF7276" />
             </View>
           </TouchableOpacity>
-          <OpenCamera
-            isVisible={callOpenCamera}
-            onPhotoTaken={handlePhotoTaken}
-            onSelectOption={handleNewPhoto}
-            onClose={() => setCallOpenCamera(false)}
-            mode="photo"
-            allowMultipleImages={false}
-            bucketName="profilePhotos"
-          />
-          {/* <PhotoOptionsModal
+          <PhotoOptionsModal
             isVisible={isPhotoOptionsModalVisible}
             onClose={() => setPhotoModalVisible(false)}
             onSelectOption={handleNewPhoto}
-          /> */}
+          />
         </View>
       </View>
 
@@ -277,31 +243,6 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalContainer}>
-          <RemoteImage
-            path={selectedImage}
-            bucketName="profilePhotos"
-            style={styles.fullImage}
-          />
-          <TouchableOpacity
-            style={{
-              position: "absolute",
-              top: 25,
-              right: 10,
-              zIndex: 9999, // Ensure the close button is on top
-            }}
-            onPress={closeModal}
-          >
-            <Entypo name="cross" size={30} color="red" />
-          </TouchableOpacity>
-        </View>
-      </Modal>
 
       {/* <View style={styles.inputContainer}>
         <Text style={styles.label}>Email</Text>

@@ -4,8 +4,6 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { TouchableOpacity } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import CustomDrawerContent from "../components/CustomDrawerContent";
-import { useUsersContext } from "../contexts/UsersContext";
 import DropOffListScreen from "../screens/DropOffListScreen";
 import DropOffRouteScreen from "../screens/DropOffRouteScreen";
 import CompleteProfileScreen from "../screens/CompleteProfileScreen";
@@ -13,13 +11,9 @@ import ChatScreen from "../screens/ChatScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import ChatUserScreen from "../screens/ChatUserScreen";
 import HomeScreen from "../screens/HomeScreen";
-import CheckInScreen from "../screens/CheckInScreen";
-import StudentScreen from "../screens/StudentScreen";
-import StudentFeedScreen from "../screens/StudentFeedScreen";
-import StudentProfileScreen from "../screens/StudentProfileScreen";
-import AddAddressScreen from "../screens/AddAddressScreen";
-import AddressListScreen from "../screens/AddressListScreen";
-import NewActivityScreen from "../screens/NewActivityScreen";
+import CheckIn from "../screens/CheckIn";
+import CustomDrawerContent from "../components/CustomDrawerContent";
+import { useUsersContext } from "../contexts/UsersContext";
 
 const Drawer = createDrawerNavigator();
 
@@ -58,7 +52,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       headerLeft: () => <CustomHamburgerMenu />,
     }}
   >
-    <Drawer.Screen
+    {/* <Drawer.Screen
       name="Home"
       options={{
         drawerLabel: "Home",
@@ -68,7 +62,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         ),
       }}
       component={HomeScreen}
-    />
+    /> */}
     <Drawer.Screen
       name="DropOffList"
       options={{
@@ -100,29 +94,6 @@ const DrawerNavigator = ({ currentUserData }) => (
       }}
       component={ProfileScreen}
     />
-
-    <Drawer.Screen
-      name="CheckIn"
-      options={{
-        drawerLabel: "Check In",
-        title: "Check In",
-        drawerIcon: () => (
-          <SimpleLineIcons name="check" size={20} color="#808080" />
-        ),
-      }}
-      component={CheckInScreen}
-    />
-    <Drawer.Screen
-      name="Students"
-      options={{
-        drawerLabel: "Students",
-        title: "Students",
-        drawerIcon: () => (
-          <FontAwesome name="child" size={20} color="#808080" />
-        ),
-      }}
-      component={StudentScreen}
-    />
     <Drawer.Screen
       name="DropOffRoute"
       options={{
@@ -140,44 +111,15 @@ const DrawerNavigator = ({ currentUserData }) => (
       component={ChatUserScreen}
     />
     <Drawer.Screen
-      name="StudentFeed"
+      name="CheckIn"
       options={{
-        drawerItemStyle: { display: "none" },
-        headerShown: true,
+        drawerLabel: "Check In",
+        title: "Check In",
+        drawerIcon: () => (
+          <SimpleLineIcons name="check" size={20} color="#808080" />
+        ),
       }}
-      component={StudentFeedScreen}
-    />
-    <Drawer.Screen
-      name="StudentProfile"
-      component={StudentProfileScreen}
-      options={{
-        drawerItemStyle: { display: "none" },
-        headerShown: true,
-      }}
-    />
-    <Drawer.Screen
-      name="AddAddress"
-      component={AddAddressScreen}
-      options={{
-        drawerItemStyle: { display: "none" },
-        headerShown: true,
-      }}
-    />
-    <Drawer.Screen
-      name="AddressList"
-      component={AddressListScreen}
-      options={{
-        drawerItemStyle: { display: "none" },
-        headerShown: true,
-      }}
-    />
-    <Drawer.Screen
-      name="Activities"
-      component={NewActivityScreen}
-      options={{
-        drawerItemStyle: { display: "none" },
-        headerShown: true,
-      }}
+      component={CheckIn}
     />
   </Drawer.Navigator>
 );
