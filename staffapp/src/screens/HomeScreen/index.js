@@ -36,7 +36,7 @@ const HomeScreen = () => {
   // if (true) {
   //   return (
   //     <View style={{ flex: 1 }}>
-  //       <CustomLoading />
+  //       <CustomLoading size={100} imageSize={100} />
   //     </View>
   //   );
   // }

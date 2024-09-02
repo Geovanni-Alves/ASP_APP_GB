@@ -93,7 +93,7 @@ const RemoteVideo = ({
   if (loading && onlyThumbnail) {
     return (
       <View style={[styles.loaderContainer, style]}>
-        <CustomLoading progress={progress} size={70} imageSize={70} />
+        <CustomLoading progress={progress} size={70} imageSize={80} />
       </View>
     );
   }
@@ -132,6 +132,7 @@ const RemoteVideo = ({
 
 const styles = StyleSheet.create({
   loaderContainer: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#00000010",
