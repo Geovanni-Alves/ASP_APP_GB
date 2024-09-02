@@ -1,3 +1,4 @@
+import styles from "./styles";
 import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
@@ -10,23 +11,24 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import styles from "./styles";
-import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
-import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import { useRouteContext } from "../../contexts/RouteContext";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { useMessageContext } from "../../contexts/MessageContext";
-import { useKidsContext } from "../../contexts/KidsContext";
-import { useUsersContext } from "../../contexts/UsersContext";
+import { FontAwesome } from "@expo/vector-icons";
+import {
+  useNavigation,
+  useFocusEffect,
+  useRoute,
+} from "@react-navigation/native";
 import RemoteImage from "../../components/RemoteImage";
+import { useRouteContext } from "../../contexts/RouteContext";
+import { useUsersContext } from "../../contexts/UsersContext";
 
 const DropOffListScreen = () => {
+  const route = useRoute();
   const { routesData, updateRoutesData } = useRouteContext();
   const { currentUserData } = useUsersContext();
-  const { unreadMessages } = useMessageContext();
-  const { kids } = useKidsContext();
+  // const { unreadMessages } = useMessageContext();
+  // const { kids } = useKidsContext();
 
-  const [images, setImages] = useState({});
+  //const [images, setImages] = useState({});
   const navigation = useNavigation();
 
   const [assignedRoute, setAssignedRoute] = useState(null);
@@ -38,20 +40,20 @@ const DropOffListScreen = () => {
   ).uri;
 
   // useEffect to fetch and update the message count
-  useEffect(() => {
-    if (unreadMessages && kids) {
-      // Count the number of unread messages
-      try {
-        const unreadCount = unreadMessages.filter((message) =>
-          kids.some((kid) => !message.isRead && message.senderID === kid.id)
-        ).length;
-        //console.log("unreadMessages", unreadCount);
-        setMsgsCount(unreadCount);
-      } catch (error) {
-        console.log("error updating the unread Message", error);
-      }
-    }
-  }, [unreadMessages, kids]);
+  // useEffect(() => {
+  //   if (unreadMessages && kids) {
+  //     // Count the number of unread messages
+  //     try {
+  //       const unreadCount = unreadMessages.filter((message) =>
+  //         kids.some((kid) => !message.isRead && message.senderID === kid.id)
+  //       ).length;
+  //       //console.log("unreadMessages", unreadCount);
+  //       setMsgsCount(unreadCount);
+  //     } catch (error) {
+  //       console.log("error updating the unread Message", error);
+  //     }
+  //   }
+  // }, [unreadMessages, kids]);
 
   // const fetchImage = async (imageURL) => {
   //   try {
@@ -70,6 +72,21 @@ const DropOffListScreen = () => {
   //     console.error("Logout error:", error);
   //   }
   // };
+
+  const goBack = () => {
+    navigation.goBack();
+  };
+
+  useEffect(() => {
+    navigation.setOptions({
+      //title: title,
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [route]);
 
   const fetchData = async () => {
     setRefreshing(true);
@@ -145,11 +162,11 @@ const DropOffListScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerButtons}>
-          {/* <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        {/* <View style={styles.headerButtons}> */}
+        {/* <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <MaterialIcons name="logout" size={20} color="white" />
           </TouchableOpacity> */}
-          <TouchableOpacity
+        {/* <TouchableOpacity
             style={styles.chatButton}
             onPress={() => navigation.navigate("Chat")}
           >
@@ -165,13 +182,13 @@ const DropOffListScreen = () => {
                 </Text>
               </View>
             )}
-          </TouchableOpacity>
-          <View style={styles.checkBtn}>
+          </TouchableOpacity> */}
+        {/* <View style={styles.checkBtn}>
             <TouchableOpacity onPress={() => navigation.navigate("CheckIn")}>
               <MaterialIcons name="account-box" size={20} color="black" />
             </TouchableOpacity>
-          </View>
-        </View>
+          </View> */}
+        {/* </View> */}
         <View style={styles.headerGreetings}>
           <Text style={styles.title}>{`Hello, ${currentUserData?.name}`}</Text>
 

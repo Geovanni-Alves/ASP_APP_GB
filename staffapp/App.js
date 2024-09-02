@@ -13,8 +13,7 @@ import KidsContextProvider from "./src/contexts/KidsContext";
 import MessageContextProvider from "./src/contexts/MessageContext";
 import StaffContextProvider from "./src/contexts/StaffContext";
 import UsersContextProvider from "./src/contexts/UsersContext";
-
-// Aws Amplify config
+import FeedContextProvider from "./src/contexts/FeedContext";
 
 LogBox.ignoreLogs(["NSLocation*UsageDescription"]);
 
@@ -26,29 +25,31 @@ function App() {
   }, []);
 
   return (
-    <NavigationContainer>
-      <PushNotificationsContextProvider>
-        <AuthContextProvider>
-          <PicturesContextProvider>
-            <UsersContextProvider>
-              <KidsContextProvider>
-                <StaffContextProvider>
-                  <MessageContextProvider>
-                    <RouteContextProvider>
-                      <BackgroundTasksProvider>
-                        <GestureHandlerRootView style={{ flex: 1 }}>
-                          <RootNavigator />
-                        </GestureHandlerRootView>
-                      </BackgroundTasksProvider>
-                    </RouteContextProvider>
-                  </MessageContextProvider>
-                </StaffContextProvider>
-              </KidsContextProvider>
-            </UsersContextProvider>
-          </PicturesContextProvider>
-        </AuthContextProvider>
-      </PushNotificationsContextProvider>
-    </NavigationContainer>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <NavigationContainer>
+        <PushNotificationsContextProvider>
+          <AuthContextProvider>
+            <PicturesContextProvider>
+              <UsersContextProvider>
+                <KidsContextProvider>
+                  <StaffContextProvider>
+                    <FeedContextProvider>
+                      <MessageContextProvider>
+                        <RouteContextProvider>
+                          <BackgroundTasksProvider>
+                            <RootNavigator />
+                          </BackgroundTasksProvider>
+                        </RouteContextProvider>
+                      </MessageContextProvider>
+                    </FeedContextProvider>
+                  </StaffContextProvider>
+                </KidsContextProvider>
+              </UsersContextProvider>
+            </PicturesContextProvider>
+          </AuthContextProvider>
+        </PushNotificationsContextProvider>
+      </NavigationContainer>
+    </GestureHandlerRootView>
   );
 }
 

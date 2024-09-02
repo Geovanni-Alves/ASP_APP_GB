@@ -5,7 +5,7 @@ export default {
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
-  userInterfaceStyle: "light",
+  userInterfaceStyle: "automatic",
   splash: {
     image: "./assets/splash.png",
     //resizeMode: "contain",
@@ -25,7 +25,23 @@ export default {
         isIosBackgroundLocationEnabled: true,
       },
     ],
+    [
+      "expo-camera",
+      {
+        cameraPermission: "Allow $(PRODUCT_NAME) to access your camera",
+        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone",
+        recordAudioAndroid: true,
+      },
+    ],
+    [
+      "expo-av",
+      {
+        microphonePermission:
+          "Allow $(PRODUCT_NAME) to access your microphone.",
+      },
+    ],
   ],
+
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.geodarth.appaspstaff",
