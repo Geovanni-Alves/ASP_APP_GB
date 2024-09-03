@@ -113,6 +113,7 @@ const StudentProfileScreen = () => {
 
   useEffect(() => {
     fetchData();
+    setActualPhoto(null);
   }, [kidId, kids]);
 
   useEffect(() => {
@@ -401,7 +402,11 @@ const StudentProfileScreen = () => {
             <View style={styles.imageWrapper}>
               <TouchableOpacity
                 style={styles.imageContainer}
-                onPress={() => handleImagePress(actualPhoto)}
+                onPress={() => {
+                  if (actualPhoto) {
+                    handleImagePress(actualPhoto);
+                  }
+                }}
               >
                 <RemoteImage
                   path={actualPhoto}

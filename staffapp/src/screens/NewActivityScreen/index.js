@@ -1,9 +1,9 @@
 import styles from "./styles";
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import Entypo from "@expo/vector-icons/Entypo";
+import { View, Text, TouchableOpacity } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import Fontisto from "@expo/vector-icons/Fontisto";
+import { FontAwesome, Entypo } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 //import RemoteImage from "../../components/RemoteImage";
 import OpenCamera from "../../components/OpenCamera";
@@ -15,12 +15,42 @@ const NewActivityScreen = () => {
   const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState("photo");
   const [bucketName, setBucketName] = useState(null);
-  const [mediaPath, setMediaPath] = useState(null);
+  const [selectedKid, setSelectedKid] = useState(null);
   const navigation = useNavigation();
   const route = useRoute();
-  const { kidId } = route.params || {};
+  const from = route.params?.from;
+  const { id: kidId } = route.params || {};
   const { kids } = useKidsContext();
   const { currentUserData } = useUsersContext();
+
+  const goBack = () => {
+    if (from === "home") {
+      navigation.navigate("Home");
+    } else {
+      navigation.navigate("StudentFeed", { id: kidId });
+    }
+  };
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [route]);
+
+  useEffect(() => {
+    if (kidId && from === "feed") {
+      const foundKid = kids.find((kid) => kid.id === kidId);
+      if (foundKid) {
+        setSelectedKid(foundKid);
+      }
+    } else {
+      setSelectedKid(null);
+    }
+  }, [kidId, kids]);
 
   const handlePhotoPress = () => {
     setCameraMode("photo");
@@ -34,34 +64,25 @@ const NewActivityScreen = () => {
     setCallOpenCamera(true);
   };
 
-  function handleRetake() {
-    setMediaUris([]);
-    setRecordedTime(0);
-  }
-
-  // const handleTaggingComplete = (selectedKids) => {
-  //   //setTagModalVisible(false);
-  //   console.log("Selected kids:", selectedKids);
-  //   console.log("Media path:", mediaPath);
-  //   // Save the media with the selected kids or proceed as necessary
-  //   // navigation.goBack(); // Or navigate to the next screen if needed
-  // };
-
   const handleActivityPress = (activityType) => {
     console.log(`Selected activity: ${activityType}`);
+    console.log("selectedKid", selectedKid);
   };
 
-  const handleSelectOption = (paths, selectedKids) => {
-    console.log("paths", paths);
-    console.log("selectedKids", selectedKids);
+  const handleSelectPhotoVideo = (paths, selectedKids) => {
     //setMediaPath(path);
-    if (selectedKids.length > 0) {
+    // console.log("selectedKids", selectedKids);
+    // console.log("paths", paths);
+    if (selectedKids?.length > 0) {
       selectedKids.forEach((kidId) => {
         paths.forEach((path) => {
           const mediaType = cameraMode === "photo" ? "PHOTO" : "VIDEO";
           createNewFeedForKid(kidId, path, mediaType);
         });
       });
+    } else {
+      const mediaType = cameraMode === "photo" ? "PHOTO" : "VIDEO";
+      createNewFeedForKid(selectedKid.id, paths, mediaType);
     }
   };
 
@@ -125,7 +146,7 @@ const NewActivityScreen = () => {
         </View>
         <View style={styles.iconContainer}>
           <TouchableOpacity
-            onPress={() => handleActivityPress("incident")}
+            onPress={() => navigation.navigate("StudentSelection")}
             style={styles.patchIcon}
           >
             <Fontisto name="bandage" size={45} color="#FFFFFF" />
@@ -145,11 +166,11 @@ const NewActivityScreen = () => {
       <OpenCamera
         isVisible={callOpenCamera}
         //onPhotoTaken={handlePhotoTaken}
-        onSelectOption={handleSelectOption}
+        onSelectOption={handleSelectPhotoVideo}
         onClose={() => setCallOpenCamera(false)}
         mode={cameraMode}
         bucketName={bucketName}
-        tag={true}
+        tag={selectedKid ? false : true}
       />
     </View>
   );

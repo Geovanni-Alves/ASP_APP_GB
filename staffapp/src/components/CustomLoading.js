@@ -1,7 +1,12 @@
 import React, { useEffect, useRef } from "react";
 import { View, Animated, StyleSheet, Image, Easing } from "react-native";
 
-const CustomLoading = ({ progress, size = 100, imageSize = 100 }) => {
+const CustomLoading = ({
+  progress,
+  size = 100, // This is the size of the entire loader container
+  imageSize = 80, // This is the size of the rotating image (sun)
+  loadingBar = false, // Optional loading bar
+}) => {
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const loadingAnim = useRef(new Animated.Value(0)).current;
 
@@ -43,16 +48,18 @@ const CustomLoading = ({ progress, size = 100, imageSize = 100 }) => {
         });
 
   return (
-    <View style={[styles.container, { width: size }]}>
+    <View style={[styles.container, { height: size }]}>
       <Animated.View style={{ transform: [{ rotate }] }}>
         <Image
           source={require("../../assets/sol.png")} // Adjust the path to your PNG file
           style={[styles.image, { width: imageSize, height: imageSize }]}
         />
       </Animated.View>
-      <View style={styles.loadingBarBackground}>
-        <Animated.View style={[styles.loadingBar, { width: loadingWidth }]} />
-      </View>
+      {loadingBar && (
+        <View style={[styles.loadingBarBackground, { width: size * 0.8 }]}>
+          <Animated.View style={[styles.loadingBar, { width: loadingWidth }]} />
+        </View>
+      )}
     </View>
   );
 };
@@ -63,10 +70,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   image: {
+    // width: 400,
+    // height: 200,
     resizeMode: "contain",
   },
   loadingBarBackground: {
-    width: "80%", // Ensures the loading bar is always 80% of the container's width
     height: 8, // Adjust the height as needed
     backgroundColor: "#ccc",
     borderRadius: 10,

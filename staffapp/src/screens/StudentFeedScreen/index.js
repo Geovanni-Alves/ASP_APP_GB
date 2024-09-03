@@ -340,7 +340,10 @@ const StudentFeedScreen = () => {
         <Pressable
           style={styles.actionButton}
           onPress={() => {
-            /* Add navigation here */
+            navigation.navigate("Activities", {
+              id: selectedKid.id,
+              from: "feed",
+            });
           }}
         >
           <AntDesign name="staro" size={24} color="black" />

@@ -49,6 +49,7 @@ const StudentScreen = () => {
       </TouchableOpacity>
     );
   };
+
   return (
     <SafeAreaView style={styles.container}>
       <TextInput

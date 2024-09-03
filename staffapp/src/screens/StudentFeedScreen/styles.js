@@ -9,6 +9,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     alignItems: "center",
+    paddingTop: 10,
     padding: 5,
     overflow: "hidden",
   },

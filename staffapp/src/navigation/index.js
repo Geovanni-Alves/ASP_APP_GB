@@ -20,6 +20,8 @@ import StudentProfileScreen from "../screens/StudentProfileScreen";
 import AddAddressScreen from "../screens/AddAddressScreen";
 import AddressListScreen from "../screens/AddressListScreen";
 import NewActivityScreen from "../screens/NewActivityScreen";
+import IncidentsScreen from "../screens/IncidentsScreen";
+import StudentSelectionScreen from "../screens/StudentSelectionScreen";
 
 const Drawer = createDrawerNavigator();
 
@@ -175,6 +177,25 @@ const DrawerNavigator = ({ currentUserData }) => (
       name="Activities"
       component={NewActivityScreen}
       options={{
+        title: "Activities",
+        drawerItemStyle: { display: "none" },
+        headerShown: true,
+      }}
+    />
+    <Drawer.Screen
+      name="Incidents"
+      component={IncidentsScreen}
+      options={{
+        title: "Incidents",
+        drawerItemStyle: { display: "none" },
+        headerShown: true,
+      }}
+    />
+    <Drawer.Screen
+      name="StudentSelection"
+      component={StudentSelectionScreen}
+      options={{
+        title: "Select Students",
         drawerItemStyle: { display: "none" },
         headerShown: true,
       }}

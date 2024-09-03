@@ -362,7 +362,7 @@ const OpenCamera = ({
     );
   }
 
-  if (mediaUris.length > 0) {
+  if (mediaUris?.length > 0) {
     return (
       <Modal visible={isVisible} animationType="slide" transparent={false}>
         <View style={{ flex: 1 }}>
@@ -423,7 +423,7 @@ const OpenCamera = ({
                 >
                   <Text style={styles.bottomText}>
                     Use {mode === "video" ? "Video" : "Photo"}
-                    {mediaUris.length > 1 ? "s" : ""}
+                    {mediaUris?.length > 1 ? "s" : ""}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -460,7 +460,7 @@ const OpenCamera = ({
                     keyExtractor={(item) => item.id}
                     horizontal
                   />
-                  {selectedKids.length > 0 && (
+                  {selectedKids?.length > 0 && (
                     <TouchableOpacity
                       style={styles.doneButton}
                       onPress={handleTaggingComplete}

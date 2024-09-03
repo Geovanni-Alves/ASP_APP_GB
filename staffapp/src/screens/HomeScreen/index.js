@@ -35,8 +35,8 @@ const HomeScreen = () => {
 
   // if (true) {
   //   return (
-  //     <View style={{ flex: 1 }}>
-  //       <CustomLoading size={100} imageSize={100} />
+  //     <View>
+  //       <CustomLoading size={100} imageSize={300} />
   //     </View>
   //   );
   // }
@@ -70,7 +70,7 @@ const HomeScreen = () => {
           <TouchableOpacity
             style={styles.activityButton}
             onPress={() => {
-              navigation.navigate("Activities");
+              navigation.navigate("Activities", { from: "home" });
             }}
           >
             <FontAwesome name="feed" size={20} color="white" />
