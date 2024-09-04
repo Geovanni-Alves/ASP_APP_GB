@@ -2,63 +2,86 @@ import { StyleSheet } from "react-native";
 
 export default StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
+    padding: 7,
+    backgroundColor: "#fff",
   },
-  header: {
-    width: "100%",
-    height: "12%",
-    backgroundColor: "#FF7276",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "white",
-    marginTop: 40,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#CCCCCC",
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  addButton: {
-    backgroundColor: "#FF7276",
-    paddingVertical: 12,
-    borderRadius: 5,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  inputContainer: {
-    padding: 20,
-    marginBottom: "100%",
-  },
-  studentContainer: {
+  headerContainer: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
-    marginLeft: "auto",
-    marginRight: "auto",
+    marginBottom: 10,
   },
-  profilePicture: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginRight: 20,
-  },
-  studentName: {
+  title: {
     fontSize: 18,
     fontWeight: "bold",
+  },
+  editButton: {
+    padding: 5,
+  },
+  studentsContainer: {
+    margin: 10,
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  studentItem: {
+    alignItems: "center",
+    marginRight: 10,
+  },
+  studentImage: {
+    width: 45,
+    height: 45,
+    borderRadius: 25,
+    marginBottom: 5,
+  },
+  studentName: {
+    fontSize: 10,
     textAlign: "center",
+  },
+  timeText: {
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  noteContainer: {
+    marginBottom: 20,
+  },
+  noteLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  noteInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    height: 100,
+    textAlignVertical: "top",
+  },
+  mediaContainer: {
+    marginBottom: 20,
+  },
+  mediaLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  mediaImage: {
+    width: "100%",
+    height: 300,
+    borderRadius: 8,
+  },
+  cameraButton: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  addButton: {
+    backgroundColor: "#007bff",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  addButtonText: {
+    color: "#fff",
+    fontSize: 18,
   },
 });

@@ -22,7 +22,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -459,6 +458,7 @@ const OpenCamera = ({
                     renderItem={renderKidItem}
                     keyExtractor={(item) => item.id}
                     horizontal
+                    showsHorizontalScrollIndicator={false}
                   />
                   {selectedKids?.length > 0 && (
                     <TouchableOpacity
