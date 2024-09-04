@@ -14,15 +14,18 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import RemoteImage from "../../components/RemoteImage";
 import OpenCamera from "../../components/OpenCamera";
+import { useFeedContext } from "../../contexts/FeedContext";
 
 const IncidentsScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
+  const [note, setNote] = useState("");
   const { selectedStudents } = route.params;
   const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState("photo");
   const [bucketName, setBucketName] = useState(null);
-  const [mediaPath, setMediaPath] = useState(null); // Store the media path here
+  const [mediaPath, setMediaPath] = useState(null);
+  const { createNewFeedForKid } = useFeedContext();
 
   const renderStudent = ({ item }) => (
     <View style={styles.studentItem}>
@@ -47,6 +50,15 @@ const IncidentsScreen = () => {
     setCameraMode("photo");
     setBucketName("feedPhotos");
     setCallOpenCamera(true);
+  };
+
+  const handleAddActivity = async () => {
+    const mediaType = "INCIDENT";
+
+    selectedStudents.map((student) => {
+      createNewFeedForKid(student.id, mediaPath, mediaType, note);
+      //console.log(student.name);
+    });
   };
 
   return (
@@ -84,6 +96,8 @@ const IncidentsScreen = () => {
             style={styles.noteInput}
             placeholder="Optional note - Type here or use the microphone button to say it aloud"
             multiline
+            value={note}
+            onChangeText={setNote}
           />
         </View>
 
@@ -105,7 +119,7 @@ const IncidentsScreen = () => {
           <Ionicons name="camera-outline" size={24} color="black" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity style={styles.addButton} onPress={handleAddActivity}>
           <Text style={styles.addButtonText}>Add Activity</Text>
         </TouchableOpacity>
 

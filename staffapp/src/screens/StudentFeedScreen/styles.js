@@ -19,6 +19,23 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginBottom: 10,
   },
+  notesContainer: {
+    flex: 1,
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+    alignSelf: "flex-start",
+  },
+  notesTitleText: {
+    margin: 2,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  notesText: {
+    fontStyle: "italic",
+    marginBottom: 9,
+    fontSize: 14,
+    color: "#666",
+  },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -87,8 +104,17 @@ const styles = StyleSheet.create({
     height: 300,
     borderRadius: 10,
     alignSelf: "center",
+    borderWidth: 2, // Add a thin border
+    borderColor: "#ccc", // Light gray color for subtle effect
   },
-
+  video: {
+    width: width - 20,
+    height: 300,
+    borderRadius: 10,
+    alignSelf: "center",
+    borderWidth: 2, // Add a thin border
+    borderColor: "#ccc", // Light gray color for subtle effect
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
@@ -106,12 +132,7 @@ const styles = StyleSheet.create({
     height: 300,
     alignSelf: "center",
   },
-  video: {
-    width: width - 20,
-    height: 300,
-    borderRadius: 10,
-    alignSelf: "center",
-  },
+
   playIcon: {
     position: "absolute",
     top: "50%",

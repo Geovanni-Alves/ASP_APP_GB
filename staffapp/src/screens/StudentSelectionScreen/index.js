@@ -40,8 +40,6 @@ const StudentSelectionScreen = () => {
   };
 
   const handleNextPressed = () => {
-    console.log(selectedStudents);
-    console.log("Next pressed");
     navigation.navigate("Incidents", { selectedStudents });
   };
 

@@ -8,8 +8,8 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 //import RemoteImage from "../../components/RemoteImage";
 import OpenCamera from "../../components/OpenCamera";
 import { useKidsContext } from "../../contexts/KidsContext";
-import { useUsersContext } from "../../contexts/UsersContext";
 import { supabase } from "../../lib/supabase";
+import { useFeedContext } from "../../contexts/FeedContext";
 
 const NewActivityScreen = () => {
   const [callOpenCamera, setCallOpenCamera] = useState(false);
@@ -21,7 +21,7 @@ const NewActivityScreen = () => {
   const from = route.params?.from;
   const { id: kidId } = route.params || {};
   const { kids } = useKidsContext();
-  const { currentUserData } = useUsersContext();
+  const { createNewFeedForKid } = useFeedContext();
 
   const goBack = () => {
     if (from === "home") {
@@ -86,45 +86,45 @@ const NewActivityScreen = () => {
     }
   };
 
-  const createNewFeedForKid = async (kidId, mediaPath, mediaType) => {
-    try {
-      // format correct time
-      const currentTime = new Date();
-      const year = currentTime.getFullYear();
-      const month = String(currentTime.getMonth() + 1).padStart(2, "0");
-      const day = String(currentTime.getDate()).padStart(2, "0");
-      const hours = String(currentTime.getHours()).padStart(2, "0");
-      const minutes = String(currentTime.getMinutes()).padStart(2, "0");
-      const seconds = String(currentTime.getSeconds()).padStart(2, "0");
+  // const createNewFeedForKid = async (kidId, mediaPath, mediaType) => {
+  //   try {
+  //     // format correct time
+  //     const currentTime = new Date();
+  //     const year = currentTime.getFullYear();
+  //     const month = String(currentTime.getMonth() + 1).padStart(2, "0");
+  //     const day = String(currentTime.getDate()).padStart(2, "0");
+  //     const hours = String(currentTime.getHours()).padStart(2, "0");
+  //     const minutes = String(currentTime.getMinutes()).padStart(2, "0");
+  //     const seconds = String(currentTime.getSeconds()).padStart(2, "0");
 
-      const formattedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-      // Format mediaType to capitalize the first letter and lowercase the rest
+  //     const formattedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  //     // Format mediaType to capitalize the first letter and lowercase the rest
 
-      const formattedMediaType =
-        mediaType.charAt(0).toUpperCase() + mediaType.slice(1).toLowerCase();
+  //     const formattedMediaType =
+  //       mediaType.charAt(0).toUpperCase() + mediaType.slice(1).toLowerCase();
 
-      const feedData = {
-        type: mediaType, // "photo" or "video"
-        dateTime: formattedTime, // Current date and time
-        studentId: kidId,
-        mediaName: mediaPath, // Path to the media
-        text: `has a new ${formattedMediaType}`, // Text for the feed
-        creatorId: currentUserData.id, // Replace with actual creatorId when available
-      };
+  //     const feedData = {
+  //       type: mediaType, // "photo" or "video"
+  //       dateTime: formattedTime, // Current date and time
+  //       studentId: kidId,
+  //       mediaName: mediaPath, // Path to the media
+  //       text: `has a new ${formattedMediaType}`, // Text for the feed
+  //       creatorId: currentUserData.id, // Replace with actual creatorId when available
+  //     };
 
-      // Insert the data into the Supabase "kidFeeds" table
-      //console.log("feedData", feedData);
-      const { data, error } = await supabase
-        .from("kidFeeds")
-        .insert([feedData]);
+  //     // Insert the data into the Supabase "kidFeeds" table
+  //     //console.log("feedData", feedData);
+  //     const { data, error } = await supabase
+  //       .from("kidFeeds")
+  //       .insert([feedData]);
 
-      if (error) {
-        throw new Error(`Failed to create feed: ${error.message}`);
-      }
-    } catch (error) {
-      console.error(`Error creating feed for kid ${kidId}:`, error);
-    }
-  };
+  //     if (error) {
+  //       throw new Error(`Failed to create feed: ${error.message}`);
+  //     }
+  //   } catch (error) {
+  //     console.error(`Error creating feed for kid ${kidId}:`, error);
+  //   }
+  // };
 
   return (
     <View style={styles.container}>

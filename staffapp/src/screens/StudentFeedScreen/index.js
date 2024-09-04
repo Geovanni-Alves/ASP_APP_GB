@@ -14,6 +14,7 @@ import {
 import { FontAwesome, Entypo } from "@expo/vector-icons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AntDesign from "@expo/vector-icons/AntDesign";
+import Fontisto from "@expo/vector-icons/Fontisto";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { useFeedContext } from "../../contexts/FeedContext";
@@ -144,6 +145,16 @@ const StudentFeedScreen = () => {
           <Entypo name="calendar" size={24} color="black" style={styles.icon} />
         );
         break;
+      case "INCIDENT":
+        iconComponent = (
+          <Fontisto
+            name="bandage"
+            size={24}
+            color="black"
+            style={styles.icon}
+          />
+        );
+        break;
       case "PROMOTION":
         iconComponent = (
           <Entypo
@@ -171,7 +182,13 @@ const StudentFeedScreen = () => {
             {dateComponent}
           </View>
         </View>
-        {item.mediaName && item.type === "PHOTO" && (
+        {item.notes && item.notes.trim() !== "" && (
+          <View style={styles.notesContainer}>
+            <Text style={styles.notesTitleText}>Note:</Text>
+            <Text style={styles.notesText}>{item.notes}</Text>
+          </View>
+        )}
+        {item.mediaName && item.type !== "VIDEO" && (
           <TouchableOpacity
             onPress={() => handleMediaPress(item.mediaName, item.type)}
           >
