@@ -28,9 +28,9 @@ export default StyleSheet.create({
     marginRight: 10,
   },
   studentImage: {
-    width: 45,
-    height: 45,
-    borderRadius: 25,
+    width: 35,
+    height: 35,
+    borderRadius: 20,
     marginBottom: 5,
   },
   studentName: {

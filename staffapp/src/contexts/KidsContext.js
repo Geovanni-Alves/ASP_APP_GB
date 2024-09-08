@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { ActivityIndicator } from "react-native";
 import { supabase } from "../lib/supabase";
+import CustomLoading from "../components/CustomLoading";
 //import { usePicturesContext } from "./PicturesContext";
 
 const KidsContext = createContext({});
@@ -90,7 +91,12 @@ const KidsContextProvider = ({ children }) => {
 
   return (
     <KidsContext.Provider value={{ kids, RefreshKidsData }}>
-      {loading ? <ActivityIndicator /> : children}
+      {/* {loading ? <ActivityIndicator /> : children} */}
+      {loading ? (
+        <CustomLoading imageSize={40} showContainer={false} />
+      ) : (
+        children
+      )}
     </KidsContext.Provider>
   );
 };

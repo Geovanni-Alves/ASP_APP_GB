@@ -7,7 +7,6 @@ import {
   CameraView,
 } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import * as MediaLibrary from "expo-media-library";
 import {
   StyleSheet,
   Text,
@@ -18,12 +17,14 @@ import {
   Image,
   ActivityIndicator,
   Button,
-  Animated,
   FlatList,
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  PanResponder,
+  Animated,
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import Swiper from "react-native-swiper";
@@ -32,7 +33,7 @@ import { usePicturesContext } from "../contexts/PicturesContext";
 import { useKidsContext } from "../contexts/KidsContext";
 import RemoteImage from "./RemoteImage";
 import CustomLoading from "./CustomLoading";
-import CustomMessageBox from "./CustomMessageBox";
+import { PinchGestureHandler, State } from "react-native-gesture-handler";
 
 const OpenCamera = ({
   isVisible,
@@ -54,7 +55,6 @@ const OpenCamera = ({
   const [mediaUris, setMediaUris] = useState([]);
   const [loading, setLoading] = useState(false);
   const [confirmMedia, setConfirmMedia] = useState(false);
-  //const [showPostButton, setShowPostButton] = useState(false);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedTime, setRecordedTime] = useState(60);
@@ -66,18 +66,42 @@ const OpenCamera = ({
   const borderColorValue = useRef(new Animated.Value(0)).current;
   const { kids } = useKidsContext();
   const [searchText, setSearchText] = useState("");
-  const [isCustomMessageVisible, setIsCustomMessageVisible] = useState(false);
-  const [showSaveOrDiscard, setShowSaveOrDiscard] = useState(false);
-  const [mediaLibraryPermission, requestMediaLibraryPermission] =
-    MediaLibrary.usePermissions(); // Request media library permissions
+  const [isEditing, setIsEditing] = useState(false);
+  const [caption, setCaption] = useState("");
+  const pan = useRef(new Animated.ValueXY()).current;
+  const scale = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    if (isVisible) {
-      if (!mediaLibraryPermission?.granted) {
-        requestMediaLibraryPermission(); // Request permissions on mount if not granted
-      }
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        pan.setOffset({
+          x: pan.x._value,
+          y: pan.y._value,
+        });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (e, gestureState) => {
+        // Instead of using Animated.event, update pan directly
+        pan.x.setValue(gestureState.dx);
+        pan.y.setValue(gestureState.dy);
+      },
+      onPanResponderRelease: () => {
+        pan.flattenOffset(); // Merge the pan offset so the next move starts from the current position
+      },
+    })
+  ).current;
+
+  const onPinchGestureEvent = Animated.event(
+    [{ nativeEvent: { scale: scale } }],
+    { useNativeDriver: false }
+  );
+
+  const onPinchStateChange = (event) => {
+    if (event.nativeEvent.state === State.END) {
+      scale.flattenOffset();
     }
-  }, [isVisible]);
+  };
 
   useEffect(() => {
     if (isVisible) {
@@ -280,56 +304,19 @@ const OpenCamera = ({
     }
   }
 
-  const handleAskForNote = async () => {
-    setIsCustomMessageVisible(true);
+  const handleSaveWithoutTag = async () => {
+    const mediaPath = await saveMedia();
+    onSelectOption(mediaPath[0]);
+    onClose();
   };
 
-  const handleFinishActivity = async (notes = "") => {
-    const savedMediaPaths = await saveMedia(); // Save media paths
+  const handleTaggingComplete = async () => {
+    setShowTagKids(false); // Close the tagging modal
+    const savedMediaPaths = await saveMedia();
 
-    if (selectedKids.length > 0) {
-      setShowTagKids(false);
-      const validKids = selectedKids.filter((kidId) => kidId !== "all");
-
-      // Always pass parameters in the same order: media paths, valid kids, and notes
-      onSelectOption(savedMediaPaths, validKids, notes);
-    } else {
-      // Pass media paths, an empty array for selected kids, and notes
-      onSelectOption(savedMediaPaths, [], notes);
-    }
-
-    onClose(); // Close the modal
-  };
-
-  // const handleSaveWithoutTag = async () => {
-  //   const mediaPath = await saveMedia();
-  //   onSelectOption(mediaPath[0]);
-  //   onClose();
-  // };
-
-  // const handleTaggingComplete = async () => {
-  //   setShowTagKids(false); // Close the tagging modal
-  //   //setIsCustomMessageVisible(true);
-  //   const savedMediaPaths = await saveMedia();
-
-  //   const validKids = selectedKids.filter((kidId) => kidId !== "all");
-  //   onSelectOption(savedMediaPaths, validKids); // Pass the saved media path to the parent
-  //   onClose();
-  // };
-
-  const handleSaveToGallery = async (uri) => {
-    try {
-      if (!mediaLibraryPermission?.granted) {
-        const permission = await requestMediaLibraryPermission();
-        if (!permission.granted) {
-          alert("Permission to access gallery is required!");
-        }
-      }
-      await MediaLibrary.createAssetAsync(uri);
-      alert("media saved at gallery");
-    } catch (error) {
-      console.error("Error saving media to gallery:");
-    }
+    const validKids = selectedKids.filter((kidId) => kidId !== "all");
+    onSelectOption(savedMediaPaths, validKids); // Pass the saved media path to the parent
+    onClose();
   };
 
   async function saveMedia() {
@@ -355,27 +342,10 @@ const OpenCamera = ({
     }
   }
 
-  const handleCloseRetake = async () => {
-    setShowSaveOrDiscard(true);
-  };
-
-  const handleSave = async () => {
-    console.log("handle save...");
-    setShowSaveOrDiscard(false);
+  function handleRetake() {
     setMediaUris([]);
-    setConfirmMedia(false); // Close confirmation screen
     setRecordedTime(60);
-    setIsTakingPhoto(false); // Reset camera state
-    await handleSaveToGallery(mediaUris[0]);
-  };
-
-  const handleClose = async () => {
-    setShowSaveOrDiscard(false);
-    setMediaUris([]);
-    setConfirmMedia(false); // Close confirmation screen
-    setRecordedTime(60);
-    setIsTakingPhoto(false);
-  };
+  }
 
   const renderKidItem = ({ item }) => {
     const isSelected = selectedKids.includes(item.id);
@@ -429,179 +399,165 @@ const OpenCamera = ({
 
   if (mediaUris?.length > 0) {
     return (
-      <Modal visible={isVisible} animationType="slide" transparent={false}>
-        <View style={{ flex: 1 }}>
-          <Swiper
-            loop={false}
-            showsPagination={true}
-            activeDotStyle={styles.activeDot}
-            dotStyle={styles.dot}
-          >
-            {mode === "photo"
-              ? mediaUris.map((uri, index) => (
-                  <Image
-                    key={index}
-                    source={{ uri: uri }}
-                    style={styles.fullScreenImage}
-                    resizeMode="contain"
-                  />
-                ))
-              : mediaUris.map((uri, index) => (
-                  <Video
-                    key={index}
-                    source={{ uri: uri }}
-                    style={styles.fullScreenImage}
-                    useNativeControls
-                    resizeMode={ResizeMode.CONTAIN}
-                    shouldPlay
-                  />
-                ))}
-          </Swiper>
-          {confirmMedia && (
-            <>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={handleCloseRetake}
+      <View style={[styles.fullScreenOverlay]}>
+        <Swiper
+          loop={false}
+          showsPagination={true}
+          activeDotStyle={styles.activeDot}
+          dotStyle={styles.dot}
+        >
+          {mode === "photo"
+            ? mediaUris.map((uri, index) => (
+                <Image
+                  key={index}
+                  source={{ uri: uri }}
+                  style={styles.fullScreenImage}
+                  resizeMode="contain"
+                />
+              ))
+            : mediaUris.map((uri, index) => (
+                <Video
+                  key={index}
+                  source={{ uri: uri }}
+                  style={styles.fullScreenImage}
+                  useNativeControls
+                  resizeMode={ResizeMode.CONTAIN}
+                  shouldPlay
+                />
+              ))}
+        </Swiper>
+        {confirmMedia && (
+          <>
+            <View
+              style={{
+                position: "absolute",
+                alignItems: "center",
+                alignSelf: "center",
+                justifyContent: "center",
+                //left: 50,
+                width: "100%",
+                height: 200,
+                //alignItems: "center",
+              }}
+            >
+              <PinchGestureHandler
+                onGestureEvent={onPinchGestureEvent}
+                onHandlerStateChange={onPinchStateChange}
               >
-                <Ionicons name="close" size={25} color="white" />
-              </TouchableOpacity>
-              <View style={styles.bottomContainer}>
-                <TouchableOpacity
-                  style={styles.bottomButton}
-                  onPress={handleCloseRetake}
-                >
-                  <Text style={styles.bottomText}>Retake</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.bottomButton}
-                  onPress={() => {
-                    setConfirmMedia(false);
-                    if (tag) {
-                      setShowTagKids(true);
-                    } else if (bucketName != "profilePhotos") {
-                      setIsCustomMessageVisible(true);
-                      //setShowPostButton(true);
-                    } else {
-                      handleFinishActivity();
-                    }
+                <Animated.View
+                  style={{
+                    transform: [
+                      { translateX: pan.x },
+                      { translateY: pan.y },
+                      { scale: scale },
+                    ],
                   }}
+                  {...panResponder.panHandlers}
                 >
-                  <Text style={styles.bottomText}>
-                    Use {mode === "video" ? "Video" : "Photo"}
-                    {mediaUris?.length > 1 ? "s" : ""}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          {showTagKids && (
-            <View style={styles.tagOverlay}>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => {
-                  setShowTagKids(false);
-                  setConfirmMedia(true);
-                }}
-              >
-                <Ionicons name="arrow-back" size={25} color="white" />
-              </TouchableOpacity>
-              <KeyboardAvoidingView
-                style={styles.tagContainer}
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-              >
-                <View style={styles.tagContainer}>
-                  <Text style={styles.tagTitle}>Tag Kids</Text>
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search Kid"
-                    placeholderTextColor="gray"
-                    value={searchText}
-                    onChangeText={(text) => setSearchText(text)}
-                  />
-                  <FlatList
-                    data={filteredKids}
-                    renderItem={renderKidItem}
-                    keyExtractor={(item) => item.id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                  />
-                  {selectedKids?.length > 0 && (
-                    <TouchableOpacity
-                      style={styles.doneButton}
-                      //onPress={handleTaggingComplete}
-                      onPress={handleAskForNote}
-                    >
-                      <Text style={styles.doneButtonText}>
-                        Post {mode === "video" ? "Video" : "Photo"}
-                      </Text>
+                  {isEditing ? (
+                    <TextInput
+                      style={styles.captionInput}
+                      value={caption}
+                      onChangeText={(text) => setCaption(text)}
+                      onSubmitEditing={() => setIsEditing(false)}
+                      autoFocus
+                    />
+                  ) : (
+                    <TouchableOpacity onPress={() => setIsEditing(true)}>
+                      <Text style={styles.draggableText}>{caption}</Text>
                     </TouchableOpacity>
                   )}
-                </View>
-              </KeyboardAvoidingView>
+                </Animated.View>
+              </PinchGestureHandler>
             </View>
-          )}
-          {/* {showPostButton && (
-            <View style={styles.tagOverlay}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                setConfirmMedia(false);
+                onClose();
+              }}
+            >
+              <Ionicons name="close" size={25} color="white" />
+            </TouchableOpacity>
+            <View style={styles.bottomContainer}>
               <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => {
-                  setShowPostButton(false);
-                  setConfirmMedia(true);
-                }}
+                style={styles.bottomButton}
+                onPress={handleRetake}
               >
-                <Ionicons name="arrow-back" size={25} color="white" />
+                <Text style={styles.bottomText}>Retake</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.doneButton}
-                //onPress={handleSaveWithoutTag}
-                onPress={handleAskForNote}
+                style={styles.textIcon} // Round background
+                onPress={() => setIsEditing(true)}
               >
-                <Text style={styles.doneButtonText}>
-                  Post {mode === "video" ? "Video" : "Photo"}
+                <Text style={styles.textIconText}>Aa</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.bottomButton}
+                onPress={() => {
+                  setConfirmMedia(false);
+                  if (tag) {
+                    setShowTagKids(true);
+                  } else {
+                    handleSaveWithoutTag();
+                  }
+                }}
+              >
+                <Text style={styles.bottomText}>
+                  Use {mode === "video" ? "Video" : "Photo"}
+                  {mediaUris?.length > 1 ? "s" : ""}
                 </Text>
               </TouchableOpacity>
             </View>
-          )} */}
-        </View>
-        <CustomMessageBox
-          isVisible={isCustomMessageVisible}
-          onClose={() => setIsCustomMessageVisible(false)}
-          header={`Do you want to add a note to this ${
-            mode === "photo" ? "photo" : "video"
-          }?`}
-          infoItems={[]}
-          showTextInput={true}
-          textInputPlaceholder="Write a note..."
-          confirmButtonText="Yes, add a note" // Custom confirm button text
-          cancelButtonText="No, post without notes" // Custom cancel button text
-          onSubmit={(action, inputValue) => {
-            if (inputValue) {
-              handleFinishActivity(inputValue);
-            } else {
-              //console.log("no note added");
-              handleFinishActivity();
-            }
-          }}
-        />
-        <CustomMessageBox
-          isVisible={showSaveOrDiscard}
-          onClose={() => setShowSaveOrDiscard(false)}
-          header={`Save ${mode === "photo" ? "photo" : "video"} to gallery?`}
-          infoItems={[]}
-          confirmButtonText="Save"
-          cancelButtonText="Discard"
-          onSubmit={(action) => {
-            console.log("action", action);
-            if (action === "Save") {
-              handleSave();
-            } else {
-              handleClose();
-            }
-            //setShowSaveOrDiscard(false);
-          }}
-        />
-      </Modal>
+          </>
+        )}
+
+        {showTagKids && (
+          <View style={styles.tagOverlay}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                setShowTagKids(false);
+                setConfirmMedia(true);
+              }}
+            >
+              <Ionicons name="arrow-back" size={25} color="white" />
+            </TouchableOpacity>
+            <KeyboardAvoidingView
+              style={styles.tagContainer}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+            >
+              <View style={styles.tagContainer}>
+                <Text style={styles.tagTitle}>Tag Kids</Text>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search Kid"
+                  placeholderTextColor="gray"
+                  value={searchText}
+                  onChangeText={(text) => setSearchText(text)}
+                />
+                <FlatList
+                  data={filteredKids}
+                  renderItem={renderKidItem}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                />
+                {selectedKids?.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.doneButton}
+                    onPress={handleTaggingComplete}
+                  >
+                    <Text style={styles.doneButtonText}>
+                      Post {mode === "video" ? "Video" : "Photo"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        )}
+      </View>
     );
   }
 
@@ -732,6 +688,15 @@ function formatTime(seconds) {
 export default OpenCamera;
 
 const styles = StyleSheet.create({
+  fullScreenOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "white",
+    zIndex: 9999, // Ensure it stays above other elements
+  },
   container: {
     flex: 1,
     justifyContent: "center",
@@ -739,6 +704,61 @@ const styles = StyleSheet.create({
   cameraContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  textIcon: {
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Round background for Aa icon
+    borderRadius: 50,
+    padding: 10,
+    marginRight: 10,
+  },
+  textIconText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  draggableText: {
+    color: "white",
+    fontSize: 24,
+    fontWeight: "bold",
+    //backgroundColor: "rgba(0, 0, 0, 0.5)",
+    padding: 10,
+    borderRadius: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  captionInput: {
+    color: "white",
+    fontSize: 24,
+    fontWeight: "bold",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    padding: 10,
+    borderRadius: 10,
+    width: 200,
+  },
+  modalButtonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: "#007bff",
+    borderRadius: 5,
+  },
+  modalButtonText: {
+    color: "white",
+    fontSize: 16,
   },
   topBar: {
     height: 70, // Smaller height for top bar
@@ -967,9 +987,8 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     marginTop: 5,
-    marginBottom: 10,
     backgroundColor: "#00f",
-    padding: 12,
+    padding: 10,
     borderRadius: 5,
   },
   image: {

@@ -74,7 +74,8 @@ const ProfileScreen = () => {
     setSelectedImage(null);
   };
 
-  const handleNewPhoto = async (imagePath) => {
+  const handleNewPhoto = async (Paths) => {
+    const imagePath = Paths[0];
     try {
       if (imagePath) {
         await updateUserImage(imagePath);
@@ -183,6 +184,7 @@ const ProfileScreen = () => {
             onSelectOption={handleNewPhoto}
             onClose={() => setCallOpenCamera(false)}
             mode="photo"
+            tag={false}
             allowMultipleImages={false}
             bucketName="profilePhotos"
           />

@@ -7,16 +7,32 @@ import {
   TouchableOpacity,
   TextInput,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useKidsContext } from "../../contexts/KidsContext";
 import RemoteImage from "../../components/RemoteImage";
-import { useNavigation } from "@react-navigation/native";
+import { FontAwesome } from "@expo/vector-icons";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
 const StudentScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const { kids } = useKidsContext();
   const [searchByName, setSearchByName] = useState("");
   const [filteredStudents, setFilteredStudents] = useState(kids);
+
+  const goBack = () => {
+    navigation.goBack();
+  };
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [route]);
 
   const handleSearch = (text) => {
     setSearchByName(text);

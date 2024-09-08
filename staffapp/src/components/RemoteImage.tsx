@@ -71,8 +71,8 @@ const RemoteImage = ({
     <View style={[styles.loaderContainer, style]}>
       {loading ? (
         <CustomLoader
-          size={style.width} // Use the container size for the loader
-          imageSize={style.width + 100} // Use the image size for the rotating image
+          imageSize={45}
+          showContainer={false} // Use the image size for the rotating image
         />
       ) : image ? (
         <Image source={{ uri: image }} style={style} {...imageProps} />

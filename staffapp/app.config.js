@@ -40,6 +40,14 @@ export default {
           "Allow $(PRODUCT_NAME) to access your microphone.",
       },
     ],
+    [
+      "expo-media-library",
+      {
+        photosPermission: "Allow $(PRODUCT_NAME) to access your photos.",
+        savePhotosPermission: "Allow $(PRODUCT_NAME) to save photos.",
+        isAccessMediaLocationEnabled: true,
+      },
+    ],
   ],
 
   ios: {

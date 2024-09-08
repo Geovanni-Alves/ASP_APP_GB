@@ -2,6 +2,7 @@ import { createContext, useState, useEffect, useContext } from "react";
 import { supabase } from "../lib/supabase";
 import { ActivityIndicator, View } from "react-native";
 import Auth from "../components/Auth";
+import CustomLoading from "../components/CustomLoading";
 
 const AuthContext = createContext({});
 
@@ -49,7 +50,8 @@ const AuthContextProvider = ({ children }) => {
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <ActivityIndicator size="large" color="#0000ff" />
+          <CustomLoading imageSize={40} showContainer={false} />
+          {/* <ActivityIndicator size="large" color="#0000ff" /> */}
         </View>
       ) : session ? (
         children

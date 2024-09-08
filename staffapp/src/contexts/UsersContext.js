@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from "react-native";
 import { supabase } from "../lib/supabase";
 import { usePushNotificationsContext } from "./PushNotificationsContext";
 import { useAuthContext } from "./AuthContext";
+import CustomLoading from "../components/CustomLoading";
 
 const UsersContext = createContext({});
 
@@ -138,7 +139,8 @@ const UsersContextProvider = ({ children }) => {
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <ActivityIndicator size="large" color="#0000ff" />
+          {/* <ActivityIndicator size="large" color="#0000ff" /> */}
+          <CustomLoading imageSize={40} showContainer={false} />
         </View>
       ) : (
         children
