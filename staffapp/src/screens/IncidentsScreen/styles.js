@@ -1,4 +1,5 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet, Dimensions } from "react-native";
+const { width, height } = Dimensions.get("window");
 
 export default StyleSheet.create({
   container: {
@@ -9,7 +10,7 @@ export default StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 5,
   },
   title: {
     fontSize: 18,
@@ -42,7 +43,7 @@ export default StyleSheet.create({
     marginBottom: 20,
   },
   noteContainer: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   noteLabel: {
     fontSize: 16,
@@ -54,11 +55,19 @@ export default StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 8,
     padding: 10,
-    height: 100,
+    height: 80,
     textAlignVertical: "top",
   },
   mediaContainer: {
-    marginBottom: 20,
+    marginBottom: 10,
+  },
+  trashIconContainer: {
+    alignSelf: "flex-end",
+    backgroundColor: "#F5F5F5",
+    marginLeft: 10,
+    marginTop: 3,
+    borderRadius: 20,
+    padding: 5,
   },
   mediaLabel: {
     fontSize: 16,
@@ -68,11 +77,14 @@ export default StyleSheet.create({
   mediaImage: {
     width: "100%",
     height: 300,
-    borderRadius: 8,
+    borderRadius: 10,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    resizeMode: "contain",
   },
   cameraButton: {
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   addButton: {
     backgroundColor: "#007bff",
@@ -83,5 +95,16 @@ export default StyleSheet.create({
   addButtonText: {
     color: "#fff",
     fontSize: 18,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+  },
+  fullImage: {
+    width: width - 20,
+    height: height - 20,
+    resizeMode: "contain",
   },
 });

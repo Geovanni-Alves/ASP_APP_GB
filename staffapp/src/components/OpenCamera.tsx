@@ -44,6 +44,8 @@ const OpenCamera = ({
   cameraPermissionText = "Allow the app to access your camera",
   microphonePermissionText = "Allow the app to access your microphone",
   tag = false,
+  allowNotes = true,
+  saveMediaOnCamera = true,
 }) => {
   const { savePhotoInBucket, saveVideoInBucket } = usePicturesContext();
   const [facing, setFacing] = useState<CameraType>("back");
@@ -67,6 +69,7 @@ const OpenCamera = ({
   const { kids } = useKidsContext();
   const [searchText, setSearchText] = useState("");
   const [isCustomMessageVisible, setIsCustomMessageVisible] = useState(false);
+  const [pickFromGallery, setPickFromGallery] = useState(false);
   const [showSaveOrDiscard, setShowSaveOrDiscard] = useState(false);
   const [mediaLibraryPermission, requestMediaLibraryPermission] =
     MediaLibrary.usePermissions(); // Request media library permissions
@@ -106,6 +109,8 @@ const OpenCamera = ({
       setRecordedTime(60);
       setSelectedKids([]);
       setShowTagKids(false);
+      setPickFromGallery(false);
+      setShowSaveOrDiscard(false);
     }
   }, [isVisible]);
 
@@ -245,6 +250,7 @@ const OpenCamera = ({
 
   async function pickImageFromGallery() {
     try {
+      setPickFromGallery(true);
       setIsTakingPhoto(true);
       setLoading(true);
 
@@ -281,20 +287,46 @@ const OpenCamera = ({
   }
 
   const handleAskForNote = async () => {
-    setIsCustomMessageVisible(true);
+    if (allowNotes) {
+      setIsCustomMessageVisible(true);
+    } else {
+      handleFinishPhotoOrVideo();
+      return;
+    }
   };
 
-  const handleFinishActivity = async (notes = "") => {
-    const savedMediaPaths = await saveMedia(); // Save media paths
+  // const handleFinishPhotoOrVideo = async (notes = "") => {
+  //   const savedMediaPaths = await saveMedia(); // Save media paths
 
+  //   if (selectedKids.length > 0) {
+  //     setShowTagKids(false);
+  //     const validKids = selectedKids.filter((kidId) => kidId !== "all");
+
+  //     // Always pass parameters in the same order: media paths, valid kids, and notes
+  //     onSelectOption(savedMediaPaths, validKids, notes);
+  //   } else {
+  //     // Pass media paths, an empty array for selected kids, and notes
+  //     onSelectOption(savedMediaPaths, [], notes);
+  //   }
+
+  //   onClose(); // Close the modal
+  // };
+
+  const handleFinishPhotoOrVideo = async (notes = "") => {
+    let savedMediaPaths = [];
+
+    if (saveMediaOnCamera) {
+      savedMediaPaths = await saveMedia(); // Save media to storage
+    } else {
+      savedMediaPaths = mediaUris; // Directly return mediaUris if not saving
+    }
+
+    // Return the media paths via onSelectOption callback
     if (selectedKids.length > 0) {
       setShowTagKids(false);
       const validKids = selectedKids.filter((kidId) => kidId !== "all");
-
-      // Always pass parameters in the same order: media paths, valid kids, and notes
       onSelectOption(savedMediaPaths, validKids, notes);
     } else {
-      // Pass media paths, an empty array for selected kids, and notes
       onSelectOption(savedMediaPaths, [], notes);
     }
 
@@ -360,7 +392,7 @@ const OpenCamera = ({
   };
 
   const handleSave = async () => {
-    console.log("handle save...");
+    //console.log("handle save...");
     setShowSaveOrDiscard(false);
     setMediaUris([]);
     setConfirmMedia(false); // Close confirmation screen
@@ -461,14 +493,32 @@ const OpenCamera = ({
             <>
               <TouchableOpacity
                 style={styles.closeButton}
-                onPress={handleCloseRetake}
+                onPress={() => {
+                  if (!pickFromGallery) {
+                    handleCloseRetake();
+                  } else {
+                    setMediaUris([]);
+                    setRecordedTime(60);
+                    setPickFromGallery(false);
+                    setConfirmMedia(false);
+                  }
+                }}
               >
                 <Ionicons name="close" size={25} color="white" />
               </TouchableOpacity>
               <View style={styles.bottomContainer}>
                 <TouchableOpacity
                   style={styles.bottomButton}
-                  onPress={handleCloseRetake}
+                  onPress={() => {
+                    if (!pickFromGallery) {
+                      handleCloseRetake();
+                    } else {
+                      setMediaUris([]);
+                      setRecordedTime(60);
+                      setPickFromGallery(false);
+                      setConfirmMedia(false);
+                    }
+                  }}
                 >
                   <Text style={styles.bottomText}>Retake</Text>
                 </TouchableOpacity>
@@ -479,10 +529,15 @@ const OpenCamera = ({
                     if (tag) {
                       setShowTagKids(true);
                     } else if (bucketName != "profilePhotos") {
-                      setIsCustomMessageVisible(true);
+                      if (allowNotes) {
+                        setIsCustomMessageVisible(true);
+                      } else {
+                        handleFinishPhotoOrVideo();
+                      }
+
                       //setShowPostButton(true);
                     } else {
-                      handleFinishActivity();
+                      handleFinishPhotoOrVideo();
                     }
                   }}
                 >
@@ -577,10 +632,10 @@ const OpenCamera = ({
           cancelButtonText="No, post without notes" // Custom cancel button text
           onSubmit={(action, inputValue) => {
             if (inputValue) {
-              handleFinishActivity(inputValue);
+              handleFinishPhotoOrVideo(inputValue);
             } else {
               //console.log("no note added");
-              handleFinishActivity();
+              handleFinishPhotoOrVideo();
             }
           }}
         />
@@ -592,8 +647,7 @@ const OpenCamera = ({
           confirmButtonText="Save"
           cancelButtonText="Discard"
           onSubmit={(action) => {
-            console.log("action", action);
-            if (action === "Save") {
+            if (action === "Yes") {
               handleSave();
             } else {
               handleClose();

@@ -68,9 +68,21 @@ const NewActivityScreen = () => {
     setCallOpenCamera(true);
   };
 
+  const handleIncidentPress = () => {
+    if (selectedKid) {
+      // If a kid is already selected, navigate directly to the IncidentsScreen
+      navigation.navigate("Incidents", {
+        selectedStudents: [selectedKid],
+      });
+    } else {
+      // Otherwise, navigate to the StudentSelection screen
+      navigation.navigate("StudentSelection");
+    }
+  };
+
   const handleActivityPress = (activityType) => {
     console.log(`Selected activity: ${activityType}`);
-    setShowPostConfirmation(true);
+    // setShowPostConfirmation(true);
   };
 
   const handleSelectPhotoVideo = (paths, selectedKids, notes) => {
@@ -113,7 +125,7 @@ const NewActivityScreen = () => {
         </View>
         <View style={styles.iconContainer}>
           <TouchableOpacity
-            onPress={() => navigation.navigate("StudentSelection")}
+            onPress={handleIncidentPress}
             style={styles.patchIcon}
           >
             <Fontisto name="bandage" size={45} color="#FFFFFF" />

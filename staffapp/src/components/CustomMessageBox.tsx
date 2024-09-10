@@ -56,7 +56,7 @@ const CustomMessageBox: React.FC<CustomMessageBoxProps> = ({
   const handlePressOk = () => {
     onClose();
     if (onSubmit) {
-      onSubmit(confirmButtonText, showTextInput ? inputValue : undefined); // Pass the input value when submitting
+      onSubmit("Yes", showTextInput ? inputValue : undefined); // Pass the input value when submitting
     }
     if (shouldNavigateAfterFinish && whereToNavigate) {
       navigation.navigate(whereToNavigate);
@@ -66,7 +66,7 @@ const CustomMessageBox: React.FC<CustomMessageBoxProps> = ({
   const handlePressNo = () => {
     onClose();
     if (onSubmit) {
-      onSubmit(cancelButtonText); // Submit with no input
+      onSubmit("No"); // Submit with no input
     }
   };
 

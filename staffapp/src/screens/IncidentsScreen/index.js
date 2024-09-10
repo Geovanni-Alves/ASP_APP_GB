@@ -10,6 +10,8 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Alert,
+  Image,
+  Modal,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,50 +21,55 @@ import { FontAwesome } from "@expo/vector-icons";
 import { useFeedContext } from "../../contexts/FeedContext";
 import InfoModal from "../../components/InfoModal";
 import { usePicturesContext } from "../../contexts/PicturesContext";
+import CustomLoading from "../../components/CustomLoading";
 
 const IncidentsScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const [note, setNote] = useState("");
   const { selectedStudents } = route.params;
+  const { savePhotoInBucket } = usePicturesContext();
+
+  const [note, setNote] = useState("");
+  const [incidentImage, setIncidentImage] = useState(null);
   const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [cameraMode, setCameraMode] = useState("photo");
   const [bucketName, setBucketName] = useState(null);
-  const [mediaPath, setMediaPath] = useState(null);
   const { createNewFeedForKid } = useFeedContext();
+  const [fullScreenModalVisible, setFullScreenModalVisible] = useState(false);
   const [showPostConfirmation, setShowPostConfirmation] = useState(false);
-  const { deleteMediaFromBucket } = usePicturesContext();
+  const initialNoteRef = useRef("");
+  const initialMediaPathRef = useRef(null);
+  const [loading, setLoading] = useState(false);
 
-  // Use refs to store the initial state
-  const initialNoteRef = useRef(note);
-  const initialMediaPathRef = useRef(mediaPath);
+  // Reset state when entering the screen
+  useEffect(() => {
+    setNote("");
+    setIncidentImage(null);
+    initialNoteRef.current = "";
+    initialMediaPathRef.current = null;
+  }, [route]);
 
-  // Function to check if any changes were made to the note or mediaPath
+  // Check if there are changes
   const hasChanges = () => {
     return (
       note !== initialNoteRef.current ||
-      mediaPath !== initialMediaPathRef.current
+      incidentImage !== initialMediaPathRef.current
     );
   };
 
   const goBack = () => {
-    console.log(hasChanges());
     if (hasChanges()) {
-      //   // If media or note has been changed, ask the user if they want to discard changes
       Alert.alert(
         "Discard Changes",
         "If you go back now, you will lose the changes you made. Do you want to continue?",
         [
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
+          { text: "Cancel", style: "cancel" },
           {
             text: "Yes, discard",
             onPress: () => {
-              if (mediaPath) {
-                deleteMediaFromBucket(mediaPath, "feedPhotos"); // Assume a function to delete from your bucket
-              }
+              // if (incidentImage) {
+              //   deleteMediaFromBucket(incidentImage, "feedPhotos");
+              // }
               navigation.navigate("StudentSelection");
             },
             style: "destructive",
@@ -82,7 +89,7 @@ const IncidentsScreen = () => {
         </TouchableOpacity>
       ),
     });
-  }, [route]);
+  }, [route, note, incidentImage]); // Ensure dependencies track changes
 
   const renderStudent = ({ item }) => (
     <View style={styles.studentItem}>
@@ -95,10 +102,23 @@ const IncidentsScreen = () => {
     </View>
   );
 
+  const saveMedia = async () => {
+    setLoading(true);
+    const uri = incidentImage;
+    try {
+      const path = await savePhotoInBucket({ uri }, bucketName);
+      return path;
+    } catch (error) {
+      console.error("Error saving media to storage", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSelectPhotoVideo = (path) => {
-    // Handle the selected media path
+    //console.log("path", path);
     if (path) {
-      setMediaPath(path); // Assuming only one image is selected
+      setIncidentImage(path[0]); // Set selected media path
     }
     setCallOpenCamera(false);
   };
@@ -110,15 +130,37 @@ const IncidentsScreen = () => {
   };
 
   const handleAddActivity = async () => {
+    let mediaPath = "";
+    if (incidentImage) {
+      mediaPath = await saveMedia();
+    }
     const mediaType = "INCIDENT";
-
-    selectedStudents.map((student) => {
+    selectedStudents.forEach((student) => {
       createNewFeedForKid(student.id, mediaPath, mediaType, note);
-      //console.log(student.name);
     });
     setShowPostConfirmation(true);
-    //navigation.navigate("Activities");
   };
+
+  const openImageModal = () => {
+    setFullScreenModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setFullScreenModalVisible(false);
+  };
+
+  const deletePhoto = () => {
+    setIncidentImage(null);
+  };
+
+  if (loading) {
+    return (
+      <Modal animationType="slide" transparent={true}>
+        <CustomLoading imageSize={80} text="Loading..." />
+        {/* <Text style={styles.loadingText}>Loading...</Text> */}
+      </Modal>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -150,7 +192,7 @@ const IncidentsScreen = () => {
         </Text>
 
         <View style={styles.noteContainer}>
-          <Text style={styles.noteLabel}>Note</Text>
+          <Text style={styles.noteLabel}>Notes:</Text>
           <TextInput
             style={styles.noteInput}
             placeholder="Optional note - Type here or use the microphone button to say it aloud"
@@ -160,23 +202,30 @@ const IncidentsScreen = () => {
           />
         </View>
 
-        {mediaPath && (
+        {incidentImage && (
           <View style={styles.mediaContainer}>
-            <Text style={styles.mediaLabel}>Attached Media:</Text>
-            <RemoteImage
-              path={mediaPath}
-              style={styles.mediaImage}
-              bucketName="feedPhotos"
-            />
+            <Text style={styles.mediaLabel}>Attached Photo:</Text>
+            <TouchableOpacity onPress={openImageModal}>
+              <Image
+                source={{ uri: incidentImage }}
+                style={styles.mediaImage}
+              />
+            </TouchableOpacity>
+            <View style={styles.trashIconContainer}>
+              <TouchableOpacity onPress={deletePhoto}>
+                <Ionicons name="trash" size={25} color="red" />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
-
-        <TouchableOpacity
-          style={styles.cameraButton}
-          onPress={handlePhotoPress}
-        >
-          <Ionicons name="camera-outline" size={24} color="black" />
-        </TouchableOpacity>
+        {!incidentImage && (
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={handlePhotoPress}
+          >
+            <Ionicons name="camera-outline" size={34} color="black" />
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity style={styles.addButton} onPress={handleAddActivity}>
           <Text style={styles.addButtonText}>Add Activity</Text>
@@ -190,7 +239,33 @@ const IncidentsScreen = () => {
           bucketName={bucketName}
           tag={false}
           allowMultipleImages={false}
+          allowNotes={false}
+          saveMediaOnCamera={false}
         />
+
+        <Modal
+          visible={fullScreenModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={closeModal}
+        >
+          <View style={styles.modalContainer}>
+            <Image source={{ uri: incidentImage }} style={styles.fullImage} />
+            <TouchableOpacity
+              style={{
+                position: "absolute",
+                top: 70,
+                right: 20,
+                backgroundColor: "gray",
+                borderRadius: 30,
+                padding: 7,
+              }}
+              onPress={closeModal}
+            >
+              <Ionicons name="close" size={25} color="white" />
+            </TouchableOpacity>
+          </View>
+        </Modal>
         <InfoModal
           isVisible={showPostConfirmation}
           onClose={() => setShowPostConfirmation(false)}
