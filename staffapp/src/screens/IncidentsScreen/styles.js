@@ -96,6 +96,14 @@ export default StyleSheet.create({
     color: "#fff",
     fontSize: 18,
   },
+  closeModalButton: {
+    position: "absolute",
+    top: 70,
+    right: 20,
+    backgroundColor: "gray",
+    borderRadius: 30,
+    padding: 7,
+  },
   modalContainer: {
     flex: 1,
     justifyContent: "center",

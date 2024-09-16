@@ -14,7 +14,6 @@ export default {
     backgroundGradientRight: "#2287f4",
     backgroundColor: "#59dae4",
   },
-  userInterfaceStyle: "automatic",
   assetBundlePatterns: ["**/*"],
   plugins: [
     [

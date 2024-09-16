@@ -12,15 +12,9 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
 } from "react-native";
-import {
-  FontAwesome5,
-  MaterialIcons,
-  FontAwesome,
-  Entypo,
-} from "@expo/vector-icons";
-
+import { FontAwesome5, MaterialIcons, FontAwesome } from "@expo/vector-icons";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { supabase } from "../../lib/supabase";
 import OpenCamera from "../../components/OpenCamera";
 import RemoteImage from "../../components/RemoteImage";
@@ -29,9 +23,186 @@ import InfoModal from "../../components/InfoModal";
 import { useKidsContext } from "../../contexts/KidsContext";
 import styles from "./styles";
 import { useNavigation, useRoute } from "@react-navigation/native"; // Corrected Import
-import CustomLoading from "../../components/CustomLoading";
-import BasicInfoScreen from "./BasicInfoScreen";
-import { usePicturesContext } from "../../contexts/PicturesContext";
+import { ScrollView } from "react-native-gesture-handler";
+
+// Helper function to calculate age
+const calculateAge = (birthDate) => {
+  const today = new Date();
+  const birth = new Date(birthDate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDifference = today.getMonth() - birth.getMonth();
+  if (
+    monthDifference < 0 ||
+    (monthDifference === 0 && today.getDate() < birth.getDate())
+  ) {
+    age--;
+  }
+  return age;
+};
+
+// Header with Profile Picture, Name, Age, and Jiu Jitsu Category
+const ProfileHeader = ({
+  name,
+  birthDate,
+  category,
+  photo,
+  onPressEditPhoto,
+}) => {
+  const age = calculateAge(birthDate);
+  return (
+    <View style={styles.headerContainer}>
+      <TouchableOpacity onPress={onPressEditPhoto}>
+        {photo ? (
+          <RemoteImage
+            path={photo}
+            bucketName="profilePhotos"
+            style={styles.profilePicture}
+          />
+        ) : (
+          <View style={styles.profilePicturePlaceholder}>
+            <Text>No Image</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+      <Text style={styles.headerText}>
+        {name}, {age} years old
+      </Text>
+      <Text style={styles.categoryText}>{category}</Text>
+    </View>
+  );
+};
+
+const Tab = createBottomTabNavigator();
+
+const BasicInfoScreen = ({
+  kid,
+  setKidDetails,
+  setBirthDate,
+  setIsFormChanged,
+}) => {
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+  //const [birthDate, setBirthDate] = useState("");
+
+  const handleConfirmDate = (date) => {
+    try {
+      // Convert date to the expected format and update birth date
+      const formattedDate = date.toISOString().split("T")[0];
+      setBirthDate(formattedDate);
+
+      // If you're storing birthDate in kidDetails, update it as well
+      setKidDetails((prev) => ({
+        ...prev,
+        birthDate: formattedDate,
+      }));
+
+      // Mark the form as changed
+      setIsFormChanged(true);
+
+      // Close the Date Picker
+      setDatePickerVisible(false);
+    } catch (error) {
+      console.error("Error updating date:", error); // Add error handling for debugging
+      setDatePickerVisible(false); // Ensure the modal closes even on error
+    }
+  };
+
+  return (
+    <ScrollView
+      contentContainerStyle={{ flexGrow: 1 }}
+      keyboardShouldPersistTaps="handled"
+      style={styles.tabContainer}
+    >
+      {/* <View style={styles.tabContainer}> */}
+      <View style={styles.detailItemContainer}>
+        <Text style={styles.detailLabel}>Birthday</Text>
+        <TouchableOpacity
+          onPress={() => {
+            setDatePickerVisible(true);
+          }}
+        >
+          <Text style={styles.detailTextInput}>
+            {kid.birthDate || "Select Date"}
+          </Text>
+        </TouchableOpacity>
+        <DateTimePickerModal
+          isVisible={isDatePickerVisible}
+          mode="date"
+          date={kid.birthDate ? new Date(kid.birthDate) : new Date()} // Use current date if birthDate is not set
+          onConfirm={handleConfirmDate}
+          onCancel={() => setDatePickerVisible(false)}
+        />
+      </View>
+      <Text style={styles.detailLabel}>Notes</Text>
+      <TextInput
+        style={styles.detailTextInput}
+        value={kid.notes}
+        onChangeText={(text) =>
+          setKidDetails((prev) => ({ ...prev, notes: text }))
+        }
+      />
+      <Text style={styles.detailLabel}>Allergies</Text>
+      <TextInput
+        style={styles.detailTextInput}
+        value={kid.allergies}
+        onChangeText={(text) =>
+          setKidDetails((prev) => ({ ...prev, allergies: text }))
+        }
+      />
+      <Text style={styles.detailLabel}>Medicine</Text>
+      <TextInput
+        style={styles.detailTextInput}
+        value={kid.medicine}
+        onChangeText={(text) =>
+          setKidDetails((prev) => ({ ...prev, medicine: text }))
+        }
+      />
+      {/* </View> */}
+    </ScrollView>
+  );
+};
+
+const SchoolInfoScreen = ({
+  selectedSchool,
+  schoolExitPhoto,
+  onChangePhoto,
+}) => (
+  <View style={styles.tabContainer}>
+    <Text>
+      School: {selectedSchool ? selectedSchool.name : "No school selected"}
+    </Text>
+    {schoolExitPhoto ? (
+      <Image source={{ uri: schoolExitPhoto }} style={styles.schoolPhoto} />
+    ) : (
+      <Text>No exit door photo</Text>
+    )}
+    <TouchableOpacity onPress={onChangePhoto} style={styles.changeButton}>
+      <Text style={styles.changeButtonText}>Change Exit Door Photo</Text>
+    </TouchableOpacity>
+  </View>
+);
+
+const AddressInfoScreen = ({ kid }) => (
+  <View style={styles.tabContainer}>
+    {kid.dropOffAddress ? (
+      <Text>Drop Off Address: {kid.dropOffAddress.addressLine1}</Text>
+    ) : (
+      <Text>No drop off address added</Text>
+    )}
+  </View>
+);
+
+const JiuJitsuInfoScreen = ({ belt, stripes, setBelt, setStripes }) => (
+  <View style={styles.tabContainer}>
+    <Text>Belt</Text>
+    <TextInput style={styles.input} value={belt} onChangeText={setBelt} />
+    <Text>Stripes</Text>
+    <TextInput
+      style={styles.input}
+      value={stripes.toString()}
+      onChangeText={(text) => setStripes(Number(text))}
+    />
+  </View>
+);
 
 const StudentProfileScreen = () => {
   const route = useRoute();
@@ -49,43 +220,13 @@ const StudentProfileScreen = () => {
   const [notes, setNotes] = useState("");
   const [allergies, setAllergies] = useState("");
   const [medicine, setMedicine] = useState("");
-  const [bjjCategory, setBjjCategory] = useState("Little Champions");
-  const [age, SetAge] = useState("");
-  const [selectedImage, setSelectedImage] = useState(null);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [belt, setBelt] = useState("White");
   const [stripes, setStripes] = useState(2);
   const [callOpenCameraForSchool, setCallOpenCameraForSchool] = useState(false);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [callOpenCamera, setCallOpenCamera] = useState(false);
-  const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
-  const [loading, setLoading] = useState(false);
   const { RefreshKidsData } = useKidsContext();
-  const Tab = createBottomTabNavigator();
-  const { deleteMediaFromBucket } = usePicturesContext();
-
-  // Helper function to calculate age
-  const calculateAge = (birthDate) => {
-    if (birthDate) {
-      const today = new Date();
-      const birth = new Date(birthDate);
-      let age = today.getFullYear() - birth.getFullYear();
-      const monthDifference = today.getMonth() - birth.getMonth();
-      if (
-        monthDifference < 0 ||
-        (monthDifference === 0 && today.getDate() < birth.getDate())
-      ) {
-        age--;
-      }
-      return age;
-    } else {
-      return 0;
-    }
-  };
-
-  const goBack = () => {
-    navigation.navigate("StudentFeed", { id: kidId });
-  };
 
   const fetchData = async () => {
     setRefreshing(true);
@@ -100,9 +241,9 @@ const StudentProfileScreen = () => {
           .from("students")
           .select(
             `
-              *,
-              schools(id, name)
-            `
+            *,
+            schools(id, name)
+          `
           )
           .eq("id", kidId)
           .single();
@@ -128,11 +269,10 @@ const StudentProfileScreen = () => {
         setKid(fetchedKid);
         setActualPhoto(fetchedKid.photo);
         setName(fetchedKid.name);
-        // setBirthDate(fetchedKid.birthDate);
-        // setNotes(fetchedKid.notes);
-        // setAllergies(fetchedKid.allergies);
-        // setMedicine(fetchedKid.medicine);
-        SetAge(calculateAge(fetchedKid.birthDate));
+        setBirthDate(fetchedKid.birthDate);
+        setNotes(fetchedKid.notes);
+        setAllergies(fetchedKid.allergies);
+        setMedicine(fetchedKid.medicine);
         if (fetchedKid.schools) {
           setSelectedSchool(fetchedKid.schools);
         }
@@ -147,67 +287,28 @@ const StudentProfileScreen = () => {
     setActualPhoto(null);
   }, [kidId]);
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack} style={styles.goBackIcon}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" />
-        </TouchableOpacity>
-      ),
-    });
-    if (kid) {
-      navigation.setOptions({
-        title: `${kid?.name} Profile`,
-      });
-    }
-  }, [route, kid]);
-
   const handleNewSchoolPhoto = async (imagePath) => {
     setCallOpenCameraForSchool(false);
     setSchoolExitPhoto(imagePath[0]);
   };
 
   const handleNewProfilePhoto = async (imagePath) => {
+    setCallOpenCamera(false);
+    setActualPhoto(imagePath[0]);
+  };
+
+  const handleUpdateKid = async () => {
+    setIsFormChanged(false);
+    const kidDetails = {
+      name: kid.name,
+      birthDate: kid.birthDate,
+      notes: kid.notes,
+      allergies: kid.allergies,
+      medicine: kid.medicine,
+      photo: actualPhoto,
+    };
+
     try {
-      setLoading(true);
-      setCallOpenCamera(false);
-      const mediaToDeletePath = actualPhoto;
-
-      if (mediaToDeletePath) {
-        await deleteMediaFromBucket(mediaToDeletePath, "profilePhotos");
-      }
-
-      const newMediaPath = imagePath[0];
-      setActualPhoto(newMediaPath);
-
-      // Use handleUpdateKid to update only the photo field
-      await handleUpdateKid({ photo: newMediaPath });
-    } catch (error) {
-      console.error("Error changing the profile photo", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleImagePress = (image) => {
-    if (image) {
-      setSelectedImage(image);
-      setFullScreenImageModal(true);
-    }
-  };
-
-  const closeFullScreenModal = () => {
-    setFullScreenImageModal(false);
-    setSelectedImage(null);
-  };
-
-  const handleUpdateKid = async (updatedFields) => {
-    try {
-      // Merge the existing kid data with the updated fields
-      const kidDetails = {
-        ...updatedFields,
-      };
-
       const { error } = await supabase
         .from("students")
         .update(kidDetails)
@@ -219,17 +320,17 @@ const StudentProfileScreen = () => {
 
       await fetchData();
       await RefreshKidsData();
-      setIsFormChanged(false);
     } catch (error) {
       console.error("Error updating kid's data:", error);
     }
   };
 
-  if (!kid || loading) {
+  if (!kid) {
     return (
-      <View style={{ flex: 1 }}>
-        <CustomLoading imageSize={80} text="Loading..." />
-      </View>
+      <ActivityIndicator
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        size={"large"}
+      />
     );
   }
 
@@ -237,56 +338,16 @@ const StudentProfileScreen = () => {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 15 : 20}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 20}
     >
       <View style={{ flex: 1 }}>
-        <View style={styles.headerContainer}>
-          <View style={styles.imageWrapper}>
-            <TouchableOpacity
-              // style={styles.imageContainer}
-              onPress={() => {
-                if (actualPhoto) {
-                  handleImagePress(actualPhoto);
-                }
-              }}
-            >
-              <RemoteImage
-                path={actualPhoto}
-                style={styles.profilePicture}
-                name={kid?.name}
-                bucketName="profilePhotos"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cameraIcon}
-              onPress={() => setCallOpenCamera(true)}
-            >
-              <Text
-                style={{
-                  position: "absolute",
-                  bottom: -12,
-                  right: 3,
-                  fontSize: 15,
-                  fontWeight: "600",
-                  color: "blue",
-                }}
-              >
-                Edit
-              </Text>
-              <MaterialIcons
-                name="photo-camera"
-                size={32}
-                color="gray"
-                //color="#FF7276"
-              />
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.headerText}>
-            {name}
-            {age > 0 ? `, ${age} years old` : ""}
-          </Text>
-          <Text style={styles.categoryText}>{bjjCategory}</Text>
-        </View>
+        <ProfileHeader
+          name={kid.name}
+          birthDate={kid.birthDate}
+          category="Little Champions"
+          photo={actualPhoto}
+          onPressEditPhoto={() => setCallOpenCamera(true)}
+        />
         <Tab.Navigator>
           <Tab.Screen
             name="Basic Info"
@@ -294,7 +355,8 @@ const StudentProfileScreen = () => {
               <BasicInfoScreen
                 kid={kid}
                 setKidDetails={setKid}
-                handleUpdateKid={handleUpdateKid}
+                setBirthDate={setBirthDate}
+                setIsFormChanged={setIsFormChanged}
               />
             )}
             options={{
@@ -364,36 +426,12 @@ const StudentProfileScreen = () => {
           allowMultipleImages={false}
           saveMediaOnCamera={false}
         />
-        {/* <ConfirmationModal
+        <ConfirmationModal
           isVisible={isFormChanged}
           onConfirm={handleUpdateKid}
           onCancel={() => setIsFormChanged(false)}
           questionText="Save changes to the profile?"
-        /> */}
-        <Modal
-          visible={fullScreenImageModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={closeFullScreenModal}
-        >
-          <View style={styles.fullScreenModalContainer}>
-            {selectedImage ? (
-              <RemoteImage
-                path={selectedImage}
-                bucketName="profilePhotos"
-                style={styles.fullImage}
-              />
-            ) : (
-              <ActivityIndicator size="large" />
-            )}
-            <TouchableOpacity
-              style={styles.closeModalButton}
-              onPress={closeFullScreenModal}
-            >
-              <Entypo name="cross" size={25} color="white" />
-            </TouchableOpacity>
-          </View>
-        </Modal>
+        />
         {showConfirmationModal && (
           <InfoModal
             isVisible={true}
@@ -409,46 +447,3 @@ const StudentProfileScreen = () => {
 };
 
 export default StudentProfileScreen;
-
-const SchoolInfoScreen = ({
-  selectedSchool,
-  schoolExitPhoto,
-  onChangePhoto,
-}) => (
-  <View style={styles.tabContainer}>
-    <Text>
-      School: {selectedSchool ? selectedSchool.name : "No school selected"}
-    </Text>
-    {schoolExitPhoto ? (
-      <Image source={{ uri: schoolExitPhoto }} style={styles.schoolPhoto} />
-    ) : (
-      <Text>No exit door photo</Text>
-    )}
-    <TouchableOpacity onPress={onChangePhoto} style={styles.changeButton}>
-      <Text style={styles.changeButtonText}>Change Exit Door Photo</Text>
-    </TouchableOpacity>
-  </View>
-);
-
-const AddressInfoScreen = ({ kid }) => (
-  <View style={styles.tabContainer}>
-    {kid.dropOffAddress ? (
-      <Text>Drop Off Address: {kid.dropOffAddress.addressLine1}</Text>
-    ) : (
-      <Text>No drop off address added</Text>
-    )}
-  </View>
-);
-
-const JiuJitsuInfoScreen = ({ belt, stripes, setBelt, setStripes }) => (
-  <View style={styles.tabContainer}>
-    <Text>Belt</Text>
-    <TextInput style={styles.input} value={belt} onChangeText={setBelt} />
-    <Text>Stripes</Text>
-    <TextInput
-      style={styles.input}
-      value={stripes.toString()}
-      onChangeText={(text) => setStripes(Number(text))}
-    />
-  </View>
-);

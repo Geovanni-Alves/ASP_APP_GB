@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 const StudentSelectionScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const from = route.params?.from;
   const [searchText, setSearchText] = useState("");
   const [selectedStudents, setSelectedStudents] = useState([]);
   const { kids } = useKidsContext();
@@ -56,7 +57,11 @@ const StudentSelectionScreen = () => {
   };
 
   const handleNextPressed = () => {
-    navigation.navigate("Incidents", { selectedStudents });
+    if (from === "Promotions") {
+      navigation.navigate("Promotions", { selectedStudents });
+    } else {
+      navigation.navigate("Incidents", { selectedStudents });
+    }
   };
 
   const filteredStudents = kids.filter((student) =>

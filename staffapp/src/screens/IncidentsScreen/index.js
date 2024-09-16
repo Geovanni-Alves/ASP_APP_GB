@@ -25,6 +25,7 @@ import CustomLoading from "../../components/CustomLoading";
 
 const IncidentsScreen = () => {
   const route = useRoute();
+  const from = route.params?.from;
   const navigation = useNavigation();
   const { selectedStudents } = route.params;
   const { savePhotoInBucket } = usePicturesContext();
@@ -70,14 +71,28 @@ const IncidentsScreen = () => {
               // if (incidentImage) {
               //   deleteMediaFromBucket(incidentImage, "feedPhotos");
               // }
-              navigation.navigate("StudentSelection");
+              if (from === "Students") {
+                navigation.navigate("Activities", {
+                  id: selectedStudents[0].id,
+                  from: "feed",
+                });
+              } else {
+                navigation.navigate("StudentSelection");
+              }
             },
             style: "destructive",
           },
         ]
       );
     } else {
-      navigation.navigate("StudentSelection");
+      if (from === "Students") {
+        navigation.navigate("Activities", {
+          id: selectedStudents[0].id,
+          from: "feed",
+        });
+      } else {
+        navigation.navigate("StudentSelection");
+      }
     }
   };
 
@@ -170,12 +185,14 @@ const IncidentsScreen = () => {
       >
         <View style={styles.headerContainer}>
           <Text style={styles.title}>Kids on the Incident</Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate("StudentSelection")}
-            style={styles.editButton}
-          >
-            <Ionicons name="pencil-outline" size={24} color="black" />
-          </TouchableOpacity>
+          {from !== "Students" && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate("StudentSelection")}
+              style={styles.editButton}
+            >
+              <Ionicons name="pencil-outline" size={24} color="black" />
+            </TouchableOpacity>
+          )}
         </View>
 
         <FlatList
@@ -252,14 +269,7 @@ const IncidentsScreen = () => {
           <View style={styles.modalContainer}>
             <Image source={{ uri: incidentImage }} style={styles.fullImage} />
             <TouchableOpacity
-              style={{
-                position: "absolute",
-                top: 70,
-                right: 20,
-                backgroundColor: "gray",
-                borderRadius: 30,
-                padding: 7,
-              }}
+              style={styles.closeModalButton}
               onPress={closeModal}
             >
               <Ionicons name="close" size={25} color="white" />

@@ -73,7 +73,7 @@ const PicturesContextProvider = ({ children }) => {
   const deleteMediaFromBucket = async (filePath, bucketName = "photos") => {
     try {
       if (!filePath) {
-        throw new Error("FIles path is required to delete media.");
+        throw new Error("Files path is required to delete media.");
       }
       const { data, error } = await supabase.storage
         .from(bucketName)
@@ -83,7 +83,7 @@ const PicturesContextProvider = ({ children }) => {
         throw error;
       }
       if (data) {
-        console.log(`Successfully deleted file: ${filePath}`);
+        //console.log(`Successfully deleted file: ${filePath}`);
         return true;
       }
     } catch (error) {

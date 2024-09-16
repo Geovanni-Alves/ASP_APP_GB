@@ -1,4 +1,6 @@
-import { StyleSheet } from "react-native";
+import { StyleSheet, Dimensions } from "react-native";
+
+const { width, height } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   title: {
@@ -101,6 +103,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   separator: {
     height: 3,
     backgroundColor: "#E0E0E0",
@@ -131,6 +139,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#FF7276",
     backgroundColor: "#FFF",
+  },
+  closeModalButton: {
+    position: "absolute",
+    top: 70,
+    right: 20,
+    backgroundColor: "gray",
+    borderRadius: 30,
+    padding: 7,
+  },
+  fullImage: {
+    width: width - 20,
+    height: height - 20,
+    resizeMode: "contain",
   },
 });
 

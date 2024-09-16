@@ -183,6 +183,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
   },
+  closeModalButton: {
+    position: "absolute",
+    top: 70,
+    right: 20,
+    backgroundColor: "gray",
+    borderRadius: 30,
+    padding: 7,
+  },
 });
 
 export default styles;

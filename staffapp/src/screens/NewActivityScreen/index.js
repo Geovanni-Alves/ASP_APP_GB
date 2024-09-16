@@ -5,10 +5,8 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import { FontAwesome, Entypo } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-//import RemoteImage from "../../components/RemoteImage";
 import OpenCamera from "../../components/OpenCamera";
 import { useKidsContext } from "../../contexts/KidsContext";
-//import { supabase } from "../../lib/supabase";
 import { useFeedContext } from "../../contexts/FeedContext";
 import InfoModal from "../../components/InfoModal";
 
@@ -36,16 +34,6 @@ const NewActivityScreen = () => {
   };
 
   useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [route]);
-
-  useEffect(() => {
     if (kidId && from === "feed") {
       const foundKid = kids.find((kid) => kid.id === kidId);
       if (foundKid) {
@@ -55,6 +43,18 @@ const NewActivityScreen = () => {
       setSelectedKid(null);
     }
   }, [kidId, kids]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+        </TouchableOpacity>
+      ),
+
+      title: selectedKid ? `${selectedKid.name} Activities` : "Activities",
+    });
+  }, [route, selectedKid]);
 
   const handlePhotoPress = () => {
     setCameraMode("photo");
@@ -73,6 +73,7 @@ const NewActivityScreen = () => {
       // If a kid is already selected, navigate directly to the IncidentsScreen
       navigation.navigate("Incidents", {
         selectedStudents: [selectedKid],
+        from: "Students",
       });
     } else {
       // Otherwise, navigate to the StudentSelection screen
@@ -80,9 +81,18 @@ const NewActivityScreen = () => {
     }
   };
 
-  const handleActivityPress = (activityType) => {
-    console.log(`Selected activity: ${activityType}`);
-    // setShowPostConfirmation(true);
+  const handlePromotionPress = () => {
+    console.log("selectedKid", selectedKid);
+    if (selectedKid) {
+      // If a kid is already selected, navigate directly to the IncidentsScreen
+      navigation.navigate("Promotions", {
+        selectedStudents: [selectedKid],
+        from: "Students",
+      });
+    } else {
+      // Otherwise, navigate to the StudentSelection screen
+      navigation.navigate("Promotions");
+    }
   };
 
   const handleSelectPhotoVideo = (paths, selectedKids, notes) => {
@@ -132,15 +142,15 @@ const NewActivityScreen = () => {
           </TouchableOpacity>
           <Text style={styles.textIcon}>Incident</Text>
         </View>
-        <View style={styles.iconContainer}>
+        {/* <View style={styles.iconContainer}>
           <TouchableOpacity
-            onPress={() => handleActivityPress("trophy")}
+            onPress={handlePromotionPress}
             style={styles.trophyIcon}
           >
             <MaterialIcons name="workspace-premium" size={45} color="#000080" />
           </TouchableOpacity>
           <Text style={styles.textIcon}>Promotions</Text>
-        </View>
+        </View> */}
       </View>
       <OpenCamera
         isVisible={callOpenCamera}

@@ -14,7 +14,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerText: {
-    marginTop: 23,
     fontSize: 22,
     fontWeight: "bold",
     color: "#333",
@@ -22,36 +21,6 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 16,
     color: "#007BFF",
-  },
-  imageWrapper: {
-    alignItems: "center",
-  },
-  fullImage: {
-    width: "100%",
-    height: "80%",
-    resizeMode: "contain",
-  },
-  fullScreenModalContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  closeModalButton: {
-    position: "absolute",
-    top: 30,
-    right: 30,
-  },
-  goBackIcon: {
-    paddingLeft: 14,
-  },
-  cameraIcon: {
-    position: "absolute",
-    bottom: -12,
-    right: 0,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 2,
   },
   profilePicture: {
     width: 120,
@@ -119,9 +88,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 25,
     alignItems: "center",
-    marginTop: 10,
-    marginHorizontal: 50,
-    //marginBottom: 20,
+    marginHorizontal: 20,
+    marginBottom: 20,
   },
   saveButtonText: {
     color: "#FFFFFF",

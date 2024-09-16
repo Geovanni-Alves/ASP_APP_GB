@@ -23,6 +23,7 @@ import { useUsersContext } from "../../contexts/UsersContext";
 import styles from "./styles";
 import RemoteImage from "../../components/RemoteImage";
 import OpenCamera from "../../components/OpenCamera";
+import { usePicturesContext } from "../../contexts/PicturesContext";
 //import PhotoOptionsModal from "../../components/PhotoOptionsModal";
 
 const ProfileScreen = () => {
@@ -41,6 +42,7 @@ const ProfileScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [actualPhoto, setActualPhoto] = useState(dbUser?.photo || null);
+  const { deleteMediaFromBucket } = usePicturesContext();
 
   const navigation = useNavigation();
   const userAddressRef = useRef();
@@ -75,8 +77,13 @@ const ProfileScreen = () => {
   };
 
   const handleNewPhoto = async (Paths) => {
-    const imagePath = Paths[0];
     try {
+      const mediaToDeletePath = actualPhoto;
+
+      if (mediaToDeletePath) {
+        await deleteMediaFromBucket(mediaToDeletePath, "profilePhotos");
+      }
+      const imagePath = Paths[0];
       if (imagePath) {
         await updateUserImage(imagePath);
         setActualPhoto(imagePath);
@@ -187,6 +194,7 @@ const ProfileScreen = () => {
             tag={false}
             allowMultipleImages={false}
             bucketName="profilePhotos"
+            allowNotes={false}
           />
           {/* <PhotoOptionsModal
             isVisible={isPhotoOptionsModalVisible}
@@ -292,15 +300,10 @@ const ProfileScreen = () => {
             style={styles.fullImage}
           />
           <TouchableOpacity
-            style={{
-              position: "absolute",
-              top: 25,
-              right: 10,
-              zIndex: 9999, // Ensure the close button is on top
-            }}
+            style={styles.closeModalButton}
             onPress={closeModal}
           >
-            <Entypo name="cross" size={30} color="red" />
+            <Entypo name="cross" size={25} color="white" />
           </TouchableOpacity>
         </View>
       </Modal>

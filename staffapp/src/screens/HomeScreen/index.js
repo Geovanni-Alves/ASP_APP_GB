@@ -8,7 +8,6 @@ import { useMessageContext } from "../../contexts/MessageContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { useNavigation } from "@react-navigation/native";
-import CustomMessageBox from "../../components/CustomMessageBox";
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -32,32 +31,6 @@ const HomeScreen = () => {
       }
     }
   }, [unreadMessages, kids]);
-
-  // if (true) {
-  //   return (
-  //     <View>
-  //       <CustomMessageBox
-  //         isVisible={true}
-  //         onClose={false}
-  //         header="Do you want to add a note to this media?"
-  //         infoItems={[]}
-  //         showTextInput={true}
-  //         textInputPlaceholder="Write a note..."
-  //         confirmButtonText="Yes, add a note" // Custom confirm button text
-  //         cancelButtonText="No, post without notes" // Custom cancel button text
-  //         onSubmit={(inputValue) => {
-  //           if (inputValue) {
-  //             //console.log("Note added:", inputValue);
-  //             handleFinishActivity(inputValue);
-  //           } else {
-  //             //console.log("no note added");
-  //             handleFinishActivity();
-  //           }
-  //         }}
-  //       />
-  //     </View>
-  //   );
-  // }
 
   return (
     <SafeAreaView style={styles.container}>

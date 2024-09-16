@@ -408,14 +408,7 @@ const StudentFeedScreen = () => {
             />
           )}
           <TouchableOpacity
-            style={{
-              position: "absolute",
-              top: 70,
-              right: 20,
-              zIndex: 9999, // Ensure the close button is on top
-              backgroundColor: "gray",
-              borderRadius: 30,
-            }}
+            style={styles.closeModalButton}
             onPress={closeModal}
           >
             <Entypo name="cross" size={25} color="white" />
