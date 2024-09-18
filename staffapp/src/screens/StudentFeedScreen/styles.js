@@ -132,7 +132,6 @@ const styles = StyleSheet.create({
     height: 300,
     alignSelf: "center",
   },
-
   playIcon: {
     position: "absolute",
     top: "50%",

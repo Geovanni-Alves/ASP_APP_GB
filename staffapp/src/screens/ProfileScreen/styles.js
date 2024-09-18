@@ -13,7 +13,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
+    marginBottom: 25,
   },
   input: {
     marginLeft: 10,
@@ -91,8 +91,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   userPhoto: {
-    width: 120,
-    height: 120,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: "#ccc",
   },
   signOutButtonText: {
     color: "white",
@@ -100,7 +102,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   imageWrapper: {
-    flexDirection: "row",
+    //flexDirection: "row",
     alignItems: "center",
   },
   modalContainer: {
@@ -116,9 +118,11 @@ const styles = StyleSheet.create({
   },
   cameraIcon: {
     position: "absolute",
-    bottom: 0,
+    bottom: -12,
     right: 0,
-    zIndex: 9999,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 2,
   },
   inputContainer: {
     marginBottom: 5,

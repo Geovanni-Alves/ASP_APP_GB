@@ -39,8 +39,11 @@ const styles = StyleSheet.create({
   },
   closeModalButton: {
     position: "absolute",
-    top: 30,
-    right: 30,
+    top: 70,
+    right: 20,
+    backgroundColor: "gray",
+    borderRadius: 30,
+    padding: 7,
   },
   goBackIcon: {
     paddingLeft: 14,
@@ -96,23 +99,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
   },
-  changeButton: {
-    backgroundColor: "#007BFF",
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  changeButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  schoolPhoto: {
-    width: 150,
-    height: 150,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    marginTop: 10,
-  },
   saveButton: {
     backgroundColor: "#007AFF",
     paddingVertical: 10,
@@ -122,14 +108,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginHorizontal: 50,
     //marginBottom: 20,
-  },
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  disabledButton: {
-    backgroundColor: "#D3D3D3",
   },
 });
 

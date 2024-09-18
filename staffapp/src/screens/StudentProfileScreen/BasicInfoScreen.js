@@ -49,6 +49,7 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
       allergies: localKid.allergies,
       medicine: localKid.medicine,
     };
+    setIsFormChanged(false);
     await handleUpdateKid(updatedFields); // Call the save function from the parent
   };
 

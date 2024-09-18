@@ -24,11 +24,11 @@ import styles from "./styles";
 import RemoteImage from "../../components/RemoteImage";
 import OpenCamera from "../../components/OpenCamera";
 import { usePicturesContext } from "../../contexts/PicturesContext";
+import FullScreenImageModal from "../../components/FullScreenImageModal";
 //import PhotoOptionsModal from "../../components/PhotoOptionsModal";
 
 const ProfileScreen = () => {
   const { setDbUser, dbUser, RefreshCurrentUserData } = useUsersContext();
-
   const [name, setName] = useState(dbUser?.name || "");
   const [unitNumber, setUnitNumber] = useState(dbUser?.unitNumber || "");
   const [address, setAddress] = useState(dbUser?.address || "");
@@ -38,15 +38,24 @@ const ProfileScreen = () => {
   const [lat, setLat] = useState(dbUser?.lat || null);
   const [lng, setLng] = useState(dbUser?.lng || null);
   //const [isPhotoOptionsModalVisible, setPhotoModalVisible] = useState(false);
+  const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  //const [modalVisible, setModalVisible] = useState(false);
   const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [actualPhoto, setActualPhoto] = useState(dbUser?.photo || null);
   const { deleteMediaFromBucket } = usePicturesContext();
+  const [urlPicture, setUrlPicture] = useState(null);
+  const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
 
   const navigation = useNavigation();
   const userAddressRef = useRef();
   const flatListRef = useRef();
+
+  // Capture the position of the small container (e.g., profile picture)
+  const handleProfilePictureLayout = (event) => {
+    const { x, y } = event.nativeEvent.layout;
+    setContainerPosition({ x, y });
+  };
 
   useEffect(() => {
     if (dbUser?.address) {
@@ -67,13 +76,15 @@ const ProfileScreen = () => {
   };
 
   const handleImagePress = (image) => {
-    setModalVisible(true);
-    setSelectedImage(image);
+    if (image) {
+      //setSelectedImage(image);
+      setFullScreenImageModal(true);
+    }
   };
 
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedImage(null);
+  const closeFullScreenModal = () => {
+    //setSelectedImage(null);
+    setFullScreenImageModal(false);
   };
 
   const handleNewPhoto = async (Paths) => {
@@ -154,36 +165,43 @@ const ProfileScreen = () => {
   };
 
   const renderContent = () => (
-    <View style={{ flex: 1, padding: 16 }}>
+    <View style={{ flex: 1 }}>
       <View style={styles.headerContainer}>
-        <View style={styles.imageWrapper}>
-          <TouchableOpacity onPress={() => setCallOpenCamera(true)}>
-            <TouchableOpacity
-              style={styles.imageContainer}
-              onPress={() => handleImagePress(actualPhoto)}
+        <View style={styles.imageWrapper} onLayout={handleProfilePictureLayout}>
+          <TouchableOpacity
+            // style={styles.imageContainer}
+            //onPress={() => handleImagePress(actualPhoto)}
+            onPress={() => {
+              if (urlPicture) {
+                handleImagePress(urlPicture);
+              }
+            }}
+          >
+            <RemoteImage
+              path={actualPhoto}
+              style={styles.userPhoto}
+              name={dbUser?.name}
+              bucketName="profilePhotos"
+              onImageLoaded={(url) => setUrlPicture(url)}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.cameraIcon}
+            onPress={() => setCallOpenCamera(true)}
+          >
+            <Text
+              style={{
+                position: "absolute",
+                bottom: -12,
+                right: 3,
+                fontSize: 15,
+                fontWeight: "600",
+                color: "blue",
+              }}
             >
-              <RemoteImage
-                path={actualPhoto}
-                style={styles.userPhoto}
-                name={dbUser?.name}
-                bucketName="profilePhotos"
-              />
-            </TouchableOpacity>
-            <View style={styles.cameraIcon}>
-              <Text
-                style={{
-                  position: "absolute",
-                  bottom: -12,
-                  right: 3,
-                  fontSize: 15,
-                  fontWeight: "600",
-                  color: "blue",
-                }}
-              >
-                Edit
-              </Text>
-              <MaterialIcons name="photo-camera" size={32} color="gray" />
-            </View>
+              Edit
+            </Text>
+            <MaterialIcons name="photo-camera" size={32} color="gray" />
           </TouchableOpacity>
           <OpenCamera
             isVisible={callOpenCamera}
@@ -287,7 +305,8 @@ const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
-      <Modal
+
+      {/* <Modal
         visible={modalVisible}
         transparent={true}
         animationType="fade"
@@ -306,7 +325,7 @@ const ProfileScreen = () => {
             <Entypo name="cross" size={25} color="white" />
           </TouchableOpacity>
         </View>
-      </Modal>
+      </Modal> */}
 
       {/* <View style={styles.inputContainer}>
         <Text style={styles.label}>Email</Text>
@@ -339,6 +358,13 @@ const ProfileScreen = () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 65 : 65}
       >
+        <FullScreenImageModal
+          isVisible={fullScreenImageModal}
+          source={urlPicture}
+          onClose={closeFullScreenModal}
+          targetX={containerPosition.x + 10}
+          targetY={containerPosition.y + 10}
+        />
         <FlatList
           ref={flatListRef}
           data={[{ key: "profile" }]}

@@ -20,18 +20,19 @@ import {
   FontAwesome,
   Entypo,
 } from "@expo/vector-icons";
-
+import FullScreenImageModal from "../../components/FullScreenImageModal";
 import { supabase } from "../../lib/supabase";
 import OpenCamera from "../../components/OpenCamera";
 import RemoteImage from "../../components/RemoteImage";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import InfoModal from "../../components/InfoModal";
-import { useKidsContext } from "../../contexts/KidsContext";
 import styles from "./styles";
 import { useNavigation, useRoute } from "@react-navigation/native"; // Corrected Import
 import CustomLoading from "../../components/CustomLoading";
 import BasicInfoScreen from "./BasicInfoScreen";
+import SchoolInfoScreen from "./SchoolInfoScreen";
 import { usePicturesContext } from "../../contexts/PicturesContext";
+import { useKidsContext } from "../../contexts/KidsContext";
 
 const StudentProfileScreen = () => {
   const route = useRoute();
@@ -40,18 +41,14 @@ const StudentProfileScreen = () => {
   const [kid, setKid] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [actualPhoto, setActualPhoto] = useState(null);
-  const [isConfirmationModalVisible, setConfirmationModalVisible] =
-    useState(false);
-  const [selectedSchool, setSelectedSchool] = useState(null);
-  const [schoolExitPhoto, setSchoolExitPhoto] = useState(null);
+  // const [isConfirmationModalVisible, setConfirmationModalVisible] =
+  //   useState(false);
+  //const [selectedSchool, setSelectedSchool] = useState(null);
+  //const [schoolExitPhoto, setSchoolExitPhoto] = useState(null);
   const [name, setName] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [notes, setNotes] = useState("");
-  const [allergies, setAllergies] = useState("");
-  const [medicine, setMedicine] = useState("");
   const [bjjCategory, setBjjCategory] = useState("Little Champions");
   const [age, SetAge] = useState("");
-  const [selectedImage, setSelectedImage] = useState(null);
+  //const [selectedImage, setSelectedImage] = useState(null);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [belt, setBelt] = useState("White");
   const [stripes, setStripes] = useState(2);
@@ -63,6 +60,14 @@ const StudentProfileScreen = () => {
   const { RefreshKidsData } = useKidsContext();
   const Tab = createBottomTabNavigator();
   const { deleteMediaFromBucket } = usePicturesContext();
+  const [urlPicture, setUrlPicture] = useState(null);
+  const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
+
+  // Capture the position of the small container (e.g., profile picture)
+  const handleProfilePictureLayout = (event) => {
+    const { x, y } = event.nativeEvent.layout;
+    setContainerPosition({ x, y });
+  };
 
   // Helper function to calculate age
   const calculateAge = (birthDate) => {
@@ -133,9 +138,9 @@ const StudentProfileScreen = () => {
         // setAllergies(fetchedKid.allergies);
         // setMedicine(fetchedKid.medicine);
         SetAge(calculateAge(fetchedKid.birthDate));
-        if (fetchedKid.schools) {
-          setSelectedSchool(fetchedKid.schools);
-        }
+        // if (fetchedKid.schools) {
+        //   setSelectedSchool(fetchedKid.schools);
+        // }
       } catch (error) {
         console.error("Error fetching kid:", error);
       }
@@ -162,11 +167,6 @@ const StudentProfileScreen = () => {
     }
   }, [route, kid]);
 
-  const handleNewSchoolPhoto = async (imagePath) => {
-    setCallOpenCameraForSchool(false);
-    setSchoolExitPhoto(imagePath[0]);
-  };
-
   const handleNewProfilePhoto = async (imagePath) => {
     try {
       setLoading(true);
@@ -191,18 +191,19 @@ const StudentProfileScreen = () => {
 
   const handleImagePress = (image) => {
     if (image) {
-      setSelectedImage(image);
+      //setSelectedImage(image);
       setFullScreenImageModal(true);
     }
   };
 
   const closeFullScreenModal = () => {
+    //setSelectedImage(null);
     setFullScreenImageModal(false);
-    setSelectedImage(null);
   };
 
   const handleUpdateKid = async (updatedFields) => {
     try {
+      setLoading(true);
       // Merge the existing kid data with the updated fields
       const kidDetails = {
         ...updatedFields,
@@ -222,13 +223,16 @@ const StudentProfileScreen = () => {
       setIsFormChanged(false);
     } catch (error) {
       console.error("Error updating kid's data:", error);
+    } finally {
+      setLoading(false);
+      setShowConfirmationModal(true);
     }
   };
 
   if (!kid || loading) {
     return (
       <View style={{ flex: 1 }}>
-        <CustomLoading imageSize={80} text="Loading..." />
+        <CustomLoading imageSize={70} text="Loading..." />
       </View>
     );
   }
@@ -241,12 +245,15 @@ const StudentProfileScreen = () => {
     >
       <View style={{ flex: 1 }}>
         <View style={styles.headerContainer}>
-          <View style={styles.imageWrapper}>
+          <View
+            style={styles.imageWrapper}
+            onLayout={handleProfilePictureLayout}
+          >
             <TouchableOpacity
               // style={styles.imageContainer}
               onPress={() => {
-                if (actualPhoto) {
-                  handleImagePress(actualPhoto);
+                if (urlPicture) {
+                  handleImagePress(urlPicture);
                 }
               }}
             >
@@ -255,6 +262,7 @@ const StudentProfileScreen = () => {
                 style={styles.profilePicture}
                 name={kid?.name}
                 bucketName="profilePhotos"
+                onImageLoaded={(url) => setUrlPicture(url)}
               />
             </TouchableOpacity>
             <TouchableOpacity
@@ -307,9 +315,10 @@ const StudentProfileScreen = () => {
             name="School Info"
             children={() => (
               <SchoolInfoScreen
-                selectedSchool={selectedSchool}
-                schoolExitPhoto={schoolExitPhoto}
-                onChangePhoto={() => setCallOpenCameraForSchool(true)}
+                kid={kid}
+                // selectedSchool={selectedSchool}
+                // setSelectedSchool={setSelectedSchool}
+                // schoolExitPhoto={schoolExitPhoto}
               />
             )}
             options={{
@@ -354,7 +363,7 @@ const StudentProfileScreen = () => {
           bucketName="profilePhotos"
           allowMultipleImages={false}
         />
-        <OpenCamera
+        {/* <OpenCamera
           isVisible={callOpenCameraForSchool}
           onPhotoTaken={() => setCallOpenCameraForSchool(false)}
           onSelectOption={handleNewSchoolPhoto}
@@ -363,14 +372,22 @@ const StudentProfileScreen = () => {
           bucketName="schoolExitPhotos"
           allowMultipleImages={false}
           saveMediaOnCamera={false}
-        />
+        /> */}
         {/* <ConfirmationModal
           isVisible={isFormChanged}
           onConfirm={handleUpdateKid}
           onCancel={() => setIsFormChanged(false)}
           questionText="Save changes to the profile?"
         /> */}
-        <Modal
+
+        <FullScreenImageModal
+          isVisible={fullScreenImageModal}
+          source={urlPicture}
+          onClose={closeFullScreenModal}
+          targetX={containerPosition.x + 50}
+          targetY={containerPosition.y + 50}
+        />
+        {/* <Modal
           visible={fullScreenImageModal}
           transparent={true}
           animationType="fade"
@@ -393,7 +410,7 @@ const StudentProfileScreen = () => {
               <Entypo name="cross" size={25} color="white" />
             </TouchableOpacity>
           </View>
-        </Modal>
+        </Modal> */}
         {showConfirmationModal && (
           <InfoModal
             isVisible={true}
@@ -409,26 +426,6 @@ const StudentProfileScreen = () => {
 };
 
 export default StudentProfileScreen;
-
-const SchoolInfoScreen = ({
-  selectedSchool,
-  schoolExitPhoto,
-  onChangePhoto,
-}) => (
-  <View style={styles.tabContainer}>
-    <Text>
-      School: {selectedSchool ? selectedSchool.name : "No school selected"}
-    </Text>
-    {schoolExitPhoto ? (
-      <Image source={{ uri: schoolExitPhoto }} style={styles.schoolPhoto} />
-    ) : (
-      <Text>No exit door photo</Text>
-    )}
-    <TouchableOpacity onPress={onChangePhoto} style={styles.changeButton}>
-      <Text style={styles.changeButtonText}>Change Exit Door Photo</Text>
-    </TouchableOpacity>
-  </View>
-);
 
 const AddressInfoScreen = ({ kid }) => (
   <View style={styles.tabContainer}>

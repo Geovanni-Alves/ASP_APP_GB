@@ -41,6 +41,7 @@ const OpenCamera = ({
   mode = "photo",
   bucketName = "photos",
   allowMultipleImages = mode === "photo",
+  imagesSelectionLimit = 0,
   cameraPermissionText = "Allow the app to access your camera",
   microphonePermissionText = "Allow the app to access your microphone",
   tag = false,
@@ -262,6 +263,7 @@ const OpenCamera = ({
         allowsEditing: false,
         quality: 0.5, // 1
         allowsMultipleSelection: allowMultipleImages, //mode === "photo",
+        selectionLimit: imagesSelectionLimit,
         preferredAssetRepresentationMode: "current",
         videoMaxDuration: 60 * 1000,
       });

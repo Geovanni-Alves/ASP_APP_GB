@@ -8,6 +8,7 @@ type RemoteImageProps = {
   fallback?: string;
   name: string;
   bucketName: string;
+  onImageLoaded?: (url: string) => void;
 } & Omit<ComponentProps<typeof Image>, "source">;
 
 const RemoteImage = ({
@@ -16,6 +17,7 @@ const RemoteImage = ({
   name,
   style,
   bucketName,
+  onImageLoaded,
   ...imageProps
 }: RemoteImageProps) => {
   const [image, setImage] = useState<string>("");
@@ -56,6 +58,7 @@ const RemoteImage = ({
 
         if (data?.signedUrl) {
           setImage(data.signedUrl);
+          onImageLoaded?.(data.signedUrl); //trigger the callback if available
         } else {
           throw new Error("Image not found");
         }
