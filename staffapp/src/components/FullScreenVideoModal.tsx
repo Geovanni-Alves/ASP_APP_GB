@@ -1,34 +1,25 @@
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  StyleSheet,
-  Dimensions,
-  Animated,
-  Modal,
-  Image,
-} from "react-native";
+import { View, StyleSheet, Dimensions, Animated, Modal } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 import Entypo from "react-native-vector-icons/Entypo";
 import { PanGestureHandler, State } from "react-native-gesture-handler";
 import CustomLoading from "./CustomLoading";
-import RemoteImage from "./RemoteImage";
+import RemoteVideo from "./RemoteVideo";
 
 const { width, height } = Dimensions.get("window");
 
-interface FullScreenImageProps {
+interface FullScreenVideoProps {
   isVisible: boolean;
   source: string | null;
-  path: string | null;
   onClose: () => void;
   targetX?: number; // X coordinate of the small container
   targetY?: number; // Y coordinate of the small container
   bucketName: string | null;
 }
 
-const FullScreenImage: React.FC<FullScreenImageProps> = ({
+const FullScreenVideo: React.FC<FullScreenVideoProps> = ({
   isVisible,
   source,
-  path,
   onClose,
   targetX = width / 2,
   targetY = height / 2,
@@ -159,14 +150,12 @@ const FullScreenImage: React.FC<FullScreenImageProps> = ({
               },
             ]}
           >
-            {path ? (
-              <RemoteImage
-                path={path}
+            {source ? (
+              <RemoteVideo
+                path={source}
                 bucketName={bucketName}
-                style={styles.fullImage}
+                style={styles.fullVideo}
               />
-            ) : source ? (
-              <Image source={{ uri: source }} style={styles.fullImage} />
             ) : (
               <View style={styles.loaderContainer}>
                 <CustomLoading
@@ -208,7 +197,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "white",
   },
-  fullImage: {
+  fullVideo: {
     width: width - 20,
     height: height - 20,
     resizeMode: "contain",
@@ -223,4 +212,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default FullScreenImage;
+export default FullScreenVideo;

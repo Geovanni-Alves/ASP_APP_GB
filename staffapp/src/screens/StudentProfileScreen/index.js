@@ -4,33 +4,30 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  Modal,
   TextInput,
-  FlatList,
-  RefreshControl,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
+  Pressable,
 } from "react-native";
-import {
-  FontAwesome5,
-  MaterialIcons,
-  FontAwesome,
-  Entypo,
-} from "@expo/vector-icons";
-import FullScreenImageModal from "../../components/FullScreenImageModal";
+import { FontAwesome5, MaterialIcons, FontAwesome } from "@expo/vector-icons";
+import AntDesign from "@expo/vector-icons/AntDesign";
+import FullScreenImage from "../../components/FullScreenImageModal";
 import { supabase } from "../../lib/supabase";
 import OpenCamera from "../../components/OpenCamera";
 import RemoteImage from "../../components/RemoteImage";
-import ConfirmationModal from "../../components/ConfirmationModal";
-import InfoModal from "../../components/InfoModal";
+// import ConfirmationModal from "../../components/ConfirmationModal";
+// import InfoModal from "../../components/InfoModal";
 import styles from "./styles";
-import { useNavigation, useRoute } from "@react-navigation/native"; // Corrected Import
+import {
+  useNavigation,
+  useRoute,
+  //useFocusEffect,
+} from "@react-navigation/native";
 import CustomLoading from "../../components/CustomLoading";
 import BasicInfoScreen from "./BasicInfoScreen";
 import SchoolInfoScreen from "./SchoolInfoScreen";
+import ContactsScreen from "./ContactsScreen";
+import AddressInfoScreen from "./AddressInfoScreen";
 import { usePicturesContext } from "../../contexts/PicturesContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 
@@ -39,29 +36,138 @@ const StudentProfileScreen = () => {
   const navigation = useNavigation();
   const { id: kidId } = route.params;
   const [kid, setKid] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
+  //const [refreshing, setRefreshing] = useState(false);
   const [actualPhoto, setActualPhoto] = useState(null);
   // const [isConfirmationModalVisible, setConfirmationModalVisible] =
   //   useState(false);
   //const [selectedSchool, setSelectedSchool] = useState(null);
   //const [schoolExitPhoto, setSchoolExitPhoto] = useState(null);
   const [name, setName] = useState("");
-  const [bjjCategory, setBjjCategory] = useState("Little Champions");
+  const [activeTab, setActiveTab] = useState("Basic Info");
   const [age, SetAge] = useState("");
   //const [selectedImage, setSelectedImage] = useState(null);
-  const [isFormChanged, setIsFormChanged] = useState(false);
+  //const [isFormChanged, setIsFormChanged] = useState(false);
   const [belt, setBelt] = useState("White");
   const [stripes, setStripes] = useState(2);
-  const [callOpenCameraForSchool, setCallOpenCameraForSchool] = useState(false);
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  //const [callOpenCameraForSchool, setCallOpenCameraForSchool] = useState(false);
+  //const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { RefreshKidsData } = useKidsContext();
+  const { RefreshKidsData, kids } = useKidsContext();
   const Tab = createBottomTabNavigator();
   const { deleteMediaFromBucket } = usePicturesContext();
-  const [urlPicture, setUrlPicture] = useState(null);
   const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
+
+  const avatarSize = activeTab === "Basic Info" ? 120 : 40;
+  const containerHeight = activeTab === "Basic Info" ? 180 : 60;
+
+  const formatKidName = (fullName) => {
+    if (!fullName) return "";
+
+    const nameParts = fullName.split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts[nameParts.length - 1]; // Take only the first and last names
+
+    const fullDisplayName = `${firstName} ${lastName}`;
+
+    return fullDisplayName;
+  };
+
+  const goBack = () => {
+    navigation.navigate("StudentFeed", { id: kidId });
+  };
+
+  useEffect(() => {
+    const formattedName = formatKidName(kid?.name);
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={goBack} style={styles.goBackIcon}>
+          <FontAwesome name="arrow-left" size={23} color="#fff" />
+        </TouchableOpacity>
+      ),
+    });
+    if (kid) {
+      navigation.setOptions({
+        title: `${formattedName} Profile`,
+      });
+    }
+  }, [route, kid, activeTab]);
+
+  const fetchData = async () => {
+    //setRefreshing(true);
+    setLoading(true);
+    await fetchKidData();
+    //setRefreshing(false);
+    setLoading(false);
+  };
+
+  const fetchKidData = async () => {
+    if (kidId) {
+      try {
+        const foundKid = kids.find((kid) => kid.id === kidId);
+        if (foundKid) {
+          setKid(foundKid);
+          setActualPhoto(foundKid.photo);
+          setName(foundKid.name);
+          SetAge(calculateAge(foundKid.birthDate));
+          console.log("Found Kid from context:", foundKid);
+        }
+        //console.log("foundKid", foundKid);
+
+        //   let { data: studentData, error: studentError } = await supabase
+        //     .from("students")
+        //     .select(
+        //       `
+        //         *,
+        //         schools(id, name)
+        //       `
+        //     )
+        //     .eq("id", kidId)
+        //     .single();
+
+        //   if (studentError) {
+        //     throw studentError;
+        //   }
+
+        //   const fetchedKid = studentData;
+        //   const currentDropOffAddressId = fetchedKid.currentDropOffAddress;
+
+        //   if (currentDropOffAddressId) {
+        //     let { data: currentDropOffAddress, error: addressError } =
+        //       await supabase
+        //         .from("students_address")
+        //         .select("*")
+        //         .eq("id", currentDropOffAddressId)
+        //         .single();
+        //     if (addressError) throw addressError;
+        //     fetchedKid.dropOffAddress = currentDropOffAddress;
+        //   }
+
+        // console.log("kids from context", kids);
+        // console.log("fetcheKid", fetchedKid);
+        // setKid(fetchedKid);
+        // setActualPhoto(fetchedKid.photo);
+        // setName(fetchedKid.name);
+        // // setBirthDate(fetchedKid.birthDate);
+        // // setNotes(fetchedKid.notes);
+        // // setAllergies(fetchedKid.allergies);
+        // // setMedicine(fetchedKid.medicine);
+        // SetAge(calculateAge(fetchedKid.birthDate));
+        // // if (fetchedKid.schools) {
+        // //   setSelectedSchool(fetchedKid.schools);
+        // // }
+      } catch (error) {
+        console.error("Error fetching kid:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    setActualPhoto(null);
+    setActiveTab("Basic Info");
+    fetchData();
+  }, [kidId]);
 
   // Capture the position of the small container (e.g., profile picture)
   const handleProfilePictureLayout = (event) => {
@@ -88,84 +194,9 @@ const StudentProfileScreen = () => {
     }
   };
 
-  const goBack = () => {
-    navigation.navigate("StudentFeed", { id: kidId });
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
   };
-
-  const fetchData = async () => {
-    setRefreshing(true);
-    await fetchKidData();
-    setRefreshing(false);
-  };
-
-  const fetchKidData = async () => {
-    if (kidId) {
-      try {
-        let { data: studentData, error: studentError } = await supabase
-          .from("students")
-          .select(
-            `
-              *,
-              schools(id, name)
-            `
-          )
-          .eq("id", kidId)
-          .single();
-
-        if (studentError) {
-          throw studentError;
-        }
-
-        const fetchedKid = studentData;
-        const currentDropOffAddressId = fetchedKid.currentDropOffAddress;
-
-        if (currentDropOffAddressId) {
-          let { data: currentDropOffAddress, error: addressError } =
-            await supabase
-              .from("students_address")
-              .select("*")
-              .eq("id", currentDropOffAddressId)
-              .single();
-          if (addressError) throw addressError;
-          fetchedKid.dropOffAddress = currentDropOffAddress;
-        }
-
-        setKid(fetchedKid);
-        setActualPhoto(fetchedKid.photo);
-        setName(fetchedKid.name);
-        // setBirthDate(fetchedKid.birthDate);
-        // setNotes(fetchedKid.notes);
-        // setAllergies(fetchedKid.allergies);
-        // setMedicine(fetchedKid.medicine);
-        SetAge(calculateAge(fetchedKid.birthDate));
-        // if (fetchedKid.schools) {
-        //   setSelectedSchool(fetchedKid.schools);
-        // }
-      } catch (error) {
-        console.error("Error fetching kid:", error);
-      }
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-    setActualPhoto(null);
-  }, [kidId]);
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack} style={styles.goBackIcon}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" />
-        </TouchableOpacity>
-      ),
-    });
-    if (kid) {
-      navigation.setOptions({
-        title: `${kid?.name} Profile`,
-      });
-    }
-  }, [route, kid]);
 
   const handleNewProfilePhoto = async (imagePath) => {
     try {
@@ -220,12 +251,12 @@ const StudentProfileScreen = () => {
 
       await fetchData();
       await RefreshKidsData();
-      setIsFormChanged(false);
+      //setIsFormChanged(false);
     } catch (error) {
       console.error("Error updating kid's data:", error);
     } finally {
       setLoading(false);
-      setShowConfirmationModal(true);
+      // setShowConfirmationModal(true);
     }
   };
 
@@ -244,58 +275,77 @@ const StudentProfileScreen = () => {
       keyboardVerticalOffset={Platform.OS === "ios" ? 15 : 20}
     >
       <View style={{ flex: 1 }}>
-        <View style={styles.headerContainer}>
+        <View
+          style={[
+            activeTab === "Basic Info"
+              ? styles.fullHeaderContainer
+              : styles.minimizedHeaderContainer,
+            { height: containerHeight },
+          ]}
+        >
           <View
-            style={styles.imageWrapper}
             onLayout={handleProfilePictureLayout}
+            style={styles.imageWrapper}
           >
-            <TouchableOpacity
-              // style={styles.imageContainer}
+            <Pressable
               onPress={() => {
-                if (urlPicture) {
-                  handleImagePress(urlPicture);
+                if (activeTab === "Basic Info" && actualPhoto) {
+                  handleImagePress(actualPhoto);
                 }
               }}
             >
               <RemoteImage
                 path={actualPhoto}
-                style={styles.profilePicture}
+                // style={
+                //   activeTab === "Basic Info"
+                //     ? styles.profilePicture
+                //     : styles.profilePictureSmall
+                // }
+                style={{
+                  width: avatarSize,
+                  height: avatarSize,
+                  borderRadius: avatarSize / 2,
+                }} // Dynamic avatar size
                 name={kid?.name}
                 bucketName="profilePhotos"
-                onImageLoaded={(url) => setUrlPicture(url)}
               />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cameraIcon}
-              onPress={() => setCallOpenCamera(true)}
-            >
-              <Text
-                style={{
-                  position: "absolute",
-                  bottom: -12,
-                  right: 3,
-                  fontSize: 15,
-                  fontWeight: "600",
-                  color: "blue",
-                }}
-              >
-                Edit
-              </Text>
-              <MaterialIcons
-                name="photo-camera"
-                size={32}
-                color="gray"
-                //color="#FF7276"
-              />
-            </TouchableOpacity>
+            </Pressable>
+
+            {activeTab === "Basic Info" && (
+              <View style={styles.cameraContainer}>
+                <TouchableOpacity
+                  style={styles.cameraIcon}
+                  onPress={() => setCallOpenCamera(true)}
+                >
+                  <MaterialIcons name="photo-camera" size={32} color="gray" />
+                </TouchableOpacity>
+                <Text style={styles.editText}>Edit </Text>
+              </View>
+            )}
           </View>
-          <Text style={styles.headerText}>
+          <Text
+            style={
+              activeTab === "Basic Info"
+                ? styles.headerText
+                : styles.minimizedHeaderText
+            }
+          >
             {name}
-            {age > 0 ? `, ${age} years old` : ""}
+            {activeTab === "Basic Info" && age > 0 ? `, ${age} years old` : ""}
           </Text>
-          <Text style={styles.categoryText}>{bjjCategory}</Text>
         </View>
-        <Tab.Navigator>
+        {/* Separator */}
+        <View style={styles.separator} />
+
+        <Tab.Navigator
+          initialRouteName="Basic Info"
+          screenOptions={{
+            headerShown: false,
+          }}
+          screenListeners={({ route }) => ({
+            tabPress: () => handleTabChange(route.name),
+          })}
+        >
           <Tab.Screen
             name="Basic Info"
             children={() => (
@@ -312,15 +362,17 @@ const StudentProfileScreen = () => {
             }}
           />
           <Tab.Screen
+            name="Contacts"
+            children={() => <ContactsScreen kid={kid} />}
+            options={{
+              tabBarIcon: ({ color, size }) => (
+                <AntDesign name="contacts" size={size} color={color} />
+              ),
+            }}
+          />
+          <Tab.Screen
             name="School Info"
-            children={() => (
-              <SchoolInfoScreen
-                kid={kid}
-                // selectedSchool={selectedSchool}
-                // setSelectedSchool={setSelectedSchool}
-                // schoolExitPhoto={schoolExitPhoto}
-              />
-            )}
+            children={() => <SchoolInfoScreen kid={kid} />}
             options={{
               tabBarIcon: ({ color, size }) => (
                 <FontAwesome name="building" color={color} size={size} />
@@ -380,12 +432,13 @@ const StudentProfileScreen = () => {
           questionText="Save changes to the profile?"
         /> */}
 
-        <FullScreenImageModal
+        <FullScreenImage
           isVisible={fullScreenImageModal}
-          source={urlPicture}
+          path={actualPhoto}
           onClose={closeFullScreenModal}
           targetX={containerPosition.x + 50}
           targetY={containerPosition.y + 50}
+          bucketName={"profilePhotos"}
         />
         {/* <Modal
           visible={fullScreenImageModal}
@@ -411,7 +464,7 @@ const StudentProfileScreen = () => {
             </TouchableOpacity>
           </View>
         </Modal> */}
-        {showConfirmationModal && (
+        {/* {showConfirmationModal && (
           <InfoModal
             isVisible={true}
             onClose={() => setShowConfirmationModal(false)}
@@ -419,7 +472,7 @@ const StudentProfileScreen = () => {
               { label: "All Done ✅", value: "Kid Updated successfully!" },
             ]}
           />
-        )}
+        )} */}
       </View>
     </KeyboardAvoidingView>
   );
@@ -427,25 +480,20 @@ const StudentProfileScreen = () => {
 
 export default StudentProfileScreen;
 
-const AddressInfoScreen = ({ kid }) => (
-  <View style={styles.tabContainer}>
-    {kid.dropOffAddress ? (
-      <Text>Drop Off Address: {kid.dropOffAddress.addressLine1}</Text>
-    ) : (
-      <Text>No drop off address added</Text>
-    )}
-  </View>
-);
-
-const JiuJitsuInfoScreen = ({ belt, stripes, setBelt, setStripes }) => (
-  <View style={styles.tabContainer}>
-    <Text>Belt</Text>
-    <TextInput style={styles.input} value={belt} onChangeText={setBelt} />
-    <Text>Stripes</Text>
-    <TextInput
-      style={styles.input}
-      value={stripes.toString()}
-      onChangeText={(text) => setStripes(Number(text))}
-    />
-  </View>
-);
+const JiuJitsuInfoScreen = ({ belt, stripes, setBelt, setStripes }) => {
+  const [bjjCategory, setBjjCategory] = useState("Little Champions");
+  return (
+    <View style={styles.tabContainer}>
+      <Text>Actual Category</Text>
+      <Text style={styles.categoryText}>{bjjCategory}</Text>
+      <Text>Belt</Text>
+      <TextInput style={styles.input} value={belt} onChangeText={setBelt} />
+      <Text>Stripes</Text>
+      <TextInput
+        style={styles.input}
+        value={stripes.toString()}
+        onChangeText={(text) => setStripes(Number(text))}
+      />
+    </View>
+  );
+};

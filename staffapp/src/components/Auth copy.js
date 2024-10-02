@@ -15,7 +15,6 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Only allow sign in with email and password
   async function signInWithEmail() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({
@@ -23,11 +22,23 @@ export default function Auth() {
       password: password,
     });
 
-    // if (error) {
-    //   Alert.alert("Sign-in Error", error.message);
-    // } else {
-    //   Alert.alert("Success", "Signed in successfully!");
-    // }
+    if (error) Alert.alert(error.message);
+    setLoading(false);
+  }
+
+  async function signUpWithEmail() {
+    setLoading(true);
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+    });
+
+    if (error) Alert.alert(error.message);
+    if (!session)
+      Alert.alert("Please check your inbox for email verification!");
     setLoading(false);
   }
 
@@ -70,6 +81,14 @@ export default function Auth() {
           >
             Sign In
           </Button>
+          <Button
+            mode="outlined"
+            onPress={signUpWithEmail}
+            loading={loading}
+            style={styles.button}
+          >
+            Sign Up
+          </Button>
         </Card.Content>
       </Card>
     </KeyboardAvoidingView>
@@ -84,8 +103,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   logoContainer: {
+    // flex: 1,
     padding: 10,
+    //marginTop: 30,
+    //paddingTop: 35,
     alignItems: "center",
+    //marginBottom: 32,
   },
   logo: {
     width: 250,

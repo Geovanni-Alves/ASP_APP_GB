@@ -39,7 +39,6 @@ const AddAddressScreen = () => {
   const [country, setCountry] = useState(null);
 
   useEffect(() => {
-    console.log("route from add address", route.params);
     if (mode === "update" && currentAddress) {
       setAddress(currentAddress.addressLine1);
       setLat(currentAddress.lat);
@@ -66,10 +65,8 @@ const AddAddressScreen = () => {
   }, [mode, currentAddress]);
 
   const goBack = () => {
-    if (from === "StudentProfile") {
-      navigation.navigate("StudentProfile", {
-        kidId: kidId,
-      });
+    if (from === "kidProfile") {
+      navigation.navigate("Address Info");
     } else {
       navigation.navigate("AddressList", {
         kidId: kidId,
@@ -253,6 +250,12 @@ const AddAddressScreen = () => {
           />
         </View>
         <ScrollView contentContainerStyle={styles.contentContainer}>
+          <Text style={styles.label}>Address</Text>
+          <TextInput
+            style={styles.textInput}
+            value={address}
+            editable={false}
+          />
           <Text style={styles.label}>City</Text>
           <TextInput style={styles.textInput} value={city} editable={false} />
           <Text style={styles.label}>Province</Text>

@@ -47,6 +47,7 @@ export default function CustomDrawerContent(props) {
           style={styles.userPic}
         />
         <Text style={styles.userName}>{currentUserData?.name}</Text>
+        <Text style={styles.email}>{currentUserData?.email}</Text>
       </View>
       <DrawerContentScrollView {...props}>
         <DrawerItemList {...props} />
@@ -95,9 +96,16 @@ const styles = StyleSheet.create({
     borderRadius: 65,
   },
   userName: {
-    fontSize: 22,
+    fontSize: 23,
     marginVertical: 6,
     fontWeight: "bold",
     color: "#111",
+    alignSelf: "center",
+  },
+  email: {
+    fontSize: 12,
+    marginVertical: 6,
+    fontWeight: "700",
+    color: "blue",
   },
 });

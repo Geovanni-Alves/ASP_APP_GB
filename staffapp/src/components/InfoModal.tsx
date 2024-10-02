@@ -121,12 +121,12 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: "white",
-    padding: 20,
+    padding: 15,
     borderRadius: 10,
     elevation: 5,
   },
   infoItem: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   label: {
     fontSize: 16,
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   fixedSpacing: {
-    marginLeft: 10,
+    marginLeft: 5,
   },
   button: {
     marginTop: 10,

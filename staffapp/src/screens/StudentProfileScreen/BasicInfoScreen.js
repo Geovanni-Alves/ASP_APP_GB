@@ -13,6 +13,7 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [localKid, setLocalKid] = useState(kid);
+  const [kidName, setKidName] = useState(localKid?.name);
 
   useEffect(() => {
     setLocalKid(kid);
@@ -36,14 +37,20 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
 
   const handleInputChange = (key, value) => {
     if (value !== localKid[key]) {
-      setLocalKid((prev) => ({ ...prev, [key]: value }));
-      setKidDetails((prev) => ({ ...prev, [key]: value }));
-      setIsFormChanged(true); // Mark form as changed
+      if (key !== "name") {
+        setLocalKid((prev) => ({ ...prev, [key]: value }));
+        setKidDetails((prev) => ({ ...prev, [key]: value }));
+        setIsFormChanged(true); // Mark form as changed
+      } else {
+        setKidName(value);
+        setIsFormChanged(true); // Mark form as changed
+      }
     }
   };
 
   const saveChanges = async () => {
     const updatedFields = {
+      name: kidName,
       birthDate: localKid.birthDate,
       notes: localKid.notes,
       allergies: localKid.allergies,
@@ -60,6 +67,12 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
       style={styles.tabContainer}
     >
       <View style={styles.detailItemContainer}>
+        <Text style={styles.detailLabel}>Name</Text>
+        <TextInput
+          style={styles.detailTextInput}
+          value={kidName || ""}
+          onChangeText={(text) => handleInputChange("name", text)}
+        />
         <Text style={styles.detailLabel}>Birthday</Text>
         <TouchableOpacity
           onPress={() => {

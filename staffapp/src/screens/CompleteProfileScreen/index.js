@@ -7,15 +7,16 @@ import {
   Keyboard,
   TouchableOpacity,
 } from "react-native";
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import { useNavigation } from "@react-navigation/native";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import { GOOGLE_MAPS_APIKEY } from "@env";
-import PhoneInput from "react-native-phone-number-input";
+//import PhoneInput from "react-native-phone-number-input";
 import { supabase } from "../../lib/supabase";
+import PhoneInput from "react-native-international-phone-number";
 
 const ProfileScreen = () => {
   const { authUser, setDbUser, dbUser, userEmail } = useUsersContext();
@@ -24,16 +25,29 @@ const ProfileScreen = () => {
   const [name, setName] = useState(dbUser?.name || "");
   const [address, setAddress] = useState(dbUser?.address || "");
   const [phoneNumber, setPhoneNumber] = useState(dbUser?.phoneNumber || "");
-  const phoneInputRef = useRef(null);
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  //const phoneInputRef = useRef(null);
 
   const [lat, setLat] = useState(dbUser?.lat || null);
   const [lng, setLng] = useState(dbUser?.lng || null);
 
   const navigation = useNavigation();
 
+  // const handleConfirm = () => {
+  //   if (phoneInputRef.current.isValidNumber(phoneNumber)) {
+  //     Keyboard.dismiss();
+  //   } else {
+  //     Alert.alert("Invalid Phone Number", "Please enter a valid phone number.");
+  //   }
+  // };
+
   const handleConfirm = () => {
-    if (phoneInputRef.current.isValidNumber(phoneNumber)) {
+    if (phoneNumber) {
       Keyboard.dismiss();
+      // Alert.alert(
+      //   "Phone Number",
+      //   `Phone: ${phoneNumber}, Country: ${selectedCountry.cca2}`
+      // );
     } else {
       Alert.alert("Invalid Phone Number", "Please enter a valid phone number.");
     }
@@ -130,7 +144,7 @@ const ProfileScreen = () => {
         }}
       />
       <View style={styles.phoneInputContainer}>
-        <PhoneInput
+        {/* <PhoneInput
           ref={phoneInputRef}
           value={phoneNumber}
           onChangeText={(text) => {
@@ -140,6 +154,24 @@ const ProfileScreen = () => {
           layout="first"
           placeholder="Phone Number"
           style={styles.phoneInputField}
+        /> */}
+        <PhoneInput
+          value={phoneNumber}
+          onChangePhoneNumber={(phone) => {
+            setPhoneNumber(phone);
+          }}
+          selectedCountry={selectedCountry}
+          onChangeSelectedCountry={(country) => {
+            setSelectedCountry(country);
+          }}
+          placeholder="Phone Number"
+          language="en"
+          defaultCountry="CA"
+          phoneInputStyles={{
+            container: {
+              width: "89%",
+            },
+          }}
         />
         <TouchableOpacity style={styles.okButton} onPress={handleConfirm}>
           <Text style={styles.okButtonText}>OK</Text>

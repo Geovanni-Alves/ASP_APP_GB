@@ -9,43 +9,36 @@ import {
   KeyboardAvoidingView,
   Platform,
   FlatList,
-  Modal,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
-import { Entypo } from "@expo/vector-icons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import { GOOGLE_MAPS_APIKEY } from "@env";
-import PhoneInput from "react-native-phone-number-input";
+//import PhoneInput from "react-native-phone-number-input";
+import PhoneInput from "react-native-international-phone-number";
 import { useUsersContext } from "../../contexts/UsersContext";
 import styles from "./styles";
 import RemoteImage from "../../components/RemoteImage";
 import OpenCamera from "../../components/OpenCamera";
 import { usePicturesContext } from "../../contexts/PicturesContext";
-import FullScreenImageModal from "../../components/FullScreenImageModal";
-//import PhotoOptionsModal from "../../components/PhotoOptionsModal";
+import FullScreenImage from "../../components/FullScreenImageModal";
 
 const ProfileScreen = () => {
   const { setDbUser, dbUser, RefreshCurrentUserData } = useUsersContext();
   const [name, setName] = useState(dbUser?.name || "");
   const [unitNumber, setUnitNumber] = useState(dbUser?.unitNumber || "");
   const [address, setAddress] = useState(dbUser?.address || "");
-  //const [email, setEmail] = useState(dbUser?.email || "");
   const [phoneNumber, setPhoneNumber] = useState(dbUser?.phoneNumber || "");
-  const phoneInputRef = useRef(null);
   const [lat, setLat] = useState(dbUser?.lat || null);
   const [lng, setLng] = useState(dbUser?.lng || null);
-  //const [isPhotoOptionsModalVisible, setPhotoModalVisible] = useState(false);
   const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
-  //const [modalVisible, setModalVisible] = useState(false);
   const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [actualPhoto, setActualPhoto] = useState(dbUser?.photo || null);
   const { deleteMediaFromBucket } = usePicturesContext();
-  const [urlPicture, setUrlPicture] = useState(null);
   const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
+  const [selectedCountry, setSelectedCountry] = useState(null);
 
   const navigation = useNavigation();
   const userAddressRef = useRef();
@@ -58,18 +51,33 @@ const ProfileScreen = () => {
   };
 
   useEffect(() => {
-    if (dbUser?.address) {
-      setAddress(dbUser.address);
+    if (dbUser) {
+      setName(dbUser.name || "");
+      setPhoneNumber(dbUser.phoneNumber || "");
+      if (dbUser.address) {
+        setAddress(dbUser.address); // Load the address from dbUser
+        if (userAddressRef.current) {
+          userAddressRef.current.setAddressText(address); // Set the initial value
+        }
+      }
     }
   }, [dbUser]);
 
-  // useEffect(() => {
-  //   userAddressRef.current?.setAddressText(address);
-  // }, [address]);
+  // const handleConfirm = () => {
+  //   if (phoneInputRef.current.isValidNumber(phoneNumber)) {
+  //     Keyboard.dismiss();
+  //   } else {
+  //     Alert.alert("Invalid Phone Number", "Please enter a valid phone number.");
+  //   }
+  // };
 
   const handleConfirm = () => {
-    if (phoneInputRef.current.isValidNumber(phoneNumber)) {
+    if (phoneNumber) {
       Keyboard.dismiss();
+      // Alert.alert(
+      //   "Phone Number",
+      //   `Phone: ${phoneNumber}, Country: ${selectedCountry.cca2}`
+      // );
     } else {
       Alert.alert("Invalid Phone Number", "Please enter a valid phone number.");
     }
@@ -77,13 +85,11 @@ const ProfileScreen = () => {
 
   const handleImagePress = (image) => {
     if (image) {
-      //setSelectedImage(image);
       setFullScreenImageModal(true);
     }
   };
 
   const closeFullScreenModal = () => {
-    //setSelectedImage(null);
     setFullScreenImageModal(false);
   };
 
@@ -165,15 +171,13 @@ const ProfileScreen = () => {
   };
 
   const renderContent = () => (
-    <View style={{ flex: 1 }}>
+    <View style={styles.container}>
       <View style={styles.headerContainer}>
         <View style={styles.imageWrapper} onLayout={handleProfilePictureLayout}>
           <TouchableOpacity
-            // style={styles.imageContainer}
-            //onPress={() => handleImagePress(actualPhoto)}
             onPress={() => {
-              if (urlPicture) {
-                handleImagePress(urlPicture);
+              if (actualPhoto) {
+                handleImagePress(actualPhoto);
               }
             }}
           >
@@ -182,7 +186,6 @@ const ProfileScreen = () => {
               style={styles.userPhoto}
               name={dbUser?.name}
               bucketName="profilePhotos"
-              onImageLoaded={(url) => setUrlPicture(url)}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -214,11 +217,10 @@ const ProfileScreen = () => {
             bucketName="profilePhotos"
             allowNotes={false}
           />
-          {/* <PhotoOptionsModal
-            isVisible={isPhotoOptionsModalVisible}
-            onClose={() => setPhotoModalVisible(false)}
-            onSelectOption={handleNewPhoto}
-          /> */}
+        </View>
+        <View style={styles.textAvatar}>
+          <Text style={styles.name}>{dbUser?.name}</Text>
+          <Text style={styles.email}>{dbUser?.email}</Text>
         </View>
       </View>
 
@@ -257,16 +259,13 @@ const ProfileScreen = () => {
           enablePoweredByContainer={false}
           fetchDetails={true}
           styles={styles.autoComplete}
-          // styles={{
-          //   textInputContainer: styles.autoCompleteTextInputContainer,
-          //   textInput: styles.autoCompleteTextInput,
-          //   listView: styles.autoCompleteListView,
-          // }}
           onPress={(data, details = null) => {
-            //console.log(details.formatted_address);
-            setAddress(details.formatted_address);
-            setLat(details.geometry.location.lat);
-            setLng(details.geometry.location.lng);
+            if (details) {
+              //console.log(details.formatted_address);
+              setAddress(details.formatted_address);
+              setLat(details.geometry.location.lat);
+              setLng(details.geometry.location.lng);
+            }
           }}
           query={{
             key: GOOGLE_MAPS_APIKEY,
@@ -289,7 +288,7 @@ const ProfileScreen = () => {
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Phone Number</Text>
         <View style={styles.phoneInputContainer}>
-          <PhoneInput
+          {/* <PhoneInput
             ref={phoneInputRef}
             value={phoneNumber}
             onChangeText={(text) => {
@@ -299,6 +298,24 @@ const ProfileScreen = () => {
             layout="first"
             placeholder="Phone Number"
             style={styles.phoneInputField}
+          /> */}
+          <PhoneInput
+            value={phoneNumber}
+            onChangePhoneNumber={(phone) => {
+              setPhoneNumber(phone);
+            }}
+            selectedCountry={selectedCountry}
+            onChangeSelectedCountry={(country) => {
+              setSelectedCountry(country);
+            }}
+            placeholder="Phone Number"
+            language="en"
+            defaultCountry="CA"
+            phoneInputStyles={{
+              container: {
+                width: "89%",
+              },
+            }}
           />
           <TouchableOpacity style={styles.okButton} onPress={handleConfirm}>
             <Text style={styles.okButtonText}>OK</Text>
@@ -358,12 +375,13 @@ const ProfileScreen = () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 65 : 65}
       >
-        <FullScreenImageModal
+        <FullScreenImage
           isVisible={fullScreenImageModal}
-          source={urlPicture}
+          path={actualPhoto}
           onClose={closeFullScreenModal}
           targetX={containerPosition.x + 10}
           targetY={containerPosition.y + 10}
+          bucketName="profilePhotos"
         />
         <FlatList
           ref={flatListRef}

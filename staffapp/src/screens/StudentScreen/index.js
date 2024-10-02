@@ -6,8 +6,9 @@ import {
   SafeAreaView,
   TouchableOpacity,
   TextInput,
+  RefreshControl,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useKidsContext } from "../../contexts/KidsContext";
 import RemoteImage from "../../components/RemoteImage";
 import { FontAwesome } from "@expo/vector-icons";
@@ -16,9 +17,10 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 const StudentScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { kids } = useKidsContext();
+  const { kids, RefreshKidsData } = useKidsContext();
   const [searchByName, setSearchByName] = useState("");
   const [filteredStudents, setFilteredStudents] = useState(kids);
+  const [refreshing, setRefreshing] = useState(false);
 
   const goBack = () => {
     navigation.goBack();
@@ -34,17 +36,28 @@ const StudentScreen = () => {
     });
   }, [route]);
 
-  const handleSearch = (text) => {
-    setSearchByName(text);
-    if (text) {
+  // Effect to filter students whenever kids data changes
+  useEffect(() => {
+    if (searchByName) {
       const filteredData = kids.filter((kid) =>
-        kid.name.toLowerCase().includes(text.toLowerCase())
+        kid.name.toLowerCase().includes(searchByName.toLowerCase())
       );
       setFilteredStudents(filteredData);
     } else {
       setFilteredStudents(kids);
     }
+  }, [kids, searchByName]);
+
+  const handleSearch = (text) => {
+    setSearchByName(text);
   };
+
+  // Pull to refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await RefreshKidsData(); // Fetch latest data
+    setRefreshing(false);
+  }, [RefreshKidsData]);
 
   const renderStudents = ({ item }) => {
     return (
@@ -78,6 +91,9 @@ const StudentScreen = () => {
         data={filteredStudents}
         renderItem={renderStudents}
         keyExtractor={(item) => item.id.toString()}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       />
     </SafeAreaView>
   );

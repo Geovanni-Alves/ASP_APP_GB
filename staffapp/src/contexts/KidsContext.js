@@ -39,40 +39,86 @@ const KidsContextProvider = ({ children }) => {
     try {
       const { data: fetchedKids, error: kidsError } = await supabase
         .from("students")
-        .select("*")
+        .select(
+          `
+          *,
+          schools(*),  
+          drop_off_route(*),
+          contacts(*)
+        `
+        )
         .order("name", { ascending: true });
 
       if (kidsError) throw kidsError;
 
-      const kidsWithParents = await Promise.all(
+      // Fetch current drop-off addresses for each student manually
+      const kidsWithAddresses = await Promise.all(
         fetchedKids.map(async (kid) => {
-          if (kid.parent1Id !== null) {
-            const { data: parent1Data, error: parent1Error } = await supabase
-              .from("users")
-              .select("*")
-              .eq("id", kid.parent1Id)
-              .single();
-            if (parent1Error) throw parent1Error;
-            kid.Parent1 = parent1Data;
+          // Check if the student has a currentDropOffAddressId
+          if (kid.currentDropOffAddress) {
+            const { data: currentDropOffAddress, error: addressError } =
+              await supabase
+                .from("students_address")
+                .select("*")
+                .eq("id", kid.currentDropOffAddress)
+                .single(); // Fetch the specific address
+
+            if (addressError) {
+              console.error("Error fetching address:", addressError);
+            } else {
+              // Add the fetched drop-off address to the student object
+              kid.dropOffAddress = currentDropOffAddress;
+            }
           }
-          if (kid.parent2Id !== null) {
-            const { data: parent2Data, error: parent2Error } = await supabase
-              .from("users")
-              .select("*")
-              .eq("id", kid.parent2Id)
-              .single();
-            if (parent2Error) throw parent2Error;
-            kid.Parent2 = parent2Data;
-          }
-          return kid;
+
+          return kid; // Return the kid with the drop-off address attached (if available)
         })
       );
 
-      setKids(kidsWithParents);
+      setKids(kidsWithAddresses);
     } catch (error) {
       console.error("Error fetching kids data", error);
     }
   };
+
+  // const fetchKidsData = async () => {
+  //   try {
+  //     const { data: fetchedKids, error: kidsError } = await supabase
+  //       .from("students")
+  //       .select(`*, schools(*)`)
+  //       .order("name", { ascending: true });
+
+  //     if (kidsError) throw kidsError;
+
+  //     const kidsWithParents = await Promise.all(
+  //       fetchedKids.map(async (kid) => {
+  //         if (kid.parent1Id !== null) {
+  //           const { data: parent1Data, error: parent1Error } = await supabase
+  //             .from("users")
+  //             .select("*")
+  //             .eq("id", kid.parent1Id)
+  //             .single();
+  //           if (parent1Error) throw parent1Error;
+  //           kid.Parent1 = parent1Data;
+  //         }
+  //         if (kid.parent2Id !== null) {
+  //           const { data: parent2Data, error: parent2Error } = await supabase
+  //             .from("users")
+  //             .select("*")
+  //             .eq("id", kid.parent2Id)
+  //             .single();
+  //           if (parent2Error) throw parent2Error;
+  //           kid.Parent2 = parent2Data;
+  //         }
+  //         return kid;
+  //       })
+  //     );
+
+  //     setKids(kidsWithParents);
+  //   } catch (error) {
+  //     console.error("Error fetching kids data", error);
+  //   }
+  // };
 
   useEffect(() => {
     fetchKidsData();

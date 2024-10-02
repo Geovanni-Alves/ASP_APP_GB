@@ -9,14 +9,31 @@ const styles = StyleSheet.create({
     textAlign: "center",
     margin: 10,
   },
+  container: {
+    flex: 1,
+  },
   headerContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 25,
   },
+  textAvatar: {
+    //flex: 1,
+    padding: 10,
+    alignItems: "center",
+  },
+  name: {
+    fontSize: 22,
+    fontWeight: "500",
+  },
+  email: {
+    fontSize: 12,
+    color: "blue",
+  },
   input: {
     marginLeft: 10,
+    marginTop: 5,
     backgroundColor: "white",
     padding: 12,
     borderRadius: 5,
@@ -47,13 +64,15 @@ const styles = StyleSheet.create({
     maxHeight: 200, // Adjust as needed to fit the screen
   },
   phoneInputContainer: {
+    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
   },
   phoneInputField: {
-    flex: 1,
-    paddingVertical: 8,
+    //flex: 1,
+    //backgroundColor: "red",
+    //paddingVertical: 8,
   },
   okButton: {
     backgroundColor: "green",

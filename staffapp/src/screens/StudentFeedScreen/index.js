@@ -20,8 +20,10 @@ import { useRoute, useNavigation } from "@react-navigation/native";
 import { useFeedContext } from "../../contexts/FeedContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 import RemoteImage from "../../components/RemoteImage";
-import InfoModal from "../../components/InfoModal";
 import RemoteVideo from "../../components/RemoteVideo";
+import InfoModal from "../../components/InfoModal";
+import FullScreenImage from "../../components/FullScreenImageModal";
+import FullScreenVideo from "../../components/FullScreenVideoModal";
 
 const StudentFeedScreen = () => {
   const route = useRoute();
@@ -31,7 +33,9 @@ const StudentFeedScreen = () => {
   const { feeds } = useFeedContext();
   const [selectedKid, setSelectedKid] = useState(null);
   const [selectedKidFeeds, setSelectedKidFeeds] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
+  const [fullScreenVideoModal, setFullScreenVideoModal] = useState(false);
+  //const [modalVisible, setModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [loading, setLoading] = useState(true);
   const [videoLoading, setVideoLoading] = useState(false);
@@ -50,6 +54,7 @@ const StudentFeedScreen = () => {
       if (foundKid) {
         setSelectedKid(foundKid);
       }
+      //console.log("foundKid", foundKid);
     }
   }, [kidID, kids]);
 
@@ -302,14 +307,32 @@ const StudentFeedScreen = () => {
     );
   };
 
-  const handleMediaPress = (mediaName, mediaType) => {
-    setSelectedMedia(mediaName);
-    setModalVisible(true);
+  // const handleImagePress = (image) => {
+  //   if (image) {
+  //     //setSelectedImage(image);
+  //     setFullScreenImageModal(true);
+  //   }
+  // };
+
+  const closeFullScreenModal = () => {
+    //setSelectedImage(null);
+    setFullScreenImageModal(false);
   };
 
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedMedia(null);
+  const closeFullVideoModal = () => {
+    setFullScreenVideoModal(false);
+  };
+
+  const handleMediaPress = (mediaName, mediaType) => {
+    if (mediaType !== "VIDEO") {
+      setSelectedMedia(mediaName);
+      setFullScreenImageModal(true);
+    } else if (mediaType === "VIDEO") {
+      setSelectedMedia(mediaName);
+      setFullScreenVideoModal(true);
+    }
+
+    //setModalVisible(true);
   };
 
   if (!selectedKid) {
@@ -338,7 +361,7 @@ const StudentFeedScreen = () => {
           data={selectedKidFeeds}
           renderItem={renderFeedItem}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={{ flexGrow: 1, gap: 10 }}
+          contentContainerStyle={{ flexGrow: 1, gap: 2 }}
           bounces={true}
           scrollEnabled={true}
           ListEmptyComponent={ListEmptyComponent}
@@ -385,8 +408,23 @@ const StudentFeedScreen = () => {
           <Text style={styles.actionButtonText}>Info</Text>
         </Pressable>
       </View>
+      <FullScreenImage
+        isVisible={fullScreenImageModal}
+        path={selectedMedia}
+        onClose={closeFullScreenModal}
+        //targetX={containerPosition.x + 50}
+        //targetY={containerPosition.y + 50}
+        bucketName="feedPhotos"
+      />
 
-      <Modal
+      <FullScreenVideo
+        isVisible={fullScreenVideoModal}
+        source={selectedMedia}
+        onClose={closeFullVideoModal}
+        bucketName="feedVideos"
+      />
+
+      {/* <Modal
         visible={modalVisible}
         transparent={true}
         animationType="fade"
@@ -414,7 +452,7 @@ const StudentFeedScreen = () => {
             <Entypo name="cross" size={25} color="white" />
           </TouchableOpacity>
         </View>
-      </Modal>
+      </Modal> */}
 
       {showInfoModal && (
         <InfoModal
@@ -439,6 +477,10 @@ const StudentFeedScreen = () => {
             { label: "Medications:", value: selectedKid.medicine },
             { label: "Allergies:", value: selectedKid.allergies },
             { label: "Notes:", value: selectedKid.notes },
+            { label: "School:", value: selectedKid.schools.name },
+            { label: "Teacher:", value: selectedKid.schoolTeacherName },
+            { label: "Grade:", value: selectedKid.schoolGrade },
+            { label: "Division:", value: selectedKid.schoolGradeDivision },
           ]}
         />
       )}

@@ -5,6 +5,11 @@ import { Video, ResizeMode } from "expo-av";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import CustomLoading from "../components/CustomLoading";
 
+// In-memory cache
+const videoCache: { [key: string]: { url: string; timestamp: number } } = {};
+const thumbnailCache: { [key: string]: { url: string; timestamp: number } } =
+  {};
+
 type RemoteVideoProps = {
   path?: string;
   name: string;
@@ -33,12 +38,36 @@ const RemoteVideo = ({
   useEffect(() => {
     if (!path) return;
 
-    const fetchVideoUrl = async () => {
-      if (onlyThumbnail) {
-        setLoading(true);
-        onLoading(true); // Notify parent component about loading state
-      }
+    const cachedVideo = videoCache[path];
+    const cachedThumbnail = thumbnailCache[path];
+    const now = Date.now();
+    const cacheExpiration = 60 * 60 * 1000; // 1 hour
 
+    if (
+      onlyThumbnail &&
+      cachedThumbnail &&
+      now - cachedThumbnail.timestamp < cacheExpiration
+    ) {
+      setThumbnailUrl(cachedThumbnail.url);
+      setLoading(false);
+      onLoading(false); // Notify parent component that loading is done
+      return;
+    }
+
+    if (
+      !onlyThumbnail &&
+      cachedVideo &&
+      now - cachedVideo.timestamp < cacheExpiration
+    ) {
+      setVideoUrl(cachedVideo.url);
+      setLoading(false);
+      onLoading(false); // Notify parent component that loading is done
+      return;
+    }
+
+    const fetchVideoUrl = async () => {
+      setLoading(true);
+      onLoading(true); // Notify parent component about loading state
       setError("");
 
       try {
@@ -55,32 +84,28 @@ const RemoteVideo = ({
         if (onlyThumbnail) {
           await generateThumbnail(data.signedUrl);
         }
+
+        // Cache video URL
+        videoCache[path] = { url: data.signedUrl, timestamp: Date.now() };
       } catch (err: any) {
         console.error("Error fetching video:", err.message);
         setError(err.message);
       } finally {
-        if (onlyThumbnail) {
-          setLoading(false);
-          onLoading(false); // Notify parent component that loading is done
-        }
+        setLoading(false);
+        onLoading(false); // Notify parent component that loading is done
       }
     };
 
     const generateThumbnail = async (url: string) => {
       try {
-        // Simulate progress for generating thumbnail
-        let simulatedProgress = 0;
-        const progressInterval = setInterval(() => {
-          simulatedProgress += 10;
-          setProgress(simulatedProgress);
-          if (simulatedProgress >= 100) clearInterval(progressInterval);
-        }, 100); // Adjust the interval as needed
-
         const { uri } = await VideoThumbnails.getThumbnailAsync(url, {
           time: thumbnailTime,
           quality: 0.7,
         });
         setThumbnailUrl(uri);
+
+        // Cache thumbnail URL
+        thumbnailCache[path] = { url: uri, timestamp: Date.now() };
       } catch (err: any) {
         console.error("Error generating thumbnail:", err.message);
         setError("Failed to generate thumbnail");
