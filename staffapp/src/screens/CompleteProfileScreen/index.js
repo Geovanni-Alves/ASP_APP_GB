@@ -7,7 +7,7 @@ import {
   Keyboard,
   TouchableOpacity,
 } from "react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
@@ -21,17 +21,37 @@ import PhoneInput from "react-native-international-phone-number";
 const ProfileScreen = () => {
   const { authUser, setDbUser, dbUser, userEmail } = useUsersContext();
   const { expoPushToken } = usePushNotificationsContext();
-
   const [name, setName] = useState(dbUser?.name || "");
   const [address, setAddress] = useState(dbUser?.address || "");
   const [phoneNumber, setPhoneNumber] = useState(dbUser?.phoneNumber || "");
   const [selectedCountry, setSelectedCountry] = useState(null);
+  const [isSaveDisabled, setIsSaveDisabled] = useState(true);
+  const [isPhoneNumberValid, setIsPhoneNumberValid] = useState(false);
   //const phoneInputRef = useRef(null);
 
   const [lat, setLat] = useState(dbUser?.lat || null);
   const [lng, setLng] = useState(dbUser?.lng || null);
 
   const navigation = useNavigation();
+
+  useEffect(() => {
+    if (name && address && isPhoneNumberValid) {
+      setIsSaveDisabled(false);
+    } else {
+      setIsSaveDisabled(true);
+    }
+  });
+
+  const handlePhoneNumberChange = (phone) => {
+    setPhoneNumber(phone);
+    // Validate phone number length (10 digits for most countries)
+    const phoneDigitsOnly = phone.replace(/\D/g, ""); // Removes non-numeric characters
+    if (phoneDigitsOnly.length >= 10) {
+      setIsPhoneNumberValid(true);
+    } else {
+      setIsPhoneNumberValid(false);
+    }
+  };
 
   // const handleConfirm = () => {
   //   if (phoneInputRef.current.isValidNumber(phoneNumber)) {
@@ -157,9 +177,7 @@ const ProfileScreen = () => {
         /> */}
         <PhoneInput
           value={phoneNumber}
-          onChangePhoneNumber={(phone) => {
-            setPhoneNumber(phone);
-          }}
+          onChangePhoneNumber={handlePhoneNumberChange}
           selectedCountry={selectedCountry}
           onChangeSelectedCountry={(country) => {
             setSelectedCountry(country);
@@ -179,7 +197,14 @@ const ProfileScreen = () => {
       </View>
       <View>
         <View style={styles.saveContainer}>
-          <TouchableOpacity style={styles.saveButton} onPress={onSave}>
+          <TouchableOpacity
+            style={[
+              styles.saveButton,
+              isSaveDisabled && styles.saveButtonDisabled,
+            ]}
+            onPress={onSave}
+            disabled={isSaveDisabled}
+          >
             <Text style={styles.saveButtonText}>Save</Text>
           </TouchableOpacity>
         </View>
@@ -200,6 +225,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     margin: 10,
+    marginTop: 25,
   },
   subTitle: {
     fontSize: 20,
@@ -252,6 +278,9 @@ const styles = StyleSheet.create({
     elevation: 2,
     marginBottom: 15,
   },
+  saveButtonDisabled: {
+    backgroundColor: "gray",
+  },
   saveContainer: {
     padding: 10,
     alignItems: "center",
@@ -298,6 +327,7 @@ const styles = StyleSheet.create({
 const autoComplete = {
   container: {
     margin: 10,
+    marginLeft: 15,
     flex: 0,
   },
   TextInput: {

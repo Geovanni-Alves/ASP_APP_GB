@@ -8,16 +8,25 @@ import {
 } from "react-native";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import styles from "./styles";
+import { useKidsContext } from "../../contexts/KidsContext";
 
-const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
+const BasicInfoScreen = ({ kidId, setKidDetails, handleUpdateKid }) => {
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isFormChanged, setIsFormChanged] = useState(false);
-  const [localKid, setLocalKid] = useState(kid);
-  const [kidName, setKidName] = useState(localKid?.name);
+  const { kids, fetchSelectedKid } = useKidsContext();
+  const [localKid, setLocalKid] = useState(null);
+  const [kidName, setKidName] = useState(null);
 
+  const fetchData = async () => {
+    if (kidId) {
+      const kid = await fetchSelectedKid(kidId);
+      setLocalKid(kid);
+      setKidName(kid.name);
+    }
+  };
   useEffect(() => {
-    setLocalKid(kid);
-  }, [kid]);
+    fetchData();
+  }, [kidId]);
 
   const hideDataPicker = () => {
     setDatePickerVisible(false);
@@ -26,7 +35,7 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
   const handleConfirmDate = (date) => {
     const formattedDate = date.toISOString().split("T")[0];
 
-    if (formattedDate !== localKid.birthDate) {
+    if (formattedDate !== localKid?.birthDate) {
       //setBirthDate(formattedDate);
       setLocalKid((prev) => ({ ...prev, birthDate: formattedDate }));
       setIsFormChanged(true); // Mark form as changed
@@ -37,6 +46,7 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
 
   const handleInputChange = (key, value) => {
     if (value !== localKid[key]) {
+      //console.log(key, value);
       if (key !== "name") {
         setLocalKid((prev) => ({ ...prev, [key]: value }));
         setKidDetails((prev) => ({ ...prev, [key]: value }));
@@ -56,8 +66,16 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
       allergies: localKid.allergies,
       medicine: localKid.medicine,
     };
-    setIsFormChanged(false);
-    await handleUpdateKid(updatedFields); // Call the save function from the parent
+    // Call the save function from the parent and wait for the result.
+    const updatedKid = await handleUpdateKid(updatedFields);
+    if (updatedKid) {
+      // Update the local state with the new kid details after saving.
+      setLocalKid(updatedKid);
+      setKidName(updatedKid.name);
+      setIsFormChanged(false);
+    } else {
+      console.log("Error", "Failed to update the kid's information.");
+    }
   };
 
   return (
@@ -80,13 +98,15 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
           }}
         >
           <Text style={styles.detailTextInput}>
-            {localKid.birthDate || "Select Date"}
+            {localKid?.birthDate || "Select Date"}
           </Text>
         </TouchableOpacity>
         <DateTimePickerModal
           isVisible={isDatePickerVisible}
           mode="date"
-          date={localKid.birthDate ? new Date(localKid.birthDate) : new Date()} // Use current date if birthDate is not set
+          date={
+            localKid?.birthDate ? new Date(localKid?.birthDate) : new Date()
+          } // Use current date if birthDate is not set
           onConfirm={handleConfirmDate}
           onCancel={hideDataPicker}
         />
@@ -94,19 +114,19 @@ const BasicInfoScreen = ({ kid, setKidDetails, handleUpdateKid }) => {
       <Text style={styles.detailLabel}>Notes</Text>
       <TextInput
         style={styles.detailTextInput}
-        value={localKid.notes || ""}
+        value={localKid?.notes || ""}
         onChangeText={(text) => handleInputChange("notes", text)}
       />
       <Text style={styles.detailLabel}>Allergies</Text>
       <TextInput
         style={styles.detailTextInput}
-        value={localKid.allergies || ""}
+        value={localKid?.allergies || ""}
         onChangeText={(text) => handleInputChange("allergies", text)}
       />
       <Text style={styles.detailLabel}>Medicine</Text>
       <TextInput
         style={styles.detailTextInput}
-        value={localKid.medicine || ""}
+        value={localKid?.medicine || ""}
         onChangeText={(text) => handleInputChange("medicine", text)}
       />
       {isFormChanged && (

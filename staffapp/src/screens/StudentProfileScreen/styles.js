@@ -21,7 +21,11 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontWeight: "bold",
   },
-
+  saveButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
   fullHeaderContainer: {
     justifyContent: "center",
     alignItems: "center",

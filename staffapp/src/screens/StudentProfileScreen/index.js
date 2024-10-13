@@ -35,26 +35,16 @@ const StudentProfileScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
   const { id: kidId } = route.params;
-  const [kid, setKid] = useState(null);
-  //const [refreshing, setRefreshing] = useState(false);
+  const [selectedKid, setSelectedKid] = useState(null);
   const [actualPhoto, setActualPhoto] = useState(null);
-  // const [isConfirmationModalVisible, setConfirmationModalVisible] =
-  //   useState(false);
-  //const [selectedSchool, setSelectedSchool] = useState(null);
-  //const [schoolExitPhoto, setSchoolExitPhoto] = useState(null);
-  const [name, setName] = useState("");
   const [activeTab, setActiveTab] = useState("Basic Info");
   const [age, SetAge] = useState("");
-  //const [selectedImage, setSelectedImage] = useState(null);
-  //const [isFormChanged, setIsFormChanged] = useState(false);
   const [belt, setBelt] = useState("White");
   const [stripes, setStripes] = useState(2);
-  //const [callOpenCameraForSchool, setCallOpenCameraForSchool] = useState(false);
-  //const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { RefreshKidsData, kids } = useKidsContext();
+  const { RefreshKidsData, kids, fetchSelectedKid } = useKidsContext();
   const Tab = createBottomTabNavigator();
   const { deleteMediaFromBucket } = usePicturesContext();
   const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
@@ -79,7 +69,7 @@ const StudentProfileScreen = () => {
   };
 
   useEffect(() => {
-    const formattedName = formatKidName(kid?.name);
+    const formattedName = formatKidName(selectedKid?.name);
     navigation.setOptions({
       headerLeft: () => (
         <TouchableOpacity onPress={goBack} style={styles.goBackIcon}>
@@ -87,79 +77,22 @@ const StudentProfileScreen = () => {
         </TouchableOpacity>
       ),
     });
-    if (kid) {
+    if (selectedKid) {
       navigation.setOptions({
         title: `${formattedName} Profile`,
       });
     }
-  }, [route, kid, activeTab]);
+  }, [route, selectedKid, activeTab]);
 
   const fetchData = async () => {
     //setRefreshing(true);
-    setLoading(true);
-    await fetchKidData();
-    //setRefreshing(false);
-    setLoading(false);
-  };
-
-  const fetchKidData = async () => {
     if (kidId) {
-      try {
-        const foundKid = kids.find((kid) => kid.id === kidId);
-        if (foundKid) {
-          setKid(foundKid);
-          setActualPhoto(foundKid.photo);
-          setName(foundKid.name);
-          SetAge(calculateAge(foundKid.birthDate));
-          console.log("Found Kid from context:", foundKid);
-        }
-        //console.log("foundKid", foundKid);
-
-        //   let { data: studentData, error: studentError } = await supabase
-        //     .from("students")
-        //     .select(
-        //       `
-        //         *,
-        //         schools(id, name)
-        //       `
-        //     )
-        //     .eq("id", kidId)
-        //     .single();
-
-        //   if (studentError) {
-        //     throw studentError;
-        //   }
-
-        //   const fetchedKid = studentData;
-        //   const currentDropOffAddressId = fetchedKid.currentDropOffAddress;
-
-        //   if (currentDropOffAddressId) {
-        //     let { data: currentDropOffAddress, error: addressError } =
-        //       await supabase
-        //         .from("students_address")
-        //         .select("*")
-        //         .eq("id", currentDropOffAddressId)
-        //         .single();
-        //     if (addressError) throw addressError;
-        //     fetchedKid.dropOffAddress = currentDropOffAddress;
-        //   }
-
-        // console.log("kids from context", kids);
-        // console.log("fetcheKid", fetchedKid);
-        // setKid(fetchedKid);
-        // setActualPhoto(fetchedKid.photo);
-        // setName(fetchedKid.name);
-        // // setBirthDate(fetchedKid.birthDate);
-        // // setNotes(fetchedKid.notes);
-        // // setAllergies(fetchedKid.allergies);
-        // // setMedicine(fetchedKid.medicine);
-        // SetAge(calculateAge(fetchedKid.birthDate));
-        // // if (fetchedKid.schools) {
-        // //   setSelectedSchool(fetchedKid.schools);
-        // // }
-      } catch (error) {
-        console.error("Error fetching kid:", error);
-      }
+      setLoading(true);
+      const kid = await fetchSelectedKid(kidId);
+      setSelectedKid(kid);
+      setActualPhoto(kid.photo);
+      SetAge(calculateAge(kid.birthDate));
+      setLoading(false);
     }
   };
 
@@ -167,7 +100,7 @@ const StudentProfileScreen = () => {
     setActualPhoto(null);
     setActiveTab("Basic Info");
     fetchData();
-  }, [kidId]);
+  }, [kidId, kids]);
 
   // Capture the position of the small container (e.g., profile picture)
   const handleProfilePictureLayout = (event) => {
@@ -209,10 +142,13 @@ const StudentProfileScreen = () => {
       }
 
       const newMediaPath = imagePath[0];
-      setActualPhoto(newMediaPath);
+      if (newMediaPath) {
+        await handleUpdateKid({ photo: newMediaPath });
+        setActualPhoto(newMediaPath);
+        await RefreshKidsData();
+      }
 
       // Use handleUpdateKid to update only the photo field
-      await handleUpdateKid({ photo: newMediaPath });
     } catch (error) {
       console.error("Error changing the profile photo", error);
     } finally {
@@ -240,18 +176,22 @@ const StudentProfileScreen = () => {
         ...updatedFields,
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("students")
         .update(kidDetails)
-        .eq("id", kidId);
+        .eq("id", kidId)
+        .select();
 
       if (error) {
         throw error;
       }
-
-      await fetchData();
+      const updateKid = data[0];
+      //setSelectedKid(updateKid);
       await RefreshKidsData();
+      // await fetchData();
+
       //setIsFormChanged(false);
+      return updateKid;
     } catch (error) {
       console.error("Error updating kid's data:", error);
     } finally {
@@ -260,7 +200,7 @@ const StudentProfileScreen = () => {
     }
   };
 
-  if (!kid || loading) {
+  if (!selectedKid || loading) {
     return (
       <View style={{ flex: 1 }}>
         <CustomLoading imageSize={70} text="Loading..." />
@@ -296,17 +236,12 @@ const StudentProfileScreen = () => {
             >
               <RemoteImage
                 path={actualPhoto}
-                // style={
-                //   activeTab === "Basic Info"
-                //     ? styles.profilePicture
-                //     : styles.profilePictureSmall
-                // }
                 style={{
                   width: avatarSize,
                   height: avatarSize,
                   borderRadius: avatarSize / 2,
                 }} // Dynamic avatar size
-                name={kid?.name}
+                name={selectedKid.name}
                 bucketName="profilePhotos"
               />
             </Pressable>
@@ -330,7 +265,7 @@ const StudentProfileScreen = () => {
                 : styles.minimizedHeaderText
             }
           >
-            {name}
+            {selectedKid.name}
             {activeTab === "Basic Info" && age > 0 ? `, ${age} years old` : ""}
           </Text>
         </View>
@@ -350,8 +285,8 @@ const StudentProfileScreen = () => {
             name="Basic Info"
             children={() => (
               <BasicInfoScreen
-                kid={kid}
-                setKidDetails={setKid}
+                kidId={selectedKid.id}
+                setKidDetails={setSelectedKid}
                 handleUpdateKid={handleUpdateKid}
               />
             )}
@@ -363,7 +298,7 @@ const StudentProfileScreen = () => {
           />
           <Tab.Screen
             name="Contacts"
-            children={() => <ContactsScreen kid={kid} />}
+            children={() => <ContactsScreen kid={selectedKid} />}
             options={{
               tabBarIcon: ({ color, size }) => (
                 <AntDesign name="contacts" size={size} color={color} />
@@ -372,7 +307,7 @@ const StudentProfileScreen = () => {
           />
           <Tab.Screen
             name="School Info"
-            children={() => <SchoolInfoScreen kid={kid} />}
+            children={() => <SchoolInfoScreen kid={selectedKid} />}
             options={{
               tabBarIcon: ({ color, size }) => (
                 <FontAwesome name="building" color={color} size={size} />
@@ -381,7 +316,7 @@ const StudentProfileScreen = () => {
           />
           <Tab.Screen
             name="Address Info"
-            children={() => <AddressInfoScreen kid={kid} />}
+            children={() => <AddressInfoScreen kid={selectedKid} />}
             options={{
               tabBarIcon: ({ color, size }) => (
                 <MaterialIcons name="location-on" color={color} size={size} />
