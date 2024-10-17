@@ -477,7 +477,10 @@ const StudentFeedScreen = () => {
             { label: "Medications:", value: selectedKid.medicine },
             { label: "Allergies:", value: selectedKid.allergies },
             { label: "Notes:", value: selectedKid.notes },
-            { label: "School:", value: selectedKid.schools.name },
+            {
+              label: "School:",
+              value: selectedKid.schools ? selectedKid.schools.name : "",
+            },
             { label: "Teacher:", value: selectedKid.schoolTeacherName },
             { label: "Grade:", value: selectedKid.schoolGrade },
             { label: "Division:", value: selectedKid.schoolGradeDivision },

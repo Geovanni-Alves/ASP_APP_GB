@@ -18,7 +18,7 @@ import { GOOGLE_MAPS_APIKEY } from "@env";
 import { supabase } from "../../lib/supabase";
 import PhoneInput from "react-native-international-phone-number";
 
-const ProfileScreen = () => {
+const CompleteProfileScreen = () => {
   const { authUser, setDbUser, dbUser, userEmail } = useUsersContext();
   const { expoPushToken } = usePushNotificationsContext();
   const [name, setName] = useState(dbUser?.name || "");
@@ -335,4 +335,4 @@ const autoComplete = {
   },
 };
 
-export default ProfileScreen;
+export default CompleteProfileScreen;

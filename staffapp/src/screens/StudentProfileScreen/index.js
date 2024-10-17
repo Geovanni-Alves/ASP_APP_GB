@@ -37,7 +37,7 @@ const StudentProfileScreen = () => {
   const { id: kidId } = route.params;
   const [selectedKid, setSelectedKid] = useState(null);
   const [actualPhoto, setActualPhoto] = useState(null);
-  const [activeTab, setActiveTab] = useState("Basic Info");
+  const [activeTab, setActiveTab] = useState("BasicInfo");
   const [age, SetAge] = useState("");
   const [belt, setBelt] = useState("White");
   const [stripes, setStripes] = useState(2);
@@ -49,8 +49,8 @@ const StudentProfileScreen = () => {
   const { deleteMediaFromBucket } = usePicturesContext();
   const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
 
-  const avatarSize = activeTab === "Basic Info" ? 120 : 40;
-  const containerHeight = activeTab === "Basic Info" ? 180 : 60;
+  const avatarSize = activeTab === "BasicInfo" ? 120 : 40;
+  const containerHeight = activeTab === "BasicInfo" ? 180 : 60;
 
   const formatKidName = (fullName) => {
     if (!fullName) return "";
@@ -98,7 +98,7 @@ const StudentProfileScreen = () => {
 
   useEffect(() => {
     setActualPhoto(null);
-    setActiveTab("Basic Info");
+    //setActiveTab("Basic Info");
     fetchData();
   }, [kidId, kids]);
 
@@ -217,7 +217,7 @@ const StudentProfileScreen = () => {
       <View style={{ flex: 1 }}>
         <View
           style={[
-            activeTab === "Basic Info"
+            activeTab === "BasicInfo"
               ? styles.fullHeaderContainer
               : styles.minimizedHeaderContainer,
             { height: containerHeight },
@@ -229,7 +229,7 @@ const StudentProfileScreen = () => {
           >
             <Pressable
               onPress={() => {
-                if (activeTab === "Basic Info" && actualPhoto) {
+                if (activeTab === "BasicInfo" && actualPhoto) {
                   handleImagePress(actualPhoto);
                 }
               }}
@@ -246,7 +246,7 @@ const StudentProfileScreen = () => {
               />
             </Pressable>
 
-            {activeTab === "Basic Info" && (
+            {activeTab === "BasicInfo" && (
               <View style={styles.cameraContainer}>
                 <TouchableOpacity
                   style={styles.cameraIcon}
@@ -260,20 +260,20 @@ const StudentProfileScreen = () => {
           </View>
           <Text
             style={
-              activeTab === "Basic Info"
+              activeTab === "BasicInfo"
                 ? styles.headerText
                 : styles.minimizedHeaderText
             }
           >
             {selectedKid.name}
-            {activeTab === "Basic Info" && age > 0 ? `, ${age} years old` : ""}
+            {activeTab === "BasicInfo" && age > 0 ? `, ${age} years old` : ""}
           </Text>
         </View>
         {/* Separator */}
         <View style={styles.separator} />
 
         <Tab.Navigator
-          initialRouteName="Basic Info"
+          initialRouteName={activeTab}
           screenOptions={{
             headerShown: false,
           }}
@@ -282,7 +282,7 @@ const StudentProfileScreen = () => {
           })}
         >
           <Tab.Screen
-            name="Basic Info"
+            name="BasicInfo"
             children={() => (
               <BasicInfoScreen
                 kidId={selectedKid.id}

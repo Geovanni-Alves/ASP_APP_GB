@@ -8,9 +8,12 @@ import {
   Modal,
   TextInput,
   Alert,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { Ionicons, MaterialIcons, FontAwesome } from "@expo/vector-icons";
+import PhoneInput from "react-native-international-phone-number";
 
 const ContactsScreen = ({ kid }) => {
   const [contacts, setContacts] = useState([]); // Stores list of contacts
@@ -20,6 +23,7 @@ const ContactsScreen = ({ kid }) => {
   const [newContactName, setNewContactName] = useState(""); // Stores contact name
   const [newContactEmail, setNewContactEmail] = useState(""); // Stores contact email
   const [newContactPhone, setNewContactPhone] = useState(""); // Stores contact phone
+  const [selectedCountry, setSelectedCountry] = useState(null);
   const [newContactRelationship, setNewContactRelationship] = useState(""); // Stores relationship
   const [isPrimaryContact, setIsPrimaryContact] = useState(false); // Primary contact toggle
   const contactRelationships = ["Parent", "Family", "Approved Pickup"];
@@ -282,6 +286,11 @@ const ContactsScreen = ({ kid }) => {
       {!item.invited && !item.user_id && (
         <Text style={styles.inviteFailedText}>Invite not sent</Text>
       )}
+      {item.invited && (
+        <View>
+          <Text>Invited</Text>
+        </View>
+      )}
     </View>
   );
 
@@ -310,89 +319,108 @@ const ContactsScreen = ({ kid }) => {
         transparent={true}
         onRequestClose={() => resetModal()}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {isEditing ? "Edit Contact" : "Add Contact"}
-            </Text>
-
-            <TextInput
-              placeholder="Contact Name"
-              value={newContactName}
-              onChangeText={setNewContactName}
-              style={styles.input}
-            />
-
-            <TextInput
-              placeholder="Contact Email"
-              value={newContactEmail}
-              onChangeText={setNewContactEmail}
-              style={styles.input}
-              keyboardType="email-address"
-            />
-
-            <TextInput
-              placeholder="Phone Number"
-              value={newContactPhone}
-              onChangeText={setNewContactPhone}
-              style={styles.input}
-              keyboardType="phone-pad"
-            />
-
-            {/* Relationship selection */}
-            <View style={styles.relationshipSelection}>
-              {contactRelationships.map((relationship, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.relationshipButton,
-                    newContactRelationship === relationship &&
-                      styles.selectedRelationshipButton,
-                  ]}
-                  onPress={() => setNewContactRelationship(relationship)}
-                >
-                  <Text
-                    style={[
-                      styles.relationshipButtonText,
-                      newContactRelationship === relationship &&
-                        styles.selectedRelationshipButtonText,
-                    ]}
-                  >
-                    {relationship}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Primary contact toggle */}
-            <TouchableOpacity
-              style={styles.togglePrimaryContact}
-              onPress={() => setIsPrimaryContact(!isPrimaryContact)}
-            >
-              <Ionicons
-                name={isPrimaryContact ? "checkbox" : "square-outline"}
-                size={24}
-                color={isPrimaryContact ? "green" : "black"}
-              />
-              <Text style={styles.toggleText}>Set as Primary Contact</Text>
-            </TouchableOpacity>
-
-            {/* Save contact button */}
-            <TouchableOpacity style={styles.saveButton} onPress={saveContact}>
-              <Text style={styles.saveButtonText}>
-                {isEditing ? "Update Contact" : "Save Contact"}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                {isEditing ? "Edit Contact" : "Add Contact"}
               </Text>
-            </TouchableOpacity>
 
-            {/* Cancel button */}
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => resetModal()}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+              <TextInput
+                placeholder="Contact Name"
+                value={newContactName}
+                onChangeText={setNewContactName}
+                style={styles.input}
+              />
+
+              <TextInput
+                placeholder="Contact Email"
+                value={newContactEmail}
+                onChangeText={(text) => setNewContactEmail(text.toLowerCase())}
+                style={styles.input}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              {/* <TextInput
+                placeholder="Phone Number"
+                value={newContactPhone}
+                onChangeText={setNewContactPhone}
+                style={styles.input}
+                keyboardType="phone-pad"
+              /> */}
+              <PhoneInput
+                value={newContactPhone}
+                onChangePhoneNumber={setNewContactPhone}
+                selectedCountry={selectedCountry}
+                onChangeSelectedCountry={(country) => {
+                  setSelectedCountry(country);
+                }}
+                placeholder="Phone Number"
+                language="en"
+                defaultCountry="CA"
+                phoneInputStyles={{
+                  container: {
+                    width: "100%",
+                  },
+                }}
+              />
+
+              {/* Relationship selection */}
+              <View style={styles.relationshipSelection}>
+                {contactRelationships.map((relationship, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.relationshipButton,
+                      newContactRelationship === relationship &&
+                        styles.selectedRelationshipButton,
+                    ]}
+                    onPress={() => setNewContactRelationship(relationship)}
+                  >
+                    <Text
+                      style={[
+                        styles.relationshipButtonText,
+                        newContactRelationship === relationship &&
+                          styles.selectedRelationshipButtonText,
+                      ]}
+                    >
+                      {relationship}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Primary contact toggle */}
+              <TouchableOpacity
+                style={styles.togglePrimaryContact}
+                onPress={() => setIsPrimaryContact(!isPrimaryContact)}
+              >
+                <Ionicons
+                  name={isPrimaryContact ? "checkbox" : "square-outline"}
+                  size={24}
+                  color={isPrimaryContact ? "green" : "black"}
+                />
+                <Text style={styles.toggleText}>Set as Primary Contact</Text>
+              </TouchableOpacity>
+
+              {/* Save contact button */}
+              <TouchableOpacity style={styles.saveButton} onPress={saveContact}>
+                <Text style={styles.saveButtonText}>
+                  {isEditing ? "Update Contact" : "Save Contact"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Cancel button */}
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => resetModal()}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
@@ -467,6 +495,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "80%",
+    top: -75,
     backgroundColor: "white",
     padding: 20,
     borderRadius: 10,
