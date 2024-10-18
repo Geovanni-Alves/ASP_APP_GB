@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { API, graphqlOperation } from "aws-amplify";
-import { listKids } from "../graphql/queries";
-import { updateKid } from "../graphql/mutations";
+import { useKidsContext } from "../contexts/KidsContext";
 import "./Home.css";
 
 const ProfileCard = ({ kid, onCheckInClick }) => {
@@ -32,43 +30,16 @@ const ProfileCard = ({ kid, onCheckInClick }) => {
     </div>
   );
 };
-const Home = () => {
-  const [kids, setKids] = useState([]);
-  const [selectedKid, setSelectedKid] = useState(null);
-  useEffect(() => {
-    const fetchKids = async () => {
-      try {
-        const result = await API.graphql(graphqlOperation(listKids));
-        setKids(result.data.listKids.items);
-      } catch (error) {
-        console.error("Error fetching kids:", error);
-      }
-    };
 
-    const updateCheckInStatus = async () => {
-      try {
-        const currentDate = new Date();
-        const twelveHoursAgo = new Date(currentDate - 12 * 60 * 60 * 1000);
-        const result = await API.graphql(graphqlOperation(listKids));
-        const currentKids = result.data.listKids.items;
-        setKids((prevKids) =>
-          prevKids.map((kid) =>
-            kid.checkedIn && new Date(kid.lastCheckIn) < twelveHoursAgo
-              ? { ...kid, checkedIn: false }
-              : kid
-          )
-        );
-      } catch (error) {
-        console.error("Error updating check-in status:", error);
-      }
-    };
-    fetchKids();
-    updateCheckInStatus();
-    const updateCheckInStatusTimer = setInterval(() => {
-      updateCheckInStatus();
-    }, 12 * 60 * 60 * 1000);
-    return () => clearInterval(updateCheckInStatusTimer);
-  }, []);
+const Home = () => {
+  const { kids, fetchKidsData, updateKidOnDb } = useKidsContext(); // Use context
+  const [selectedKid, setSelectedKid] = useState(null);
+
+  useEffect(() => {
+    // Fetch kids data on mount
+    console.log("Kids", kids);
+    //fetchKidsData();
+  });
 
   const openConfirmationModal = (kid) => {
     setSelectedKid(kid);
@@ -83,35 +54,20 @@ const Home = () => {
       try {
         const currentDate = new Date().toISOString();
 
-        const updateResult = await API.graphql(
-          graphqlOperation(updateKid, {
-            input: {
-              id: selectedKid.id,
-              checkedIn: true,
-              lastCheckIn: currentDate,
-            },
-          })
-        );
+        // Use the updateKidOnDb method from context to update the kid's check-in status
+        await updateKidOnDb(selectedKid.id, [
+          { fieldName: "checkedIn", value: true },
+          { fieldName: "lastCheckIn", value: currentDate },
+        ]);
 
-        console.log("Kid checked in:", updateResult);
-
-        setKids((prevKids) =>
-          prevKids.map((kid) =>
-            kid.id === selectedKid.id
-              ? { ...kid, checkedIn: true, lastCheckIn: currentDate }
-              : kid
-          )
-        );
+        // Update the local state after successful check-in
+        fetchKidsData(); // Refetch the kids data to reflect changes
 
         closeConfirmationModal();
       } catch (error) {
         console.error("Error checking in kid:", error);
       }
     }
-  };
-
-  const checkInKid = (kidId, kidName) => {
-    openConfirmationModal({ id: kidId, name: kidName });
   };
 
   return (

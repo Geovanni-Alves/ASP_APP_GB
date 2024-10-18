@@ -5,15 +5,21 @@ import Dashboard from "../Images/dashboard.png";
 import People from "../Images/people.png";
 import School from "../Images/school.png";
 import House from "../Images/house.png";
-import GbBus from "../Images/vanDashboard.png"
+import GbBus from "../Images/vanDashboard.png";
 import Settings from "../Images/settings.png";
 import ArrowIcon from "../Images/drop-down-arrow.png";
 import { useLocation } from "react-router-dom";
+import { useUsersContext } from "../contexts/UsersContext";
+import { useAuthContext } from "../contexts/AuthContext";
+import { FaSignOutAlt } from "react-icons/fa";
+import RemoteImage from "./RemoteImage";
 
 const Sidebar = () => {
   const location = useLocation();
   const [closeMenu, setCloseMenu] = useState(false);
   const [subMenuOpen, setSubMenuOpen] = useState(false);
+  const { currentUserData } = useUsersContext();
+  const { logout } = useAuthContext();
 
   const handleCloseMenu = () => {
     setCloseMenu(!closeMenu);
@@ -21,6 +27,10 @@ const Sidebar = () => {
 
   const handleSubmenuToggle = () => {
     setSubMenuOpen(!subMenuOpen);
+  };
+
+  const handleLogout = () => {
+    logout(); // Trigger the logout function
   };
 
   return (
@@ -51,10 +61,17 @@ const Sidebar = () => {
           closeMenu === false ? "profileContainer" : "profileContainer active"
         }
       >
-        <img src={Profile} alt="profile" className="profile" />
+        <RemoteImage
+          path={currentUserData?.photo}
+          name={currentUserData?.name}
+          bucketName="profilePhotos"
+          className="profile"
+          //style={{ width: "100px", height: "100px", borderRadius: "50%" }}
+        />
+        {/* <img src={Profile} alt="profile" className="profile" /> */}
         <div className="profileContents">
-          <p className="name">Hello, Geo</p>
-          <p>geovanni@graciebarra.ca</p>
+          <p className="name">{currentUserData?.name}</p>
+          <p>{currentUserData?.email}</p>
         </div>
       </div>
       <div
@@ -91,7 +108,6 @@ const Sidebar = () => {
               <li>
                 <a href="/staff">Staff</a>
               </li>
-              
             </ul>
           )}
           <li className={location.pathname === "/vans" ? "active" : ""}>
@@ -111,6 +127,17 @@ const Sidebar = () => {
             <a href="/settings">Settings</a>
           </li>
         </ul>
+      </div>
+      {/* Logout button */}
+      <div
+        className={
+          closeMenu === false ? "logoutContainer" : "logoutContainer active"
+        }
+      >
+        <button className="logoutButton" onClick={handleLogout}>
+          <FaSignOutAlt className="logoutIcon" />
+          {closeMenu === false && <span>Logout</span>}
+        </button>
       </div>
     </div>
   );

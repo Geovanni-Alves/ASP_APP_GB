@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import styles from "./styles";
 import { Text, View, SafeAreaView, TouchableOpacity } from "react-native";
 import AntDesign from "@expo/vector-icons/AntDesign";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
+//import FontAwesome from "@expo/vector-icons/FontAwesome";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { useMessageContext } from "../../contexts/MessageContext";
 import { useKidsContext } from "../../contexts/KidsContext";
@@ -44,14 +44,14 @@ const HomeScreen = () => {
             onPress={() => navigation.navigate("Chat")}
           >
             <AntDesign name="message1" size={20} color="white" />
-            <Text style={styles.buttonText}>Messages</Text>
+            <Text style={styles.buttonText}>Chat</Text>
             {msgsCount > 0 && (
               <View style={styles.messageCountBadge}>
                 <Text style={styles.messageCountText}>{msgsCount}</Text>
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.checkInButton}
             onPress={() => navigation.navigate("CheckIn")}
           >
@@ -86,6 +86,15 @@ const HomeScreen = () => {
           >
             <FontAwesome5 name="route" size={24} color="white" />
             <Text style={styles.buttonText}>Pickup Route</Text>
+          </TouchableOpacity> */}
+          <TouchableOpacity
+            style={styles.pickUpButton}
+            onPress={() => {
+              navigation.navigate("DropOffList");
+            }}
+          >
+            <FontAwesome5 name="route" size={20} color="white" />
+            <Text style={styles.buttonText}>Drop Off</Text>
           </TouchableOpacity>
         </View>
       </View>

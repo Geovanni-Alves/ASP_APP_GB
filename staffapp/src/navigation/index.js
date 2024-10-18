@@ -104,7 +104,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       component={ProfileScreen}
     />
 
-    <Drawer.Screen
+    {/* <Drawer.Screen
       name="CheckIn"
       options={{
         drawerLabel: "Check In",
@@ -114,8 +114,8 @@ const DrawerNavigator = ({ currentUserData }) => (
         ),
       }}
       component={CheckInScreen}
-    />
-    <Drawer.Screen
+    /> */}
+    {/* <Drawer.Screen
       name="Students"
       options={{
         drawerLabel: "Students",
@@ -125,7 +125,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         ),
       }}
       component={StudentScreen}
-    />
+    /> */}
     <Drawer.Screen
       name="DropOffRoute"
       options={{

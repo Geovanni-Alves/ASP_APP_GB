@@ -9,6 +9,36 @@ body {
   // text-transform: capitalize;
 }
 
+.logoutContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.logoutButton {
+  background-color: red;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  width: 100%;
+}
+
+.logoutButton .logoutIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.logoutButton span {
+  margin-left: 10px;
+  font-weight: bold;
+}
+
 .sidebar {
   background-color: $white;
   position: absolute;
@@ -246,6 +276,10 @@ body {
 .sidebar.active {
   width: 5rem;
   transition: 0.5s all;
+
+  .logoutContainer {
+    display: none; /* Hides the logout container when sidebar is collapsed */
+  }
 
   .burgerContainer.active {
     transition: 0.5s all;

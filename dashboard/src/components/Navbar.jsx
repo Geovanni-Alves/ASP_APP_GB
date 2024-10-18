@@ -4,7 +4,10 @@ import { Link } from "react-router-dom";
 import gbLogo from "../docs/gb-logo.svg";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTv } from "@fortawesome/free-solid-svg-icons";
+import { useUsersContext } from "../contexts/UsersContext";
+
 export default function Navbar() {
+  const { currentUserData } = useUsersContext();
   const [view, setView] = useState("navbar-container");
   const toggleView = () => {
     if (view === "navbar-container") {
@@ -13,6 +16,9 @@ export default function Navbar() {
       setView("navbar-container");
     }
   };
+
+  console.log("currentUserData", currentUserData);
+
   return (
     <header>
       <div className={view}>
