@@ -3,7 +3,7 @@ import { API } from "aws-amplify";
 import { updateVan, deleteVan } from "../graphql/mutations";
 import { listVans } from "../graphql/queries";
 import "./Vans.css";
-import VansForm from "../components/VansForm";
+import VansForm from "./VansForm";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPenToSquare,

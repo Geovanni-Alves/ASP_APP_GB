@@ -5,11 +5,18 @@
   width: 95%;
   height: 105px;
   background-color: #fff;
-  margin: 30px auto;
+  /* background-color: #ed3337; */
+  margin: 20px auto;
   border-radius: 70px;
   -webkit-box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
   -moz-box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
   box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
+}
+
+.addStudentButton {
+  /* //margin: 30px;
+  display: flex;
+  //padding: 15px; */
 }
 .student-details {
   display: flex;
@@ -28,14 +35,39 @@
   object-fit: contain;
 }
 
-.student-container {
+.students-container {
+  position: relative;
   width: 60%;
-  height: 730px;
-  position: absolute;
-  left: 19rem;
-  top: 0;
+  /* height: 100vh; */
+  top: -20px;
   background-color: #fff;
+  /* background-color: #ed3337; */
   border-radius: 40px;
+  transition: left 0.3s ease;
+  max-height: 620px;
+}
+
+.menu-open {
+  left: 15rem;
+}
+
+.menu-closed {
+  left: 5rem;
+}
+
+.student-list {
+  max-height: 520px;
+  overflow-y: scroll;
+  padding: 10px;
+}
+
+.student-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.student-list::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 4px;
 }
 
 .btn-student {

@@ -1,9 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-
-import { API } from "aws-amplify";
-import { updateKid, deleteKid } from "../graphql/mutations";
+import supabase from "../lib/supabase";
+import { Modal, Button, Card } from "antd";
 import "./Students.css";
-import StudentForm from "../components/StudentForm";
+import StudentForm from "../pages/StudentForm";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPenToSquare,
@@ -13,28 +12,28 @@ import {
   faStars,
   faStar,
 } from "@fortawesome/free-solid-svg-icons";
-import { Card } from "antd";
-import GoogleMapsAutocomplete from "./GoogleMapsAutocomplete";
+import GoogleMapsAutocomplete from "../components/GoogleMapsAutocomplete";
 import { useLocation } from "react-router-dom";
 import { useKidsContext } from "../contexts/KidsContext";
 import { usePicturesContext } from "../contexts/PicturesContext";
 import { Storage } from "aws-amplify";
+import RemoteImage from "../components/RemoteImage";
 
-function Students() {
-  const { kids } = useKidsContext();
-  const { savePhotoInBucket, updateKidOnDb, fetchKidsData } =
-    usePicturesContext();
+function Students({ closeMenu }) {
+  const { kids, updateKidOnDb } = useKidsContext();
+  const { savePhotoInBucket, deleteMediaFromBucket } = usePicturesContext();
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  //const [currentPage, setCurrentPage] = useState(1);
   const [nameFilter, setNameFilter] = useState("");
-  const [addressFilter, setAddressFilter] = useState("");
+  //const [addressFilter, setAddressFilter] = useState("");
   const [mode, setMode] = useState("list");
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [updatedName, setUpdatedName] = useState("");
   const [updatedAge, setUpdatedAge] = useState("");
   const [updatedParent2Email, setUpdatedParent2Email] = useState("");
   const [updatedParent1Email, setUpdatedParent1Email] = useState("");
   const [updatedPhoto, setUpdatedPhoto] = useState("");
-  const studentsPerPage = 4;
+  //const studentsPerPage = 5;
   const [updatedDropOffAddress, setUpdatedDropOffAddress] = useState("");
   const [updatedLat, setUpdatedLat] = useState("");
   const [updatedLng, setUpdatedLng] = useState("");
@@ -117,42 +116,16 @@ function Students() {
     handleUpload(selectedPhoto);
   };
 
-  const fetchKids = async () => {
-    // try {
-    //   const response = await API.graphql({ query: listKids });
-    //   const kidsData = response.data.listKids.items;
-    //   setStudents(kidsData);
-    // } catch (error) {
-    //   console.error("Error fetching kids", error);
-    // }
-  };
-
-  // useEffect(() => {
-  //   console.log("kids from context", kids);
-  //   fetchKids();
-  // }, []);
-
-  const handleNextPage = () => {
-    setCurrentPage((prevPage) => prevPage + 1);
-  };
-
-  const handlePrevPage = () => {
-    setCurrentPage((prevPage) => prevPage - 1);
-  };
-
-  const startIndex = (currentPage - 1) * studentsPerPage;
-  const endIndex = startIndex + studentsPerPage;
-
   const filteredKids = kids.filter((kid) => {
     return (
-      (nameFilter === "" ||
-        kid.name?.toLowerCase().includes(nameFilter.toLowerCase())) &&
-      (addressFilter === "" ||
-        kid.dropOffAddress?.toLowerCase().includes(addressFilter.toLowerCase()))
+      nameFilter === "" ||
+      kid.name?.toLowerCase().includes(nameFilter.toLowerCase())
     );
   });
 
-  const displayedKids = filteredKids.slice(startIndex, endIndex);
+  // const displayedKids = filteredKids.slice(startIndex, endIndex);
+
+  // console.log("displayedKids", displayedKids);
 
   const handleStudentClick = (student) => {
     setSelectedStudent(student);
@@ -187,16 +160,15 @@ function Students() {
 
     try {
       const nameDeleted = selectedStudent.name;
-      await API.graphql({
-        query: deleteKid,
-        variables: { input: { id: selectedStudent.id } },
-      });
-      // const updatedStudents = students.filter(
-      //   (student) => student.id !== selectedStudent.id
-      // );
-      // setStudents(updatedStudents);
+      const { data, error } = await supabase
+        .from("students")
+        .delete()
+        .eq("id", selectedStudent.id);
+
+      if (error) throw error;
+
       setSelectedStudent(null);
-      await fetchKids();
+      //await fetchKids();
       setMode("list");
       alert(`Kid - ${nameDeleted}, successful deleted! `);
     } catch (error) {
@@ -213,31 +185,24 @@ function Students() {
     //console.log(updatedDropOffAddress);
     const nameUpdated = selectedStudent.name;
     try {
-      await API.graphql({
-        query: updateKid,
-        variables: {
-          input: {
-            id: selectedStudent.id,
-            name: updatedName,
-            parent1Email: updatedParent1Email,
-            parent2Email: updatedParent2Email,
-            dropOffAddress: updatedDropOffAddress,
-            lat: updatedLat,
-            lng: updatedLng,
-            birthDate: updatedAge,
-            photo: updatedPhoto,
-            vans: selectedStudent.vans,
-          },
-        },
-      });
+      const { data, error } = await supabase
+        .from("students")
+        .update({
+          name: updatedName,
+          parent1Email: updatedParent1Email,
+          parent2Email: updatedParent2Email,
+          dropOffAddress: updatedDropOffAddress,
+          lat: updatedLat,
+          lng: updatedLng,
+          birthDate: updatedAge,
+          photo: updatedPhoto,
+        })
+        .eq("id", selectedStudent.id);
+
+      if (error) throw error;
       alert(`Kid - ${nameUpdated}, updated successfully!`);
 
-      // const updatedStudents = students.map((student) =>
-      //   student.id === selectedStudent.id
-      //     ? { ...student, name: updatedName, dropOffAddress: updatedAddress }
-      //     : student
-      // );
-      await fetchKids();
+      //await fetchKids();
       //setStudents(updatedStudents);
       setSelectedStudent(null);
       setMode("list");
@@ -254,13 +219,25 @@ function Students() {
     }
   };
 
+  // Function to show modal
+  const showModal = () => {
+    setIsModalVisible(true);
+  };
+
+  // Function to hide modal
+  const handleCloseModal = () => {
+    setIsModalVisible(false);
+  };
+
   const handleStudentAdded = async () => {
     try {
-      fetchKids();
+      //fetchKids();
+      handleCloseModal(); // Close the modal when a student is added
     } catch (error) {
       console.error("Error fetching students:", error);
     }
   };
+
   const handleBackToList = (e) => {
     e.preventDefault();
     setSelectedStudent(null);
@@ -278,10 +255,16 @@ function Students() {
     <div>
       <div>
         <div>
-          <div className="student-container">
+          <div
+            className={`students-container ${
+              closeMenu ? "menu-closed" : "menu-open"
+            }`}
+          >
             {mode === "list" && (
               <div>
-                <h3>List of Kids (students.jsx)</h3>
+                <h3 style={{ textAlign: "center" }}>
+                  List of Students (students.jsx)
+                </h3>
                 <div className="filters">
                   <input
                     type="text"
@@ -289,65 +272,67 @@ function Students() {
                     value={nameFilter}
                     onChange={(e) => setNameFilter(e.target.value)}
                   />
-                  <input
+                  {/* <input
                     type="text"
                     placeholder="Filter by Address"
                     value={addressFilter}
                     onChange={(e) => setAddressFilter(e.target.value)}
-                  />
+                  /> */}
+                  <div className="addStudentButton">
+                    {/* Button to show modal */}
+                    <Button type="primary" onClick={showModal}>
+                      New Student
+                    </Button>
+                  </div>
                 </div>
-                <div className="student">
-                  {displayedKids.map((kid) => (
+                <div className="student-list">
+                  {filteredKids.map((kid) => (
                     <div className="student-details-container" key={kid.id}>
-                      <img
-                        src={kid.uriKid}
+                      <RemoteImage
+                        path={kid.photo}
+                        name={kid.name}
+                        bucketName="profilePhotos"
                         className="student-photo"
-                        alt="pic"
                       />
                       <div className="student-details">
                         <div className="student-name">{kid.name}</div>
                         <div className="student-address">
-                          {kid.dropOffAddress}
+                          {kid.dropOffAddress?.addressLine1}
+                          {kid.dropOffAddress?.city}
                         </div>
-                        {/* {kid.AttendanceDays && (
-                          <div className="studentSchedule">
-                            <h4>Attendance Schedule</h4>
-                            <p>{kid.AttendanceDays.join(", ")}</p>
-                          </div>
-                        )} */}
-                        {kid.AttendanceDays && (
-                          <div className="studentSchedule">
-                            <h4>Attendance</h4>
-                            <div className="attendance-icons">
-                              <div className="days-of-week">
-                                <span>Mon</span>
-                                <span>Tue</span>
-                                <span>Wed</span>
-                                <span>Thu</span>
-                                <span>Fri</span>
-                              </div>
-                              <div className="stars">
-                                {[
-                                  "Monday",
-                                  "Tuesday",
-                                  "Wednesday",
-                                  "Thursday",
-                                  "Friday",
-                                ].map((day) => (
-                                  <FontAwesomeIcon
-                                    key={day}
-                                    icon={faStar}
-                                    style={{
-                                      color: kid.AttendanceDays.includes(day)
+                        <div className="studentSchedule">
+                          <h4>Attendance</h4>
+                          <div className="attendance-icons">
+                            <div className="days-of-week">
+                              <span>Mon</span>
+                              <span>Tue</span>
+                              <span>Wed</span>
+                              <span>Thu</span>
+                              <span>Fri</span>
+                            </div>
+                            <div className="stars">
+                              {[
+                                "Monday",
+                                "Tuesday",
+                                "Wednesday",
+                                "Thursday",
+                                "Friday",
+                              ].map((day) => (
+                                <FontAwesomeIcon
+                                  key={day}
+                                  icon={faStar}
+                                  style={{
+                                    color:
+                                      kid.students_schedule &&
+                                      kid.students_schedule?.[day.toLowerCase()]
                                         ? "green"
                                         : "gray",
-                                    }}
-                                  />
-                                ))}
-                              </div>
+                                  }}
+                                />
+                              ))}
                             </div>
                           </div>
-                        )}
+                        </div>
                       </div>
                       <div className="student-details-btn">
                         <button
@@ -368,7 +353,8 @@ function Students() {
                     </div>
                   ))}
                 </div>
-                <div className="pagination">
+
+                {/* <div className="pagination">
                   <button
                     onClick={handlePrevPage}
                     disabled={currentPage === 1}
@@ -383,7 +369,7 @@ function Students() {
                   >
                     <FontAwesomeIcon icon={faArrowRight} beat />
                   </button>
-                </div>
+                </div> */}
               </div>
             )}
             {mode === "details" && selectedStudent && (
@@ -526,9 +512,19 @@ function Students() {
               </div>
             )}
           </div>
-          <div className="right-container">
+
+          {/* Modal for adding student */}
+          <Modal
+            title="Add a New Student"
+            open={isModalVisible}
+            onCancel={handleCloseModal}
+            footer={null}
+          >
             <StudentForm onStudentAdded={handleStudentAdded} />
-          </div>
+          </Modal>
+          {/* <div className="right-container">
+            <StudentForm onStudentAdded={handleStudentAdded} />
+          </div> */}
         </div>
       </div>
     </div>

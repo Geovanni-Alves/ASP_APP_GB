@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import { API } from "aws-amplify";
 import { createVan } from "../graphql/mutations";
 import "./StudentForm.css";
-import GoogleMapsAutocomplete from "./GoogleMapsAutocomplete";
+import GoogleMapsAutocomplete from "../components/GoogleMapsAutocomplete";
 import { Card } from "antd";
 
 function VansForm({ onVanAdded }) {

@@ -105,7 +105,7 @@ const styles = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#00000010",
+    //backgroundColor: "#00000010",
   },
   initialsContainer: {
     display: "flex",

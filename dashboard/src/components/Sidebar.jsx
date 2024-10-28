@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import GbIcon from "../Images/gb-logo.png";
-import Profile from "../Images/avatar-image.png";
+//import Profile from "../Images/avatar-image.png";
 import Dashboard from "../Images/dashboard.png";
 import People from "../Images/people.png";
 import School from "../Images/school.png";
@@ -13,24 +13,35 @@ import { useUsersContext } from "../contexts/UsersContext";
 import { useAuthContext } from "../contexts/AuthContext";
 import { FaSignOutAlt } from "react-icons/fa";
 import RemoteImage from "./RemoteImage";
+import DialogBox from "./UiComponents/DialogBox";
 
-const Sidebar = () => {
+const Sidebar = ({ closeMenu, toggleMenu }) => {
   const location = useLocation();
-  const [closeMenu, setCloseMenu] = useState(false);
+  //const [closeMenu, setCloseMenu] = useState(false);
   const [subMenuOpen, setSubMenuOpen] = useState(false);
   const { currentUserData } = useUsersContext();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const { logout } = useAuthContext();
 
-  const handleCloseMenu = () => {
-    setCloseMenu(!closeMenu);
-  };
+  // const handleCloseMenu = () => {
+  //   setCloseMenu(!closeMenu);
+  // };
 
   const handleSubmenuToggle = () => {
     setSubMenuOpen(!subMenuOpen);
   };
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true); // Show the custom dialog
+  };
+
+  const handleConfirmLogout = () => {
+    setShowLogoutDialog(false); // Close the dialog
     logout(); // Trigger the logout function
+  };
+
+  const handleCancelLogout = () => {
+    setShowLogoutDialog(false); // Close the dialog without logging out
   };
 
   return (
@@ -48,12 +59,7 @@ const Sidebar = () => {
           closeMenu === false ? "burgerContainer" : "burgerContainer active"
         }
       >
-        <div
-          className="burgerTrigger"
-          onClick={() => {
-            handleCloseMenu();
-          }}
-        ></div>
+        <div className="burgerTrigger" onClick={toggleMenu}></div>
         <div className="burgerMenu"></div>
       </div>
       <div
@@ -66,9 +72,7 @@ const Sidebar = () => {
           name={currentUserData?.name}
           bucketName="profilePhotos"
           className="profile"
-          //style={{ width: "100px", height: "100px", borderRadius: "50%" }}
         />
-        {/* <img src={Profile} alt="profile" className="profile" /> */}
         <div className="profileContents">
           <p className="name">{currentUserData?.name}</p>
           <p>{currentUserData?.email}</p>
@@ -129,16 +133,19 @@ const Sidebar = () => {
         </ul>
       </div>
       {/* Logout button */}
-      <div
-        className={
-          closeMenu === false ? "logoutContainer" : "logoutContainer active"
-        }
-      >
-        <button className="logoutButton" onClick={handleLogout}>
-          <FaSignOutAlt className="logoutIcon" />
-          {closeMenu === false && <span>Logout</span>}
-        </button>
-      </div>
+      <button className="logoutButton" onClick={handleLogoutClick}>
+        <FaSignOutAlt className="logoutIcon" />
+        {closeMenu === false && <span>Logout</span>}
+      </button>
+      <DialogBox
+        isVisible={showLogoutDialog}
+        title="Confirm Logout"
+        message="Are you sure you want to log out?"
+        onConfirm={handleConfirmLogout}
+        onCancel={handleCancelLogout}
+        confirmText="Yes, Log out"
+        cancelText="Cancel"
+      />
     </div>
   );
 };

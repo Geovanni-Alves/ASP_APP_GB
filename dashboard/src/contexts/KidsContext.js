@@ -5,23 +5,63 @@ const KidsContext = createContext({});
 
 const KidsContextProvider = ({ children }) => {
   const [kids, setKids] = useState([]);
-  //const { getPhotoInBucket } = usePicturesContext(); // Assuming this is your method for fetching photos
 
   // Fetch kids data from Supabase
   const fetchKidsData = async () => {
     try {
-      // Fetch all kids with their schedules
       const { data: fetchedKids, error: kidsError } = await supabase
-        .from("students") // Assuming your table is 'students'
-        .select("*");
+        .from("students")
+        .select(
+          `
+        *,
+        schools(*),  
+        drop_off_route(*),
+        contacts(*),
+        students_schedule(*)
+      `
+        )
+        .order("name", { ascending: true });
 
       if (kidsError) {
         throw kidsError;
       }
 
-      console.log("fetchedKids", fetchedKids);
+      // Process each kid and flatten students_schedule to avoid accessing it as an array
+      const kidsWithFlattenedSchedule = fetchedKids.map((kid) => {
+        if (kid.students_schedule && kid.students_schedule.length > 0) {
+          kid.students_schedule = kid.students_schedule[0]; // Assign the first schedule object directly to the student
+        } else {
+          kid.students_schedule = null; // Set it to null if there is no schedule
+        }
 
-      setKids(fetchedKids); // Update the kids state with the processed data
+        return kid; // Return the updated kid object
+      });
+
+      // Fetch current drop-off addresses for each student manually
+      const kidsWithAddresses = await Promise.all(
+        kidsWithFlattenedSchedule.map(async (kid) => {
+          // Check if the student has a currentDropOffAddressId
+          if (kid.currentDropOffAddress) {
+            const { data: currentDropOffAddress, error: addressError } =
+              await supabase
+                .from("students_address")
+                .select("*")
+                .eq("id", kid.currentDropOffAddress)
+                .single(); // Fetch the specific address
+
+            if (addressError) {
+              console.error("Error fetching address:", addressError);
+            } else {
+              // Add the fetched drop-off address to the student object
+              kid.dropOffAddress = currentDropOffAddress;
+            }
+          }
+
+          return kid; // Return the kid with the drop-off address attached (if available)
+        })
+      );
+
+      setKids(kidsWithAddresses);
     } catch (error) {
       console.error("Error fetching kids data:", error);
     }
@@ -53,7 +93,6 @@ const KidsContextProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    console.log("Fetching Kids Data... Context");
     fetchKidsData(); // Fetch the data on mount
   }, []);
 

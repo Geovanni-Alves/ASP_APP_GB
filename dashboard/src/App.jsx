@@ -1,21 +1,21 @@
 import "../src/styles/main.scss";
-//import "./App.css";
-import React, { useContext } from "react";
+import "./App.css";
+import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import supabase from "./lib/supabase";
+//import supabase from "./lib/supabase";
 
 import Home from "./pages/Home";
 import AuthContextProvider from "./contexts/AuthContext";
 import UsersContextProvider from "./contexts/UsersContext.js";
 //import Navbar from "./components/Navbar";
 //import Employees from "./components/Employees";
-import Students from "./components/Students";
+import Students from "./pages/Students.jsx";
 import Parents from "./pages/ParentsPage";
-import Vans from "./components/Vans";
+import Vans from "./pages/Vans.jsx";
 import VanDetailPage from "./pages/VanDetailPage";
 import Staff from "./pages/StaffPage";
 //import awsExports from "./aws-exports";
-import VansMaps from "./components/VansMaps";
+import VansMaps from "./pages/VansMaps.jsx";
 import RoutesPage from "./pages/RoutesPage";
 import Sidebar from "./components/Sidebar";
 import DashBoardHome from "./pages/DashBoardHome";
@@ -24,20 +24,35 @@ import KidsContext from "./contexts/KidsContext";
 import PicturesContext from "./contexts/PicturesContext.js";
 
 function App() {
+  const [closeMenu, setCloseMenu] = useState(false);
+
+  const toggleMenu = () => {
+    setCloseMenu((prev) => !prev);
+  };
+
   return (
     <AuthContextProvider>
       <UsersContextProvider>
         <PicturesContext>
           <KidsContext>
             <Router>
-              <div className="App">
-                <Sidebar />
+              <div
+                className={`App ${
+                  closeMenu ? "sidebar-closed" : "sidebar-open"
+                }`}
+              >
+                <Sidebar closeMenu={closeMenu} toggleMenu={toggleMenu} />
                 {/* <Navbar /> */}
-                <div className="pages">
+                <div
+                  className={`pages ${closeMenu ? "menu-closed" : "menu-open"}`}
+                >
                   <Routes>
                     <Route path="/" element={<DashBoardHome />} />
                     <Route path="/weekdays" element={<Home />} />
-                    <Route path="/students" element={<Students />} />
+                    <Route
+                      path="/students"
+                      element={<Students closeMenu={closeMenu} />}
+                    />
                     <Route path="/parents" element={<Parents />} />
                     <Route path="/staff" element={<Staff />} />
                     <Route path="/vans" element={<Vans />} />

@@ -9,7 +9,7 @@ import {
   faArrowLeft,
 } from "@fortawesome/free-solid-svg-icons";
 import { listUsers } from "../graphql/queries";
-import ParentsForm from "../components/ParentsForm";
+import ParentsForm from "./ParentsForm";
 
 function ParentsPage() {
   const [parents, setParents] = useState([]);

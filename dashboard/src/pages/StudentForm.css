@@ -1,15 +1,17 @@
 .form-container {
-  display: flex-end;
+  display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   gap: 20px;
 }
+
 label {
   display: block;
   font-size: 1rem;
   font-weight: 600;
 }
+
 input {
   display: block;
   padding: 10px;
@@ -19,6 +21,7 @@ input {
   border-radius: 4px;
   box-sizing: border-box;
 }
+
 .create-btn {
   width: 70%;
   padding: 10px;
@@ -48,4 +51,9 @@ input {
 .stars {
   display: flex;
   justify-content: space-between;
+}
+
+.required {
+  color: red;
+  margin-left: 0.25rem;
 }

@@ -1,7 +1,6 @@
 import React, { useState, useRef } from "react";
-import { API } from "aws-amplify";
-import { createKid, updateKid } from "../graphql/mutations";
-import GoogleMapsAutocomplete from "./GoogleMapsAutocomplete";
+import supabase from "../lib/supabase"; // Assuming you have Supabase set up
+import GoogleMapsAutocomplete from "../components/GoogleMapsAutocomplete";
 import { Card } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faStar } from "@fortawesome/free-solid-svg-icons";
@@ -34,53 +33,48 @@ function StudentForm({ onStudentAdded }) {
     // Validation checks
     if (
       !name ||
-      !(parent1Email || parent2Email) ||
-      !dropOffAddress ||
-      lat === "" ||
-      lng === "" ||
       !birthDate
+      // !(parent1Email || parent2Email) ||
+      // !dropOffAddress ||
+      // lat === "" ||
+      // lng === "" ||
     ) {
       setError("Please fill in all required fields.");
       return;
     }
+
     try {
       const newKidDetails = {
         name,
         parent1Email,
         parent2Email,
-        dropOffAddress,
-        lat,
-        lng,
         birthDate,
-        //attendanceDays,
-        //photo: uploadedPhotoName, // Use the uploaded photo name
       };
-      const {
-        data: {
-          createKid: { id: kidId },
-        },
-      } = await API.graphql({
-        query: createKid,
-        variables: { input: newKidDetails },
-      });
 
-      let uploadedPhotoName = null;
+      // Insert kid data into Supabase
+      const { data, error: insertError } = await supabase
+        .from("students")
+        .insert(newKidDetails)
+        .select();
+
+      if (insertError) throw insertError;
+
+      const kidId = data[0].id;
+
       if (photo) {
-        uploadedPhotoName = await savePhotoInBucket(
-          `kid-photo-${kidId}-${Date.now()}`,
-          photo
-        );
-      }
-      // Update the kid with the photo
-      const updatedKidDetails = {
-        id: kidId,
-        photo: uploadedPhotoName,
-      };
-      await API.graphql({
-        query: updateKid, // Assuming you have an updateKid mutation defined
-        variables: { input: updatedKidDetails },
-      });
+        console.log(photo);
+        const mediaPath = await savePhotoInBucket(photo, "profilePhotos");
 
+        // Update student record with the photo
+        const { error: updateError } = await supabase
+          .from("students")
+          .update({ photo: mediaPath })
+          .eq("id", kidId);
+
+        if (updateError) throw updateError;
+      }
+
+      // Reset form fields after successful submission
       setName("");
       setParent1Email("");
       setParent2Email("");
@@ -123,15 +117,19 @@ function StudentForm({ onStudentAdded }) {
   // Function to handle photo upload
   const handlePhotoChange = (e) => {
     const selectedPhoto = e.target.files[0];
-    setPhoto(selectedPhoto);
+    if (selectedPhoto) {
+      setPhoto(selectedPhoto);
+    }
   };
 
   return (
     <Card className="create">
-      <h3>Add a New Kid (StudentForm.jsx)</h3>
+      {/* <h3>Add a Student (StudentForm.jsx)</h3> */}
       <div className="form-container">
         <div className="form-item">
-          <label>Kid Name:</label>
+          <label>
+            Name: <span className="required">*</span>
+          </label>
           <input
             type="text"
             onChange={(e) => setName(e.target.value)}
@@ -162,7 +160,9 @@ function StudentForm({ onStudentAdded }) {
           />
         </div>
         <div className="form-item">
-          <label>Birth Date:</label>
+          <label>
+            Birth Date: <span className="required">*</span>
+          </label>
           <input
             type="date"
             onChange={(e) => setBirthDate(e.target.value)}

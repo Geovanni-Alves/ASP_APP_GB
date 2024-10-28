@@ -1,40 +1,123 @@
-import { createContext, useContext } from "react";
-import { Storage } from "aws-amplify";
+import React, { createContext, useContext } from "react";
+import supabase from "../lib/supabase"; // Ensure supabase is properly configured
+import { v4 as uuidv4 } from "uuid"; // UUID package for unique filenames
 
 const PicturesContext = createContext({});
 
 const PicturesContextProvider = ({ children }) => {
-  const savePhotoInBucket = async (filename, file) => {
-    try {
-      console.log("Uploading image to S3...");
-      await Storage.put(filename, file, {
-        contentType: "image/jpeg", // Adjust content type if needed
-      });
-
-      console.log("Image uploaded successfully.");
-      const imageURL = await Storage.get(filename);
-      console.log("Image URL:", imageURL);
-
-      return filename; // Return the filename upon successful upload
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      throw error;
+  const getFileExtension = (mimeType) => {
+    switch (mimeType) {
+      case "image/jpeg":
+        return "jpg";
+      case "image/png":
+        return "png";
+      case "video/mp4":
+        return "mp4";
+      default:
+        return "";
     }
   };
 
-  const getPhotoInBucket = async (filename) => {
+  const readFileAsBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result.split(",")[1]); // Split off the base64 header
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const savePhotoInBucket = async (file, bucketName = "photos") => {
+    const mimeType = file.type || "image/png"; // Default to png if type is missing
+    if (!file) {
+      console.error("Invalid file input");
+      return null;
+    }
+
     try {
-      const imageURL = await Storage.get(filename, { expires: 1800 });
-      //console.log("Image URL:", imageURL);
-      return imageURL;
+      //const base64 = await readFileAsBase64(file);
+
+      const filePath = `${uuidv4()}.${getFileExtension(mimeType)}`;
+      const contentType = mimeType;
+
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file, {
+          contentType,
+          upsert: false, // Do not overwrite existing files
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        return data.path;
+      }
     } catch (error) {
-      console.error("Error getting image:", error);
-      throw error;
+      console.error("Error saving image to storage:", error);
+      return null;
+    }
+  };
+
+  const saveVideoInBucket = async (file, bucketName = "videos") => {
+    const mimeType = file.type || "video/mp4"; // Default to mp4 if type is missing
+    if (!file) {
+      console.error("Invalid file input");
+      return null;
+    }
+
+    try {
+      const base64 = await readFileAsBase64(file);
+
+      const filePath = `${uuidv4()}.${getFileExtension(mimeType)}`;
+      const contentType = mimeType;
+
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, base64, {
+          contentType,
+          upsert: false, // Do not overwrite existing files
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        return data.path;
+      }
+    } catch (error) {
+      console.error("Error saving video to storage:", error);
+      return null;
+    }
+  };
+
+  const deleteMediaFromBucket = async (filePath, bucketName = "photos") => {
+    try {
+      if (!filePath) {
+        throw new Error("File path is required to delete media.");
+      }
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .remove([filePath]);
+
+      if (error) {
+        throw error;
+      }
+      if (data) {
+        return true;
+      }
+    } catch (error) {
+      console.error("Error deleting media from storage:", error);
+      return false;
     }
   };
 
   return (
-    <PicturesContext.Provider value={{ getPhotoInBucket, savePhotoInBucket }}>
+    <PicturesContext.Provider
+      value={{ savePhotoInBucket, saveVideoInBucket, deleteMediaFromBucket }}
+    >
       {children}
     </PicturesContext.Provider>
   );
