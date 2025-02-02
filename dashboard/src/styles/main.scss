@@ -9,36 +9,36 @@ body {
   // text-transform: capitalize;
 }
 
-.logoutContainer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-}
+// .logoutContainer {
+//   display: flex;
+//   justify-content: center;
+//   align-items: center;
+//   padding: 20px;
+// }
 
-.logoutButton {
-  margin-top: 30px;
-  background-color: red;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  width: 100%;
-}
+// .logoutButton {
+//   margin-top: 30px;
+//   background-color: red;
+//   color: white;
+//   border: none;
+//   border-radius: 4px;
+//   padding: 10px;
+//   display: flex;
+//   align-items: center;
+//   justify-content: center;
+//   cursor: pointer;
+//   width: 100%;
+// }
 
-.logoutButton .logoutIcon {
-  width: 20px;
-  height: 20px;
-}
+// .logoutButton .logoutIcon {
+//   width: 20px;
+//   height: 20px;
+// }
 
-.logoutButton span {
-  margin-left: 10px;
-  font-weight: bold;
-}
+// .logoutButton span {
+//   margin-left: 10px;
+//   font-weight: bold;
+// }
 
 .sidebar {
   background-color: $white;
@@ -54,39 +54,146 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    //padding: 1rem 0 0 0;
+    //justify-content: flex-start;
+    justify-content: center;
+    background: $lightGrey;
+    padding: 5px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease-in-out;
+    position: relative;
 
-    img {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      object-fit: cover;
-      transition: width 0.3s, height 0.3s;
+    &:hover {
+      background: darken($lightGrey, 5%);
     }
 
+    // img {
+    //   width: 100px;
+    //   height: 100px;
+    //   border-radius: 50%;
+    //   object-fit: cover;
+    //   transition: width 0.3s, height 0.3s;
+    // }
+
     .profileContents {
-      padding: 0 0 0 1rem;
-      max-width: 11rem;
+      padding-left: 10px;
+      text-align: left;
+      // padding: 0 0 0 1rem;
+      // max-width: 11rem;
 
       p.name {
-        padding: 0;
-        margin: 2px;
-        font-size: 16.7px;
+        // padding: 0;
+        // margin: 2px;
+        // font-size: 16.7px;
+        // color: $darkGrey;
+        // text-transform: capitalize;
+        // font-weight: $heavyFont;
+        font-size: 13px;
+        font-weight: bold;
         color: $darkGrey;
-        text-transform: capitalize;
-        font-weight: $heavyFont;
+        margin-top: 3px;
       }
 
       p {
-        padding: 0;
-        margin: 0;
-        font-size: 11.9px;
+        font-size: 12px;
         color: $darkGrey;
-        text-transform: lowercase;
-        overflow-wrap: break-word;
+        margin: 0;
+        // padding: 0;
+        // margin: 0;
+        // font-size: 11.9px;
+        // color: $darkGrey;
+        // text-transform: lowercase;
+        // overflow-wrap: break-word;
       }
     }
+  }
+
+  .dropdownMenu {
+    position: absolute;
+    top: 110%; /* Positioned right below the profile button */
+    left: 0;
+    background: $white;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    width: 100%;
+    padding: 10px;
+    z-index: 100;
+    animation: fadeIn 0.2s ease-in-out;
+
+    .dropdownTitle {
+      font-size: 16px;
+      font-weight: bold;
+      padding-bottom: 10px;
+      color: $blue;
+      text-align: center;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+
+      li {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        cursor: pointer;
+        border-radius: 8px;
+        transition: background 0.2s ease-in-out;
+
+        &:hover {
+          background: $lightGrey;
+        }
+
+        .dropdownIcon {
+          margin-right: 10px;
+        }
+
+        a,
+        span {
+          text-decoration: none;
+          color: $darkGrey;
+          font-size: 16px;
+          flex-grow: 1;
+          text-align: left;
+        }
+      }
+      /* Special styling for Sign Out */
+      li.signout {
+        color: red; /* Text color red */
+        font-weight: bold;
+
+        .dropdownIcon {
+          color: red; /* Icon color red */
+        }
+        span {
+          color: red;
+        }
+      }
+    }
+  }
+
+  /* Fade-in animation for pop-up */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Overlay Background for Modal */
+  .dropdownOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 998;
   }
 
   .logoContainer {
@@ -283,20 +390,27 @@ body {
   width: 5rem;
   transition: 0.5s ease;
 
-  .profileContainer img {
-    width: 50px; /* Smaller image when sidebar is collapsed */
-    height: 50px;
-    transition: width 0.3s, height 0.3s;
-  }
+  // .profileContainer img {
+  //   width: 50px; /* Smaller image when sidebar is collapsed */
+  //   height: 50px;
+  //   transition: width 0.3s, height 0.3s;
+  // }
 
   .profileContents {
     opacity: 0; /* Hide the profile text when sidebar is collapsed */
     transition: opacity 0.3s ease;
   }
 
-  .logoutContainer {
-    display: none; /* Hides the logout container when sidebar is collapsed */
+  /* Ensure dropdown menu remains the same size */
+  .dropdownMenu {
+    width: 250px; /* Same size as when sidebar is open */
+    //left: -1px; /* Position it correctly when sidebar is collapsed */
+    top: 110%;
   }
+
+  // .logoutContainer {
+  //   display: none; /* Hides the logout container when sidebar is collapsed */
+  // }
 
   .burgerContainer.active {
     transition: 0.5s all;

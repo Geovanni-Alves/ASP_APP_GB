@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import GbIcon from "../Images/gb-logo.png";
 //import Profile from "../Images/avatar-image.png";
 import Dashboard from "../Images/dashboard.png";
@@ -11,38 +11,62 @@ import ArrowIcon from "../Images/drop-down-arrow.png";
 import { useLocation } from "react-router-dom";
 import { useUsersContext } from "../contexts/UsersContext";
 import { useAuthContext } from "../contexts/AuthContext";
-import { FaSignOutAlt } from "react-icons/fa";
+import { FaSignOutAlt, FaUser } from "react-icons/fa";
 import RemoteImage from "./RemoteImage";
-import DialogBox from "./UiComponents/DialogBox";
+// import DialogBox from "./UiComponents/DialogBox";
 
 const Sidebar = ({ closeMenu, toggleMenu }) => {
   const location = useLocation();
   //const [closeMenu, setCloseMenu] = useState(false);
   const [subMenuOpen, setSubMenuOpen] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
   const { currentUserData } = useUsersContext();
-  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  // const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const { logout } = useAuthContext();
+  const dropdownRef = useRef(null);
 
   // const handleCloseMenu = () => {
   //   setCloseMenu(!closeMenu);
   // };
 
+  // Close dropdown if clicked outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const toggleDropdown = () => {
+    setShowDropdown(!showDropdown);
+  };
+
+  const handleLogout = () => {
+    setShowDropdown(false);
+    logout();
+  };
+
   const handleSubmenuToggle = () => {
     setSubMenuOpen(!subMenuOpen);
   };
 
-  const handleLogoutClick = () => {
-    setShowLogoutDialog(true); // Show the custom dialog
-  };
+  // const handleLogoutClick = () => {
+  //   setShowLogoutDialog(true); // Show the custom dialog
+  // };
 
-  const handleConfirmLogout = () => {
-    setShowLogoutDialog(false); // Close the dialog
-    logout(); // Trigger the logout function
-  };
+  // const handleConfirmLogout = () => {
+  //   setShowLogoutDialog(false); // Close the dialog
+  //   logout(); // Trigger the logout function
+  // };
 
-  const handleCancelLogout = () => {
-    setShowLogoutDialog(false); // Close the dialog without logging out
-  };
+  // const handleCancelLogout = () => {
+  //   setShowLogoutDialog(false); // Close the dialog without logging out
+  // };
 
   return (
     <div className={closeMenu === false ? "sidebar" : "sidebar active"}>
@@ -62,7 +86,8 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
         <div className="burgerTrigger" onClick={toggleMenu}></div>
         <div className="burgerMenu"></div>
       </div>
-      <div
+
+      {/* <div
         className={
           closeMenu === false ? "profileContainer" : "profileContainer active"
         }
@@ -77,7 +102,51 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
           <p className="name">{currentUserData?.name}</p>
           <p>{currentUserData?.email}</p>
         </div>
+      </div> */}
+
+      {/* Profile Button (Styled as a card) */}
+      <div
+        className="profileContainer"
+        onClick={toggleDropdown}
+        ref={dropdownRef}
+      >
+        <RemoteImage
+          path={currentUserData?.photo}
+          name={currentUserData?.name}
+          bucketName="profilePhotos"
+          style={{
+            width: closeMenu ? "40px" : "85px", // Smaller when sidebar is collapsed
+            height: closeMenu ? "40px" : "85px",
+            borderRadius: "50%",
+            transition: "width 0.3s ease, height 0.3s ease",
+            objectFit: "cover",
+          }}
+        />
+        {!closeMenu && (
+          <div className="profileContents">
+            <p className="name">{currentUserData?.name}</p>
+            <p>{currentUserData?.email}</p>
+          </div>
+        )}
+
+        {/* Dropdown Menu */}
+        {showDropdown && (
+          <div className="dropdownMenu">
+            <p className="dropdownTitle">Gracie Barra Vancouver ASP</p>
+            <ul>
+              <li>
+                <FaUser className="dropdownIcon" />
+                <a href="/profile">Profile</a>
+              </li>
+              <li className="signout" onClick={handleLogout}>
+                <FaSignOutAlt className="dropdownIcon" />
+                <span>Sign Out</span>
+              </li>
+            </ul>
+          </div>
+        )}
       </div>
+
       <div
         className={
           closeMenu === false ? "contentsContainer" : "contentsContainer active"
@@ -132,7 +201,7 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
           </li>
         </ul>
       </div>
-      {/* Logout button */}
+      {/* Logout button
       <button className="logoutButton" onClick={handleLogoutClick}>
         <FaSignOutAlt className="logoutIcon" />
         {closeMenu === false && <span>Logout</span>}
@@ -145,7 +214,7 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
         onCancel={handleCancelLogout}
         confirmText="Yes, Log out"
         cancelText="Cancel"
-      />
+      /> */}
     </div>
   );
 };

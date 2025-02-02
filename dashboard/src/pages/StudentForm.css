@@ -1,25 +1,53 @@
+/* StudentForm.css */
+
+/* Container for the entire form */
+.create {
+  max-width: 800px; /* Set a wider maximum width */
+  width: 100%; /* Ensures the form takes up the full width available within the max-width constraint */
+  margin: auto;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background-color: #f9f9f9;
+  overflow: auto;
+}
+
 .form-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: flex-start;
   gap: 20px;
+  max-width: 100%;
+}
+
+/* Input fields and labels */
+.form-item {
+  width: 100%;
+  max-width: 100%;
 }
 
 label {
-  display: block;
   font-size: 1rem;
   font-weight: 600;
 }
 
-input {
-  display: block;
+.required {
+  color: red;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="date"],
+input[type="file"] {
+  width: 100%;
+  max-width: 350px;
   padding: 10px;
   margin-top: 5px;
-  width: 350px;
   border: 1px solid #ddd;
   border-radius: 4px;
   box-sizing: border-box;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 .create-btn {
@@ -31,8 +59,14 @@ input {
   color: #fff;
   font-size: 1rem;
   cursor: pointer;
+  transition: background-color 0.3s;
 }
 
+.create-btn:hover {
+  background-color: #d12d30;
+}
+
+/* Attendance star styling */
 .star-active {
   color: green;
   cursor: pointer;
@@ -46,14 +80,75 @@ input {
 .days-of-week {
   display: flex;
   justify-content: space-between;
+  width: 100%;
+  max-width: 350px;
 }
 
-.stars {
+/* Contact table styling */
+.contact-table {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border-top: 1px solid #ddd;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.table-header {
+  display: contents;
+  font-weight: bold;
+  background-color: #f0f0f0;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.table-row {
+  display: contents;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.table-row:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .contact-table {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .table-header span,
+  .table-row span {
+    display: block;
+    text-align: left;
+  }
+}
+
+.actions {
   display: flex;
-  justify-content: space-between;
+  gap: 5px;
+  justify-content: center;
 }
 
-.required {
+/* Contact action icons */
+.icon-button {
+  cursor: pointer;
+  color: #555;
+  transition: color 0.3s;
+}
+
+.icon-button:hover {
+  color: #ed3337;
+}
+
+/* Error message styling */
+.error {
   color: red;
-  margin-left: 0.25rem;
+  font-size: 0.9rem;
+  padding: 10px;
+  background-color: #ffe0e0;
+  border: 1px solid #f5c2c2;
+  border-radius: 4px;
 }

@@ -1,0 +1,55 @@
+/* ContactModal.css */
+
+/* Modal container styles */
+.contact-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.contact-modal label {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.contact-modal input,
+.contact-modal select {
+  width: 100%;
+  max-width: 350px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.contact-modal select {
+  cursor: pointer;
+}
+
+.contact-modal .checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.contact-modal .checkbox-container label {
+  font-weight: normal;
+}
+
+.contact-modal .save-btn {
+  width: 100%;
+  max-width: 350px;
+  padding: 10px;
+  border-radius: 4px;
+  border: none;
+  background-color: #ed3337;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.contact-modal .save-btn:hover {
+  background-color: #d12d30;
+}

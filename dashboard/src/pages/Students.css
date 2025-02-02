@@ -155,3 +155,15 @@
   width: 10%;
   height: auto;
 }
+/* Custom styles for the modal (e.g., in StudentForm.css or your global CSS) */
+.custom-modal .ant-modal-content {
+  width: 100%;
+  max-width: 90vw; /* Limits the modal to 90% of the viewport width */
+}
+
+@media (max-width: 768px) {
+  .custom-modal .ant-modal-content {
+    width: 100%; /* Full width on smaller screens */
+    padding: 10px; /* Optional padding for small screens */
+  }
+}

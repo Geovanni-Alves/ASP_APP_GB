@@ -519,6 +519,8 @@ function Students({ closeMenu }) {
             open={isModalVisible}
             onCancel={handleCloseModal}
             footer={null}
+            width={800} // Set a base width for larger screens
+            className="custom-modal"
           >
             <StudentForm onStudentAdded={handleStudentAdded} />
           </Modal>
