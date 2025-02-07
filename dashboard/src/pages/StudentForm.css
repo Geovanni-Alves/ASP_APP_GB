@@ -152,3 +152,14 @@ input[type="file"] {
   border: 1px solid #f5c2c2;
   border-radius: 4px;
 }
+
+/* Ensures Google Maps Autocomplete dropdown appears above the modal */
+.autocomplete-container {
+  position: relative;
+  z-index: 1050 !important; /* Ensures it appears above the modal */
+}
+
+/* Fix for overlapping dropdown issue */
+.pac-container {
+  z-index: 2000 !important;
+}

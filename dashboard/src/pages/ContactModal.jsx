@@ -52,9 +52,10 @@ const ContactModal = ({ isVisible, onClose, onSave, contactToEdit }) => {
   return (
     <Modal
       title={contactToEdit ? "Edit Contact" : "Add Contact"}
-      visible={isVisible}
+      open={isVisible}
       onCancel={onClose}
       footer={null}
+      maskClosable={false}
       className="contact-modal"
     >
       <div className="contact-modal">
