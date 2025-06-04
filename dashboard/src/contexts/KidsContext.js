@@ -97,7 +97,7 @@ const KidsContextProvider = ({ children }) => {
   }, []);
 
   return (
-    <KidsContext.Provider value={{ kids, updateKidOnDb }}>
+    <KidsContext.Provider value={{ kids, updateKidOnDb, fetchKidsData }}>
       {children}
     </KidsContext.Provider>
   );

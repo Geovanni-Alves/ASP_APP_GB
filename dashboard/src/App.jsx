@@ -7,6 +7,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
 import AuthContextProvider from "./contexts/AuthContext";
 import UsersContextProvider from "./contexts/UsersContext.js";
+import GoogleMapsLoader from "./components/GoogleMapsLoader";
+
 //import Navbar from "./components/Navbar";
 //import Employees from "./components/Employees";
 import Students from "./pages/Students.jsx";
@@ -31,44 +33,49 @@ function App() {
   };
 
   return (
-    <AuthContextProvider>
-      <UsersContextProvider>
-        <PicturesContext>
-          <KidsContext>
-            <Router>
-              <div
-                className={`App ${
-                  closeMenu ? "sidebar-closed" : "sidebar-open"
-                }`}
-              >
-                <Sidebar closeMenu={closeMenu} toggleMenu={toggleMenu} />
-                {/* <Navbar /> */}
+    <>
+      <GoogleMapsLoader />
+      <AuthContextProvider>
+        <UsersContextProvider>
+          <PicturesContext>
+            <KidsContext>
+              <Router>
                 <div
-                  className={`pages ${closeMenu ? "menu-closed" : "menu-open"}`}
+                  className={`App ${
+                    closeMenu ? "sidebar-closed" : "sidebar-open"
+                  }`}
                 >
-                  <Routes>
-                    <Route path="/" element={<DashBoardHome />} />
-                    <Route path="/weekdays" element={<Home />} />
-                    <Route
-                      path="/students"
-                      element={<Students closeMenu={closeMenu} />}
-                    />
-                    <Route path="/parents" element={<Parents />} />
-                    <Route path="/staff" element={<Staff />} />
-                    <Route path="/vans" element={<Vans />} />
-                    <Route path="/vans/:vanId" element={<VanDetailPage />} />
-                    <Route path="/pickup" element={<PickupPage />} />
-                    {/* <Route path="/employees" element={<Employees />} /> */}
-                    <Route path="/routes" element={<RoutesPage />} />
-                    <Route path="/maps" element={<VansMaps />} />
-                  </Routes>
+                  <Sidebar closeMenu={closeMenu} toggleMenu={toggleMenu} />
+                  {/* <Navbar /> */}
+                  <div
+                    className={`pages ${
+                      closeMenu ? "menu-closed" : "menu-open"
+                    }`}
+                  >
+                    <Routes>
+                      <Route path="/" element={<DashBoardHome />} />
+                      <Route path="/weekdays" element={<Home />} />
+                      <Route
+                        path="/students"
+                        element={<Students closeMenu={closeMenu} />}
+                      />
+                      <Route path="/parents" element={<Parents />} />
+                      <Route path="/staff" element={<Staff />} />
+                      <Route path="/vans" element={<Vans />} />
+                      <Route path="/vans/:vanId" element={<VanDetailPage />} />
+                      <Route path="/pickup" element={<PickupPage />} />
+                      {/* <Route path="/employees" element={<Employees />} /> */}
+                      <Route path="/routes" element={<RoutesPage />} />
+                      <Route path="/maps" element={<VansMaps />} />
+                    </Routes>
+                  </div>
                 </div>
-              </div>
-            </Router>
-          </KidsContext>
-        </PicturesContext>
-      </UsersContextProvider>
-    </AuthContextProvider>
+              </Router>
+            </KidsContext>
+          </PicturesContext>
+        </UsersContextProvider>
+      </AuthContextProvider>
+    </>
   );
 }
 

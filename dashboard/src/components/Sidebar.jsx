@@ -76,7 +76,7 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
         }
       >
         <img src={GbIcon} alt="icon" className="logo" />
-        <h2 className="title">Gracie Barra Vancouver</h2>
+        <h2 className="title">Gracie Barra</h2>
       </div>
       <div
         className={

@@ -15,6 +15,22 @@ function StudentForm({ onStudentAdded }) {
   const [isAddSchoolModalVisible, setIsAddSchoolModalVisible] = useState(false);
   const { savePhotoInBucket } = usePicturesContext();
 
+  // Attendance State
+  const [attendanceDays, setAttendanceDays] = useState({
+    monday: false,
+    tuesday: false,
+    wednesday: false,
+    thursday: false,
+    friday: false,
+  });
+
+  const toggleDay = (day) => {
+    setAttendanceDays((prev) => ({
+      ...prev,
+      [day]: !prev[day],
+    }));
+  };
+
   // Fetch schools
   const fetchSchools = async () => {
     const { data, error } = await supabase.from("schools").select("id, name");
@@ -52,6 +68,13 @@ function StudentForm({ onStudentAdded }) {
         .single();
 
       if (studentError) throw studentError;
+
+      await supabase.from("students_schedule").insert([
+        {
+          studentId: student.id,
+          ...attendanceDays,
+        },
+      ]);
 
       alert("Student saved successfully!");
       onStudentAdded();
@@ -118,6 +141,26 @@ function StudentForm({ onStudentAdded }) {
             accept="image/jpeg, image/png"
             onChange={handlePhotoChange}
           />
+        </div>
+
+        <div className="form-item">
+          <label>Attendance Days:</label>
+          <div className="attendance-row-horizontal">
+            {["monday", "tuesday", "wednesday", "thursday", "friday"].map(
+              (day) => (
+                <div className="attendance-day" key={day}>
+                  <div className="day-label">
+                    {day.charAt(0).toUpperCase() + day.slice(1)}
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={attendanceDays[day]}
+                    onChange={() => toggleDay(day)}
+                  />
+                </div>
+              )
+            )}
+          </div>
         </div>
 
         <button className="create-btn" onClick={handleSubmit}>
