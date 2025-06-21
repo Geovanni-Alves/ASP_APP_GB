@@ -42,11 +42,12 @@ body {
 
 .sidebar {
   background-color: $white;
+  border-radius: 40px;
   position: absolute;
   top: 0;
   left: 0;
   padding: 1rem;
-  width: 15rem;
+  width: 14.8rem;
   height: 100vh;
   transition: width 0.5s ease;
 
@@ -110,7 +111,7 @@ body {
 
   .dropdownMenu {
     position: absolute;
-    top: 110%; /* Positioned right below the profile button */
+    top: 110%;
     left: 0;
     background: $white;
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
@@ -200,7 +201,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    padding-bottom: 2rem;
+    padding-bottom: 3.2rem;
     width: 100%;
 
     h2.title {
@@ -387,7 +388,7 @@ body {
 }
 
 .sidebar.active {
-  width: 5rem;
+  width: 4.8rem;
   transition: 0.5s ease;
 
   // .profileContainer img {

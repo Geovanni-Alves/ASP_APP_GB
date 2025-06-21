@@ -55,15 +55,17 @@
 }
 
 .students-container {
-  position: relative;
-  width: 80%;
-  /* height: 100vh; */
-  top: -20px;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 5rem; /* or 15rem if menu is open */
+  right: 0;
+  padding: 30px 40px;
   background-color: #fff;
-  /* background-color: #ed3337; */
   border-radius: 40px;
+  overflow-y: auto;
+  box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
   transition: left 0.3s ease;
-  max-height: 900px;
 }
 
 .menu-open {
@@ -97,10 +99,11 @@
   /* background-color: darkblue; */
   border-radius: 40px;
   transition: left 0.3s ease;
-  max-height: 900px;
+  max-height: calc(100vh - 100px);
+  /* max-height: 900px; */
   overflow-y: auto;
   /* margin: 20px auto; */
-  padding: 30px;
+  padding: 10px;
   box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
 }
 
@@ -113,19 +116,25 @@
 }
 
 .profile-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 3px;
-  margin-bottom: 30px;
-  border-radius: 30px;
-  background-color: #5ba2b0;
+  position: sticky;
+  top: 6px;
+  z-index: 10;
+  background-color: #5ba2b0; /* keep the same background */
+  padding: 10px;
+  border-radius: 20px;
+  border-bottom: 1px solid #ccc;
 }
 
 .student-name-title {
   font-size: 34px;
   font-weight: 600;
   color: white;
+}
+
+.student-name {
+  font-size: 20px;
+  font-weight: 500;
+  /* color: white; */
 }
 
 .student-photo {

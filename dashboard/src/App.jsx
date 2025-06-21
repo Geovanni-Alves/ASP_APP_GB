@@ -14,7 +14,7 @@ import GoogleMapsLoader from "./components/GoogleMapsLoader";
 import Students from "./pages/Students.jsx";
 import Parents from "./pages/ParentsPage";
 import Vans from "./pages/Vans.jsx";
-import VanDetailPage from "./pages/VanDetailPage";
+// import VanDetailPage from "./pages/VanDetailPage";
 import Staff from "./pages/StaffPage";
 //import awsExports from "./aws-exports";
 import VansMaps from "./pages/VansMaps.jsx";
@@ -60,9 +60,15 @@ function App() {
                         element={<Students closeMenu={closeMenu} />}
                       />
                       <Route path="/parents" element={<Parents />} />
-                      <Route path="/staff" element={<Staff />} />
-                      <Route path="/vans" element={<Vans />} />
-                      <Route path="/vans/:vanId" element={<VanDetailPage />} />
+                      <Route
+                        path="/staff"
+                        element={<Staff closeMenu={closeMenu} />}
+                      />
+                      <Route
+                        path="/vans"
+                        element={<Vans closeMenu={closeMenu} />}
+                      />
+                      {/* <Route path="/vans/:vanId" element={<VanDetailPage />} /> */}
                       <Route path="/pickup" element={<PickupPage />} />
                       {/* <Route path="/employees" element={<Employees />} /> */}
                       <Route path="/routes" element={<RoutesPage />} />

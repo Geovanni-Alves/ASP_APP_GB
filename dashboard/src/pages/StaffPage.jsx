@@ -1,269 +1,393 @@
 import React, { useEffect, useState } from "react";
+import supabase from "../lib/supabase";
 import "./StaffPage.css";
+import RemoteImage from "../components/RemoteImage";
+import { Button, Modal, Input, Card } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { API } from "aws-amplify";
 import {
   faPenToSquare,
   faTrash,
-  faArrowRight,
   faArrowLeft,
 } from "@fortawesome/free-solid-svg-icons";
-import { listUsers } from "../graphql/queries";
-//import ParentsForm from "../components/ParentsForm";
 
-function StaffPage() {
-  const [staffs, setStaffs] = useState([]);
-  const [selectedStaffs, setSelectedStaffs] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [nameFilter, setNameFilter] = useState("");
-  const [mode, setMode] = useState("list");
-  const [updatedName, setUpdatedName] = useState("");
-  const staffsPerPage = 4;
-  useEffect(() => {
-    const fetchStaff = async () => {
-      const variables = {
-        filter: {
-          userType: { eq: "STAFF" },
-        },
-      };
-      const employeesResponse = await API.graphql({
-        query: listUsers,
-        variables: variables,
-      });
-      const staff = employeesResponse.data.listUsers.items;
-      setStaffs(staff);
-    };
-    fetchStaff();
-  }, []);
+function StaffPage({ closeMenu }) {
+  /* ──────────────────────────────────
+     LIST + FILTER
+  ────────────────────────────────── */
+  const [staffList, setStaffList] = useState([]);
+  const [filteredStaff, setFilteredStaff] = useState([]);
+  const [filter, setFilter] = useState("");
 
-  const handleNextPage = () => {
-    setCurrentPage((prevPage) => prevPage + 1);
-  };
+  /* ──────────────────────────────────
+     SELECTION + DIALOGS
+  ────────────────────────────────── */
+  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
 
-  const handlePrevPage = () => {
-    setCurrentPage((prevPage) => prevPage - 1);
-  };
+  /* ──────────────────────────────────
+     INVITE FORM
+  ────────────────────────────────── */
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteAddress, setInviteAddress] = useState("");
 
-  const startIndex = (currentPage - 1) * staffsPerPage;
-  const endIndex = startIndex + staffsPerPage;
+  /* ──────────────────────────────────
+     EDIT FORM (when selectedStaff)
+  ────────────────────────────────── */
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editRole, setEditRole] = useState("");
 
-  const filteredStaffs = staffs.filter((staffs) => {
-    return (
-      nameFilter === "" ||
-      staffs.name.toLowerCase().includes(nameFilter.toLowerCase())
+  /* ────────────────────────────────── */
+  useEffect(() => fetchStaff(), []);
+
+  async function fetchStaff() {
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("userType", "STAFF");
+
+    if (!error) {
+      setStaffList(data || []);
+      setFilteredStaff(data || []);
+    } else console.error("Fetch staff error:", error);
+  }
+
+  /* ──────────────────────────────────
+     FILTER
+  ────────────────────────────────── */
+  function handleFilterChange(e) {
+    const val = e.target.value.toLowerCase();
+    setFilter(val);
+    setFilteredStaff(
+      staffList.filter((s) => s.name?.toLowerCase().includes(val))
     );
-  });
+  }
 
-  const displayedStaffs = filteredStaffs.slice(startIndex, endIndex);
+  /* ──────────────────────────────────
+     EDIT — populate fields
+  ────────────────────────────────── */
+  useEffect(() => {
+    if (!selectedStaff) return;
+    setEditName(selectedStaff.name || "");
+    setEditPhone(selectedStaff.phoneNumber || "");
+    setEditAddress(selectedStaff.address || "");
+    setEditRole(selectedStaff.role || "");
+  }, [selectedStaff]);
 
-  const handleStaffsClick = (staffs) => {
-    setSelectedStaffs(staffs);
-    setUpdatedName(staffs.name);
-    setMode("details");
-  };
-  const handleDeleteClick = (employee) => {
-    setSelectedStaffs(employee);
-    setMode("delete");
-  };
-  const handleDeletestaffs = async () => {
+  async function handleSaveEdits() {
+    if (!selectedStaff) return;
+    const updates = {
+      name: editName.trim(),
+      phoneNumber: editPhone.trim() || null,
+      address: editAddress.trim() || null,
+      role: editRole.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", selectedStaff.id);
+
+    if (!error) {
+      alert("Staff updated!");
+      await fetchStaff();
+      setSelectedStaff(null);
+    } else alert("Update failed.");
+  }
+
+  /* ──────────────────────────────────
+     INVITE NEW STAFF
+  ────────────────────────────────── */
+  async function handleSaveInvite() {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email || !inviteName.trim()) {
+      return alert("Name and e-mail are required.");
+    }
+
     try {
-      const response = await fetch(
-        `https://drop-off-app-dere.onrender.com/api/employes/${selectedStaffs._id}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const { data: existing } = await supabase
+        .from("users")
+        .select("id, userType")
+        .eq("email", email)
+        .single();
 
-      if (response.ok) {
-        const updatedstaffs = staffs.filter(
-          (staffs) => staffs._id !== selectedStaffs._id
-        );
-        setStaffs(updatedstaffs);
-        setSelectedStaffs(null);
-        setMode("list");
+      const payload = {
+        name: inviteName.trim(),
+        phoneNumber: invitePhone.trim() || null,
+        address: inviteAddress.trim() || null,
+        userType: "STAFF",
+        firstLogin: true,
+        updated_at: new Date().toISOString(),
+      };
+
+      let userId;
+      if (existing) {
+        userId = existing.id;
+        await supabase.from("users").update(payload).eq("id", userId);
       } else {
-        console.error("Failed to delete Employee.");
+        const { data: created, error: createErr } = await supabase
+          .from("users")
+          .insert([{ ...payload, email }])
+          .select()
+          .single();
+        if (createErr) throw createErr;
+        userId = created.id;
       }
-    } catch (error) {
-      console.error("Error deleting Employee:", error);
-    }
-  };
 
-  const handleUpdateEmployee = async () => {
-    try {
-      const response = await fetch(
-        `https://drop-off-app-dere.onrender.com/api/employes/${selectedStaffs._id}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: updatedName,
-          }),
+      const confirmInvite = window.confirm(`Send invite to ${email} now?`);
+      if (confirmInvite) {
+        const res = await fetch("http://localhost:3001/api/invite-staff", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, name: inviteName }),
+        });
+        const ok = res.ok;
+        if (!ok) {
+          const txt = await res.text();
+          alert(txt || "Invite failed");
+          return;
         }
-      );
-
-      if (response.ok) {
-        const updatedstaffs = staffs.map((employee) =>
-          employee._id === selectedStaffs._id
-            ? {
-                ...employee,
-                name: updatedName,
-              }
-            : employee
-        );
-        setStaffs(updatedstaffs);
-
-        setSelectedStaffs(null);
-        setMode("list");
-        setUpdatedName("");
-      } else {
-        console.error("Failed to update Employee.");
+        await supabase.from("users").update({ invited: true }).eq("id", userId);
+        alert("Invite sent!");
       }
-    } catch (error) {
-      console.error("Error updating Employee:", error);
+      fetchStaff();
+      resetInviteForm();
+    } catch (err) {
+      console.error(err);
+      alert("Invite error.");
     }
-  };
+  }
 
-  const handlestaffsAdded = async () => {
+  async function handleStaffInvite(staff) {
+    if (!staff.email) return alert("No email on record.");
+    const confirm = window.confirm(
+      `${staff.invited ? "Resend" : "Send"} invite to ${staff.email}?`
+    );
+    if (!confirm) return;
+
     try {
-      const response = await fetch(
-        "https://drop-off-app-dere.onrender.com/api/employes"
-      );
-      const json = await response.json();
-
-      if (response.ok) {
-        setStaffs(json.staffs);
+      const res = await fetch("http://localhost:3001/api/invite-staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: staff.email, name: staff.name }),
+      });
+      if (!res.ok) {
+        alert("Invite failed.");
+        return;
       }
-    } catch (error) {
-      console.error("Error fetching Employees:", error);
+      await supabase.from("users").update({ invited: true }).eq("id", staff.id);
+      alert("Invite sent!");
+      fetchStaff();
+    } catch (err) {
+      console.error(err);
+      alert("Invite error.");
     }
-  };
+  }
 
+  function resetInviteForm() {
+    setInviteName("");
+    setInviteEmail("");
+    setInvitePhone("");
+    setInviteAddress("");
+    setIsInviteModalVisible(false);
+  }
+
+  /* ──────────────────────────────────
+     DELETE
+  ────────────────────────────────── */
+  async function handleDelete() {
+    if (!selectedStaff) return;
+    const { error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", selectedStaff.id);
+    if (!error) {
+      alert("Deleted.");
+      setSelectedStaff(null);
+      setIsDeleteModalVisible(false);
+      fetchStaff();
+    } else alert("Delete failed.");
+  }
+
+  /* ──────────────────────────────────
+     RENDER
+  ────────────────────────────────── */
   return (
-    <div className="home-main">
-      <div className="home">
-        <div className="home-container">
-          <div className="students-container">
-            {mode === "list" && (
-              <div>
-                <h3>staffs</h3>
-                <div className="filters">
-                  <input
-                    type="text"
-                    placeholder="Filter by Name"
-                    value={nameFilter}
-                    onChange={(e) => setNameFilter(e.target.value)}
-                  />
-                </div>
-                <div className="student">
-                  {displayedStaffs.map((employee) => (
-                    <div
-                      className="student-details-container"
-                      key={employee._id}
-                    >
-                      <img
-                        src={employee.photo}
-                        alt=""
-                        className="student-photo"
-                      />
-                      <div className="student-details">
-                        <div className="student-name">{employee.name}</div>
-                        <div className="student-address">{employee.role}</div>
-                      </div>
-                      <div className="student-details-btn">
-                        <button
-                          onClick={() => handleStaffsClick(employee)}
-                          className="btn btn-student-edit"
-                        >
-                          <FontAwesomeIcon icon={faPenToSquare} />
-                        </button>
-                        <button
-                          className="btn btn-student-delete"
-                          onClick={() => {
-                            handleDeleteClick(employee);
-                          }}
-                        >
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="pagination">
-                  <button
-                    onClick={handlePrevPage}
-                    disabled={currentPage === 1}
-                    className="btn"
-                  >
-                    <FontAwesomeIcon icon={faArrowLeft} beat />
-                  </button>
-                  <button
-                    onClick={handleNextPage}
-                    disabled={endIndex >= filteredStaffs.length}
-                    className="btn"
-                  >
-                    <FontAwesomeIcon icon={faArrowRight} beat />
-                  </button>
-                </div>
-              </div>
-            )}
-            {mode === "details" && selectedStaffs && (
-              <div className="update-student-container">
-                <h2>Update Employee</h2>
-                <div className="update-student">
-                  <h4>{selectedStaffs.name}</h4>
-                  <form onSubmit={handleUpdateEmployee}>
-                    <label>Name:</label>
-                    <input
-                      type="text"
-                      value={updatedName}
-                      onChange={(e) => setUpdatedName(e.target.value)}
-                    />
-                    {/* <label>Photo:</label>
-                    <input
-                      type="text"
-                      value={updatedPhoto}
-                      onChange={(e) => setUpdatedPhoto(e.target.value)}
-                    />
-                    <label>Role:</label>
-                    <input
-                      type="text"
-                      value={updatedRole}
-                      onChange={(e) => setUpdatedRole(e.target.value)}
-                    /> */}
-                    <button type="submit" className="btn">
-                      Update Employee
-                    </button>
-                    <button onClick={() => setMode("list")} className="btn">
-                      Back to List
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-            {mode === "delete" && selectedStaffs && (
-              <div className="delete-student-container">
-                <h2>Delete Employee</h2>
-                <div className="delete-student">
-                  <h4>{selectedStaffs.name}</h4>
-                  <p>Are you sure you want to delete this student?</p>
-                  <button onClick={handleDeletestaffs} className="btn">
-                    Yes
-                  </button>
-                  <button onClick={() => setMode("list")} className="btn">
-                    No
-                  </button>
-                </div>
-              </div>
-            )}
+    <div
+      className={`staff-container ${closeMenu ? "menu-closed" : "menu-open"}`}
+    >
+      {/* ───────────── LIST ───────────── */}
+      {!selectedStaff && (
+        <div>
+          <h3 style={{ textAlign: "center" }}>Staff Members</h3>
+          <div className="filters">
+            <Input
+              placeholder="Filter by name"
+              value={filter}
+              onChange={handleFilterChange}
+              style={{ flex: 1 }}
+            />
+            <Button
+              type="primary"
+              onClick={() => setIsInviteModalVisible(true)}
+            >
+              + New Staff
+            </Button>
           </div>
-          {/* <div className="left-container">
-            <staffsForm onstaffsAdded={handlestaffsAdded} />
-          </div> */}
+
+          <div className="staff-list">
+            {filteredStaff.map((staff) => (
+              <div className="staff-card" key={staff.id}>
+                <RemoteImage
+                  path={staff.photo}
+                  name={staff.name}
+                  bucketName="profilePhotos"
+                  className="staff-photo"
+                />
+                <div className="staff-details">
+                  <div className="staff-name">
+                    {staff.name || "(no name)"}
+                    {staff.invited && (
+                      <span className="invited-badge">Invited</span>
+                    )}
+                  </div>
+                </div>
+                <div className="staff-actions">
+                  <Button
+                    size="small"
+                    onClick={() => handleStaffInvite(staff)}
+                    type={staff.invited ? "default" : "primary"}
+                  >
+                    {staff.invited ? "Resend Invite" : "Invite"}
+                  </Button>
+                  <button onClick={() => setSelectedStaff(staff)}>
+                    <FontAwesomeIcon icon={faPenToSquare} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedStaff(staff);
+                      setIsDeleteModalVisible(true);
+                    }}
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ───────────── EDIT PAGE ───────────── */}
+      {selectedStaff && (
+        <div className="staff-edit-page">
+          <div className="staff-header">
+            <RemoteImage
+              path={selectedStaff.photo}
+              name={selectedStaff.name}
+              bucketName="profilePhotos"
+              className="staff-photo-lg"
+            />
+            <h2>Edit Staff</h2>
+            <Button
+              icon={<FontAwesomeIcon icon={faArrowLeft} />}
+              onClick={() => setSelectedStaff(null)}
+            >
+              Back to list
+            </Button>
+          </div>
+
+          <Card className="form-item" title="Basic Info">
+            <label>Name</label>
+            <Input
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+            />
+
+            <label>Email (read-only)</label>
+            <Input value={selectedStaff.email || ""} readOnly />
+
+            <label>Phone</label>
+            <Input
+              value={editPhone}
+              onChange={(e) => setEditPhone(e.target.value)}
+            />
+
+            <label>Address</label>
+            <Input
+              value={editAddress}
+              onChange={(e) => setEditAddress(e.target.value)}
+            />
+
+            <label>Role</label>
+            <Input
+              value={editRole}
+              onChange={(e) => setEditRole(e.target.value)}
+            />
+          </Card>
+
+          <div className="profile-actions">
+            <Button type="primary" onClick={handleSaveEdits}>
+              Save Changes
+            </Button>
+            <Button onClick={() => setSelectedStaff(null)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      {/* ───────────── MODALS ───────────── */}
+      <Modal
+        open={isDeleteModalVisible}
+        onCancel={() => setIsDeleteModalVisible(false)}
+        onOk={handleDelete}
+        okText="Delete"
+        okType="danger"
+        cancelText="Cancel"
+        title="Delete staff?"
+      >
+        <p>Delete {selectedStaff?.name || selectedStaff?.email} permanently?</p>
+      </Modal>
+
+      <Modal
+        open={isInviteModalVisible}
+        onCancel={() => setIsInviteModalVisible(false)}
+        onOk={handleSaveInvite}
+        okText="Send Invite"
+        cancelText="Cancel"
+        title="Invite New Staff"
+      >
+        <div className="invite-form">
+          <label>Name *</label>
+          <Input
+            value={inviteName}
+            onChange={(e) => setInviteName(e.target.value)}
+            placeholder="Full name"
+          />
+          <label>Email *</label>
+          <Input
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            placeholder="name@example.com"
+          />
+          <label>Phone</label>
+          <Input
+            value={invitePhone}
+            onChange={(e) => setInvitePhone(e.target.value)}
+            placeholder="(optional)"
+          />
+          <label>Address</label>
+          <Input
+            value={inviteAddress}
+            onChange={(e) => setInviteAddress(e.target.value)}
+            placeholder="(optional)"
+          />
+        </div>
+      </Modal>
     </div>
   );
 }

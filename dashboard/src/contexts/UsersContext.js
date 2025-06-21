@@ -24,22 +24,40 @@ const UsersContextProvider = ({ children }) => {
 
   const listUser = async () => {
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("users")
-        .select()
+        .select("*")
         .eq("sub", authUser?.id);
 
-      if (error) {
-        throw error;
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        // Fallback to email-based search (for invited parents or legacy users)
+        const fallback = await supabase
+          .from("users")
+          .select("*")
+          .eq("email", authUser?.email);
+
+        if (fallback.error) throw fallback.error;
+
+        data = fallback.data;
       }
 
-      if (data.length > 0) {
-        setDbUser(data[0]); // User already exists
+      if (data && data.length > 0) {
+        const user = data[0];
+        setDbUser(user);
+
+        if (user.userType === "parent") {
+          setShowCompleteProfile(false); // Don't show CompleteProfile
+          setLoading(false);
+          return;
+        }
       } else {
-        setShowCompleteProfile(true); // Show profile completion screen
+        // No user found at all
+        setShowCompleteProfile(true);
       }
     } catch (error) {
-      console.error("Error fetching or creating user:", error.message);
+      console.error("Error fetching user:", error.message);
     } finally {
       setLoading(false);
     }
@@ -138,6 +156,15 @@ const UsersContextProvider = ({ children }) => {
     >
       {loading ? (
         <div>Loading...</div>
+      ) : dbUser?.userType === "parent" ? (
+        <div style={{ padding: 30, textAlign: "center", color: "#444" }}>
+          <h2>Access Restricted</h2>
+          <p>
+            This web portal is for staff use only. <br />
+            Please use the Parent App to manage your profile and view your
+            child’s activity.
+          </p>
+        </div>
       ) : showCompleteProfile ? (
         <CompleteProfile email={authUser.email} onCreateUser={createUser} />
       ) : (

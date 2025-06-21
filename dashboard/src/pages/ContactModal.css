@@ -1,20 +1,21 @@
-/* ContactModal.css */
-
-/* Modal container styles */
+/* Modal container */
 .contact-modal {
   display: flex;
   flex-direction: column;
   gap: 15px;
 }
 
+/* Label styling */
 .contact-modal label {
   font-size: 1rem;
   font-weight: 600;
   margin-bottom: 5px;
 }
 
+/* Input and select styling */
 .contact-modal input,
-.contact-modal select {
+.contact-modal select,
+.contact-modal .ant-select {
   width: 100%;
   max-width: 350px;
   padding: 10px;
@@ -27,16 +28,20 @@
   cursor: pointer;
 }
 
+/* Checkbox row */
 .contact-modal .checkbox-container {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
+/* Lighter label inside checkbox row */
 .contact-modal .checkbox-container label {
   font-weight: normal;
+  margin: 0;
 }
 
+/* Save button */
 .contact-modal .save-btn {
   width: 100%;
   max-width: 350px;

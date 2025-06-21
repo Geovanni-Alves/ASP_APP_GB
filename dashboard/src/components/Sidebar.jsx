@@ -13,7 +13,7 @@ import { useUsersContext } from "../contexts/UsersContext";
 import { useAuthContext } from "../contexts/AuthContext";
 import { FaSignOutAlt, FaUser } from "react-icons/fa";
 import RemoteImage from "./RemoteImage";
-// import DialogBox from "./UiComponents/DialogBox";
+import DialogBox from "./UiComponents/DialogBox";
 
 const Sidebar = ({ closeMenu, toggleMenu }) => {
   const location = useLocation();
@@ -21,7 +21,7 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
   const [subMenuOpen, setSubMenuOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const { currentUserData } = useUsersContext();
-  // const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const { logout } = useAuthContext();
   const dropdownRef = useRef(null);
 
@@ -46,27 +46,27 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
     setShowDropdown(!showDropdown);
   };
 
-  const handleLogout = () => {
-    setShowDropdown(false);
-    logout();
-  };
+  // const handleLogout = () => {
+  //   setShowDropdown(false);
+  //   logout();
+  // };
 
   const handleSubmenuToggle = () => {
     setSubMenuOpen(!subMenuOpen);
   };
 
-  // const handleLogoutClick = () => {
-  //   setShowLogoutDialog(true); // Show the custom dialog
-  // };
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true); // Show the custom dialog
+  };
 
-  // const handleConfirmLogout = () => {
-  //   setShowLogoutDialog(false); // Close the dialog
-  //   logout(); // Trigger the logout function
-  // };
+  const handleConfirmLogout = () => {
+    setShowLogoutDialog(false); // Close the dialog
+    logout(); // Trigger the logout function
+  };
 
-  // const handleCancelLogout = () => {
-  //   setShowLogoutDialog(false); // Close the dialog without logging out
-  // };
+  const handleCancelLogout = () => {
+    setShowLogoutDialog(false); // Close the dialog without logging out
+  };
 
   return (
     <div className={closeMenu === false ? "sidebar" : "sidebar active"}>
@@ -132,13 +132,13 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
         {/* Dropdown Menu */}
         {showDropdown && (
           <div className="dropdownMenu">
-            <p className="dropdownTitle">Gracie Barra Vancouver ASP</p>
+            <p className="dropdownTitle">User Options</p>
             <ul>
               <li>
                 <FaUser className="dropdownIcon" />
                 <a href="/profile">Profile</a>
               </li>
-              <li className="signout" onClick={handleLogout}>
+              <li className="signout" onClick={handleLogoutClick}>
                 <FaSignOutAlt className="dropdownIcon" />
                 <span>Sign Out</span>
               </li>
@@ -175,9 +175,9 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
               <li>
                 <a href="/students">Students</a>
               </li>
-              <li>
-                <a href="/parents">Parents</a>
-              </li>
+              {/* <li>
+                <a href="/parents">Parents/Family</a>
+              </li> */}
               <li>
                 <a href="/staff">Staff</a>
               </li>
@@ -201,11 +201,11 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
           </li>
         </ul>
       </div>
-      {/* Logout button
-      <button className="logoutButton" onClick={handleLogoutClick}>
+      {/* Logout button */}
+      {/* <button className="logoutButton" onClick={handleLogoutClick}>
         <FaSignOutAlt className="logoutIcon" />
         {closeMenu === false && <span>Logout</span>}
-      </button>
+      </button> */}
       <DialogBox
         isVisible={showLogoutDialog}
         title="Confirm Logout"
@@ -214,7 +214,7 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
         onCancel={handleCancelLogout}
         confirmText="Yes, Log out"
         cancelText="Cancel"
-      /> */}
+      />
     </div>
   );
 };

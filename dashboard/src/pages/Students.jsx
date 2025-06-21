@@ -30,8 +30,8 @@ function Students({ closeMenu }) {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [updatedName, setUpdatedName] = useState("");
   const [updatedAge, setUpdatedAge] = useState("");
-  const [updatedParent2Email, setUpdatedParent2Email] = useState("");
-  const [updatedParent1Email, setUpdatedParent1Email] = useState("");
+  // const [updatedParent2Email, setUpdatedParent2Email] = useState("");
+  // const [updatedParent1Email, setUpdatedParent1Email] = useState("");
   const [updatedPhoto, setUpdatedPhoto] = useState("");
   const [updatedDropOffAddress, setUpdatedDropOffAddress] = useState("");
   const [updatedLat, setUpdatedLat] = useState("");
@@ -43,6 +43,7 @@ function Students({ closeMenu }) {
   const fileInputRef = useRef(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
   const [isContactModalVisible, setIsContactModalVisible] = useState(false);
+  const [allContacts, setAllContacts] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [editingContact, setEditingContact] = useState(null);
   const [notes, setNotes] = useState("");
@@ -228,87 +229,27 @@ function Students({ closeMenu }) {
     setMode("details");
   };
 
-  // useEffect(() => {
-  //   const fetchSchools = async () => {
-  //     const { data, error } = await supabase.from("schools").select("*");
-  //     if (!error) setAllSchools(data);
-  //   };
-  //   fetchSchools();
-  // }, []);
-
-  // const fetchContacts = async () => {
-  //   if (!selectedStudent) return;
-  //   const { data, error } = await supabase
-  //     .from("contacts")
-  //     .select("*")
-  //     .eq("student_id", selectedStudent.id);
-  //   if (!error) setContacts(data);
-  // };
-
-  // // Use useEffect to perform actions after setSelectedStudent has completed
-  // useEffect(() => {
-  //   if (selectedStudent) {
-  //     fetchContacts();
-  //     setUpdatedName(selectedStudent.name);
-  //     setUpdatedDropOffAddress(selectedStudent.dropOffAddress);
-  //     setUpdatedAge(selectedStudent.birthDate);
-  //     setUpdatedParent1Email(selectedStudent.parent1Email);
-  //     setUpdatedParent2Email(selectedStudent.parent2Email);
-  //     setUpdatedLat(selectedStudent.lat);
-  //     setUpdatedLng(selectedStudent.lng);
-  //     setNotes(selectedStudent.notes || "");
-  //     setAllergies(selectedStudent.allergies || "");
-  //     setMedicine(selectedStudent.medicine || "");
-  //     setDoctor(selectedStudent.doctor || "");
-  //     setStatus(selectedStudent.status || "Active");
-  //     setSchoolName(selectedStudent.schoolName || "");
-  //     setDismissalTime(selectedStudent.dismissalTime?.slice(0, 5));
-  //     setSchoolGrade(selectedStudent.schoolGrade || "");
-  //     setSchoolGradeDivision(selectedStudent.schoolGradeDivision || "");
-  //     setSchoolTeacherName(selectedStudent.schoolTeacherName || "");
-  //     setSelectedSchool(selectedStudent.schools);
-
-  //     setUpdatedPhoto(selectedStudent.photo);
-
-  //     if (selectedStudent.schoolExitPhotos) {
-  //       if (Array.isArray(selectedStudent.schoolExitPhotos)) {
-  //         setSchoolExitPhotos(selectedStudent.schoolExitPhotos);
-  //       } else {
-  //         try {
-  //           setSchoolExitPhotos(JSON.parse(selectedStudent.schoolExitPhotos));
-  //         } catch (e) {
-  //           console.error("Error parsing schoolExitPhotos", e);
-  //           setSchoolExitPhotos([]);
-  //         }
-  //       }
-  //     } else {
-  //       setSchoolExitPhotos([]);
-  //     }
-  //   }
-  //   console.log(selectedStudent);
-  // }, [selectedStudent]);
-
-  // const fetchAddresses = async () => {
-  //   if (!selectedStudent) return;
-  //   const { data, error } = await supabase
-  //     .from("students_address")
-  //     .select("*")
-  //     .eq("studentId", selectedStudent.id);
-  //   if (!error) setAddresses(data || []);
-  // };
-
-  // useEffect(() => {
-  //   if (selectedStudent) {
-  //     fetchAddresses();
-  //   }
-  // }, [selectedStudent]);
-
   const fetchContacts = async (studentId) => {
-    const { data, error } = await supabase
-      .from("contacts")
-      .select("*")
-      .eq("student_id", studentId);
-    if (!error) setContacts(data || []);
+    try {
+      const { data: all, error: allErr } = await supabase
+        .from("contacts")
+        .select("*");
+      if (allErr) throw allErr;
+      setAllContacts(all);
+
+      const { data: familyRows, error } = await supabase
+        .from("student_family")
+        .select("contact:contacts (*)") // renomeia a coluna embedada
+        .eq("student_id", studentId);
+
+      if (error) throw error;
+      const linkedContacts = familyRows.map((row) => row.contact);
+      setContacts(linkedContacts);
+    } catch (err) {
+      console.error("Error fetching contacts:", err);
+      setAllContacts([]);
+      setContacts([]);
+    }
   };
 
   const fetchAddresses = async (studentId) => {
@@ -358,8 +299,8 @@ function Students({ closeMenu }) {
       setUpdatedName(selectedStudent.name);
       setUpdatedDropOffAddress(selectedStudent.dropOffAddress);
       setUpdatedAge(selectedStudent.birthDate);
-      setUpdatedParent1Email(selectedStudent.parent1Email);
-      setUpdatedParent2Email(selectedStudent.parent2Email);
+      // setUpdatedParent1Email(selectedStudent.parent1Email);
+      // setUpdatedParent2Email(selectedStudent.parent2Email);
       setUpdatedLat(selectedStudent.lat);
       setUpdatedLng(selectedStudent.lng);
       setNotes(selectedStudent.notes || "");
@@ -393,18 +334,52 @@ function Students({ closeMenu }) {
     fetchAllStudentData();
   }, [selectedStudent]);
 
-  const handleInviteContact = async (contactId) => {
-    const { error } = await supabase
-      .from("contacts")
-      .update({ invited: true })
-      .eq("id", contactId);
+  const handleInviteContact = async (contactId, contact) => {
+    try {
+      if (!contact.email) {
+        alert("This contact does not have an email.");
+        return;
+      }
 
-    if (error) {
-      console.error("Error inviting contact:", error);
-      alert("Failed to send invite.");
-    } else {
-      alert("Invite sent!");
-      fetchContacts(selectedStudent.id); // refresh contact list
+      // 1. Send invite to backend
+      const response = await fetch("http://localhost:3001/api/invite-contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: contact.email,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+        }),
+      });
+
+      const result = await response.json();
+      console.log("result of post", result);
+
+      if (!response.ok) {
+        if (
+          result?.error &&
+          result.error.toLowerCase().includes("already been registered")
+        ) {
+          alert(
+            `The email "${contact.email}" is already in use.\nPlease edit the contact with a different email before trying again.`
+          );
+        } else {
+          alert("Failed to send invite: " + result.error);
+        }
+        return;
+      }
+
+      // 2. Update Supabase status
+      await supabase
+        .from("contacts")
+        .update({ invited: true, signed: false })
+        .eq("id", contactId);
+
+      alert("Invite sent successfully!");
+      fetchContacts(selectedStudent.id);
+    } catch (err) {
+      console.error("Invite failed:", err.message);
+      alert("An unexpected error occurred while sending the invite.");
     }
   };
 
@@ -485,63 +460,133 @@ function Students({ closeMenu }) {
     }
   };
 
-  // const handleNewPhotoChange = async (e) => {
-  //   const file = e.target.files[0];
-  //   if (!file || !selectedStudent) return;
+  const handleSaveContact = async (formData) => {
+    const { email, firstName, lastName, phone, type, canPickup, code } =
+      formData;
+    const isEditing = !!editingContact;
+    let userId;
+    let contactId;
 
-  //   try {
-  //     const oldPhotoPath = selectedStudent.photo;
+    try {
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .single();
 
-  //     // Save new photo
-  //     const newPhotoPath = await savePhotoInBucket(file, "profilePhotos");
+      if (existingUser) {
+        userId = existingUser.id;
+        await supabase
+          .from("users")
+          .update({
+            name: `${firstName} ${lastName}`,
+            phoneNumber: phone,
+          })
+          .eq("id", userId);
+      } else {
+        const { data: newUser, error: userError } = await supabase
+          .from("users")
+          .insert([
+            {
+              name: `${firstName} ${lastName}`,
+              email,
+              phoneNumber: phone,
+              userType: "parent",
+              firstLogin: true,
+              updated_at: new Date().toISOString(),
+            },
+          ])
+          .select()
+          .single();
 
-  //     if (!newPhotoPath) {
-  //       alert("Failed to upload new photo.");
-  //       return;
-  //     }
+        if (userError) throw userError;
 
-  //     // Delete old photo if it exists
-  //     if (oldPhotoPath) {
-  //       await deleteMediaFromBucket(oldPhotoPath, "profilePhotos");
-  //     }
+        userId = newUser.id;
+      }
 
-  //     // Update student record in database
-  //     await updateKidOnDb(selectedStudent.id, [
-  //       { fieldName: "photo", value: newPhotoPath },
-  //     ]);
+      const contactRecord = {
+        firstName,
+        lastName,
+        email,
+        phone,
+        type,
+        canPickup,
+        code,
+        invited: formData.invited ?? false,
+        signed: formData.signed ?? false,
+        user_id: userId,
+      };
 
-  //     // Reflect change locally
-  //     setSelectedStudent((prev) => ({
-  //       ...prev,
-  //       photo: newPhotoPath,
-  //     }));
+      if (isEditing) {
+        const { error } = await supabase
+          .from("contacts")
+          .update(contactRecord)
+          .eq("id", editingContact.id);
 
-  //     setUpdatedPhoto(newPhotoPath);
-  //     alert("Photo updated successfully!");
-  //   } catch (error) {
-  //     console.error("Error updating photo:", error);
-  //     alert("Something went wrong while updating photo.");
-  //   }
-  // };
+        if (error) throw error;
+        contactId = editingContact.id;
+      } else {
+        const { data, error } = await supabase
+          .from("contacts")
+          .insert([contactRecord])
+          .select()
+          .single();
 
-  const handleSaveContact = async (newContact) => {
-    const payload = {
-      ...newContact,
-      student_id: selectedStudent.id,
-    };
+        if (error) throw error;
+        contactId = data?.id;
+      }
+      const { error: linkError } = await supabase
+        .from("student_family")
+        .upsert([{ student_id: selectedStudent.id, contact_id: contactId }]);
+      if (linkError) throw linkError;
 
-    if (editingContact) {
-      await supabase
-        .from("contacts")
-        .update(payload)
-        .eq("id", editingContact.id);
-    } else {
-      await supabase.from("contacts").insert([payload]);
+      if (!isEditing && email && !formData.invited) {
+        const confirmInvite = window.confirm(
+          `Do you want to invite ${email} to register now?`
+        );
+
+        if (confirmInvite) {
+          const response = await fetch(
+            "http://localhost:3001/api/invite-contact",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email,
+                firstName,
+                lastName,
+              }),
+            }
+          );
+
+          const result = await response.json();
+
+          console.log(result);
+
+          if (!response.ok) {
+            if (
+              result.error &&
+              result.error.toLowerCase().includes("already been registered")
+            ) {
+              alert(
+                `The email ${email} is already registered.\nPlease enter a different email or skip the invite.`
+              );
+            } else {
+              console.error("Invite failed:", result.error);
+              alert("Failed to send invite.");
+            }
+          }
+        }
+      }
+
+      // Refresh state
+      await fetchContacts(selectedStudent.id);
+      setEditingContact(null);
+      setIsContactModalVisible(false);
+    } catch (error) {
+      console.error("Error saving contact:", error.message);
+      alert("An error occurred while saving the contact.");
     }
-
-    fetchContacts(selectedStudent.id);
-    setEditingContact(null);
-    setIsContactModalVisible(false);
   };
 
   const handleDeleteClick = (student) => {
@@ -616,42 +661,13 @@ function Students({ closeMenu }) {
       console.log("Update result:", data);
       alert(`Kid - ${nameUpdated}, updated successfully!`);
 
-      // const { data, error } = await supabase
-      //   .from("students")
-      //   .update({
-      //     name: updatedName,
-      //     birthDate: updatedAge,
-      //     photo: updatedPhoto,
-      //     parent1Email: updatedParent1Email,
-      //     parent2Email: updatedParent2Email,
-      //     dropOffAddress: updatedDropOffAddress,
-      //     lat: updatedLat,
-      //     lng: updatedLng,
-      //     notes,
-      //     allergies,
-      //     medicine,
-      //     doctor,
-      //     status,
-      //     schoolId: selectedSchool?.id || selectedStudent.schoolId,
-      //     schoolGrade,
-      //     schoolGradeDivision,
-      //     schoolTeacherName,
-      //     dismissalTime,
-      //   })
-      //   .eq("id", selectedStudent.id);
-
-      // if (error) throw error;
-      // alert(`Kid - ${nameUpdated}, updated successfully!`);
-
-      //await fetchKids();
-      //setStudents(updatedStudents);
       setSelectedStudent(null);
       setMode("list");
       setUpdatedName("");
       setUpdatedDropOffAddress("");
       setUpdatedAge("");
-      setUpdatedParent1Email("");
-      setUpdatedParent2Email("");
+      // setUpdatedParent1Email("");
+      // setUpdatedParent2Email("");
       setUpdatedLat("");
       setUpdatedLng("");
       setUpdatedPhoto("");
@@ -704,9 +720,7 @@ function Students({ closeMenu }) {
           >
             {mode === "list" && (
               <div>
-                <h3 style={{ textAlign: "center" }}>
-                  List of Students (students.jsx)
-                </h3>
+                <h3 style={{ textAlign: "center" }}>List of Students</h3>
                 <div className="filters">
                   <input
                     type="text"
@@ -723,7 +737,7 @@ function Students({ closeMenu }) {
                   <div className="addStudentButton">
                     {/* Button to show modal */}
                     <Button type="primary" onClick={showModal}>
-                      New Student
+                      + New Student
                     </Button>
                   </div>
                 </div>
@@ -1216,6 +1230,7 @@ function Students({ closeMenu }) {
                                           id: a.id,
                                           isDefault: a.id === addr.id,
                                         }));
+                                        console.log(updates);
                                         supabase
                                           .from("students_address")
                                           .upsert(updates)
@@ -1374,75 +1389,92 @@ function Students({ closeMenu }) {
                   )}
                 </Card>
 
-                <Card title="Contacts" style={{ marginBottom: 20 }}>
-                  <div className="contacts-container">
-                    {contacts.map((contact) => (
-                      <div key={contact.id} className="contact-card">
-                        <p>
-                          <strong>Name:</strong> {contact.name}
-                        </p>
-                        <p>
-                          <strong>Email:</strong> {contact.email}
-                        </p>
-                        <p>
-                          <strong>Phone:</strong> {contact.phone}
-                        </p>
-                        <p>
-                          <strong>Type:</strong> {contact.type}
-                        </p>
-                        <p>
-                          <strong>Can Pickup:</strong>{" "}
-                          {contact.canPickup ? "Yes" : "No"}
-                        </p>
-                        <p>
-                          <strong>Signed Up:</strong>{" "}
-                          {contact.signed ? "Yes" : "No"}
-                        </p>
-                        <div className="contact-actions">
-                          {!contact.signed &&
-                            (contact.invited ? (
-                              <Button size="small" disabled>
-                                Invited
-                              </Button>
-                            ) : (
-                              <Button
-                                size="small"
-                                onClick={() => handleInviteContact(contact.id)}
-                              >
-                                Invite
-                              </Button>
-                            ))}
-                          <Button
-                            size="small"
-                            onClick={() => {
-                              setEditingContact(contact);
-                              setIsContactModalVisible(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            danger
-                            size="small"
-                            onClick={() => handleDeleteContact(contact.id)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    <Button
-                      type="primary"
-                      style={{ marginTop: 10 }}
-                      onClick={() => {
-                        setEditingContact(null);
-                        setIsContactModalVisible(true);
+                <Card title="Parents/Family" style={{ marginBottom: 20 }}>
+                  <div
+                    className="contacts-header"
+                    style={{
+                      display: "flex",
+                      fontWeight: "bold",
+                      padding: "8px 12px",
+                      borderBottom: "1px solid #ccc",
+                    }}
+                  >
+                    <div style={{ flex: 2 }}>Name</div>
+                    <div style={{ flex: 2 }}>Email</div>
+                    <div style={{ flex: 2 }}>Phone</div>
+                    <div style={{ flex: 1 }}>Type</div>
+                    <div style={{ flex: 1 }}>Can Pickup</div>
+                    <div style={{ flex: 1 }}>Signed</div>
+                    {/* <div style={{ flex: 1 }}>Code</div> */}
+                    <div style={{ flex: 2 }}>Actions</div>
+                  </div>
+
+                  {contacts.map((contact) => (
+                    <div
+                      key={contact.id}
+                      style={{
+                        display: "flex",
+                        padding: "10px 12px",
+                        borderBottom: "1px solid #eee",
+                        alignItems: "center",
                       }}
                     >
-                      + Add Contact
-                    </Button>
-                  </div>
+                      <div style={{ flex: 2 }}>
+                        {contact.firstName} {contact.lastName}
+                      </div>
+                      <div style={{ flex: 2 }}>{contact.email}</div>
+                      <div style={{ flex: 2 }}>{contact.phone}</div>
+                      <div style={{ flex: 1 }}>{contact.type}</div>
+                      <div style={{ flex: 1 }}>
+                        {contact.canPickup ? "Yes" : "No"}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        {contact.signed ? "Yes" : "No"}
+                      </div>
+                      {/* <div style={{ flex: 1 }}>{contact.code}</div> */}
+                      <div style={{ flex: 2, display: "flex", gap: 8 }}>
+                        {!contact.signed && (
+                          <Button
+                            size="small"
+                            onClick={() =>
+                              handleInviteContact(contact.id, contact)
+                            }
+                          >
+                            {contact.invited ? "Resend Invite" : "Invite"}
+                          </Button>
+                        )}
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            setEditingContact(contact);
+                            setIsContactModalVisible(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          danger
+                          size="small"
+                          onClick={() => handleDeleteContact(contact.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <Button
+                    type="primary"
+                    style={{ marginTop: 12 }}
+                    onClick={() => {
+                      setEditingContact(null);
+                      setIsContactModalVisible(true);
+                    }}
+                  >
+                    + Add Parent/Family
+                  </Button>
                 </Card>
+
                 <Card title="Danger Zone" style={{ border: "1px solid red" }}>
                   <p style={{ color: "red", fontWeight: "bold" }}>
                     Warning: Deleting this student is permanent and cannot be
@@ -1476,6 +1508,8 @@ function Students({ closeMenu }) {
             }}
             onSave={handleSaveContact}
             contactToEdit={editingContact}
+            allContacts={allContacts}
+            assignedContacts={contacts}
           />
           <AddressModal
             isVisible={isAddressModalVisible}

@@ -16,7 +16,9 @@ const KidsContextProvider = ({ children }) => {
         *,
         schools(*),  
         drop_off_route(*),
-        contacts(*),
+         student_family:student_family (
+          contact:contacts (*)
+        ),
         students_schedule(*)
       `
         )
