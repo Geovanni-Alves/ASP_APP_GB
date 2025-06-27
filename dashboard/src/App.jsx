@@ -18,10 +18,11 @@ import Vans from "./pages/Vans.jsx";
 import Staff from "./pages/StaffPage";
 //import awsExports from "./aws-exports";
 import VansMaps from "./pages/VansMaps.jsx";
+import StudentWeeklySchedule from "./pages/StudentWeeklySchedule.jsx";
 import RoutesPage from "./pages/RoutesPage";
 import Sidebar from "./components/Sidebar";
 import DashBoardHome from "./pages/DashBoardHome";
-import PickupPage from "./pages/PickupPage.jsx";
+import PickupPlanner from "./pages/PickupPlanner.jsx";
 import KidsContext from "./contexts/KidsContext";
 import PicturesContext from "./contexts/PicturesContext.js";
 
@@ -69,7 +70,16 @@ function App() {
                         element={<Vans closeMenu={closeMenu} />}
                       />
                       {/* <Route path="/vans/:vanId" element={<VanDetailPage />} /> */}
-                      <Route path="/pickup" element={<PickupPage />} />
+                      <Route
+                        path="/pickupPlanner"
+                        element={<PickupPlanner closeMenu={closeMenu} />}
+                      />
+                      <Route
+                        path="/studentSchedule"
+                        element={
+                          <StudentWeeklySchedule closeMenu={closeMenu} />
+                        }
+                      />
                       {/* <Route path="/employees" element={<Employees />} /> */}
                       <Route path="/routes" element={<RoutesPage />} />
                       <Route path="/maps" element={<VansMaps />} />

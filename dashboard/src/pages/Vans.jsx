@@ -110,7 +110,7 @@ function Vans({ closeMenu }) {
 
       <div className="van-list">
         {vans.map((van) => (
-          <Card title={van.name} className="van-card" key={van.id}>
+          <Card title={van.name} className="vans-card" key={van.id}>
             <RemoteImage
               path={van.image}
               name={van.name}

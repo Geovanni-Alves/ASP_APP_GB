@@ -18,7 +18,8 @@ import DialogBox from "./UiComponents/DialogBox";
 const Sidebar = ({ closeMenu, toggleMenu }) => {
   const location = useLocation();
   //const [closeMenu, setCloseMenu] = useState(false);
-  const [subMenuOpen, setSubMenuOpen] = useState(false);
+  const [subMenuPeopleOpen, setSubMenuPeopleOpen] = useState(false);
+  const [subMenuPickupOpen, setSubMenuPickupOpen] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const { currentUserData } = useUsersContext();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
@@ -51,8 +52,13 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
   //   logout();
   // };
 
-  const handleSubmenuToggle = () => {
-    setSubMenuOpen(!subMenuOpen);
+  const handleSubmenuToggle = (menu) => {
+    if (menu === "people") {
+      setSubMenuPeopleOpen(!subMenuPeopleOpen);
+    }
+    if (menu === "pickup") {
+      setSubMenuPickupOpen(!subMenuPickupOpen);
+    }
   };
 
   const handleLogoutClick = () => {
@@ -160,17 +166,17 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
 
           <li
             className={location.pathname === "/students" ? "active" : ""}
-            onClick={handleSubmenuToggle}
+            onClick={() => handleSubmenuToggle("people")}
           >
             <img src={People} alt="students" />
             <p>People</p>
             <img
               src={ArrowIcon}
               alt="submenu-toggle"
-              className={`arrow ${subMenuOpen ? "open" : ""}`}
+              className={`arrow ${subMenuPeopleOpen ? "open" : ""}`}
             />
           </li>
-          {subMenuOpen && !closeMenu && (
+          {subMenuPeopleOpen && !closeMenu && (
             <ul className="submenu">
               <li>
                 <a href="/students">Students</a>
@@ -183,14 +189,36 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
               </li>
             </ul>
           )}
+
           <li className={location.pathname === "/vans" ? "active" : ""}>
             <img src={GbBus} alt="vehicles" />
             <a href="/vans">Vehicles</a>
           </li>
-          <li className={location.pathname === "/pickup" ? "active" : ""}>
+          <li
+            className={location.pathname === "/pickup" ? "active" : ""}
+            onClick={() => handleSubmenuToggle("pickup")}
+          >
             <img src={School} alt="pickup" />
-            <a href="/pickup">Pickup</a>
+            <p>Pickup</p>
+            <img
+              src={ArrowIcon}
+              alt="submenu-toggle"
+              className={`arrow ${subMenuPickupOpen ? "open" : ""}`}
+            />
           </li>
+          {subMenuPickupOpen && !closeMenu && (
+            <ul className="submenu">
+              <li>
+                <a href="/studentSchedule">Student Weekly Schedule</a>
+              </li>
+              {/* <li>
+                <a href="/parents">Parents/Family</a>
+              </li> */}
+              <li>
+                <a href="/pickupPlanner">Pickup Planner</a>
+              </li>
+            </ul>
+          )}
           <li className={location.pathname === "/drop-off" ? "active" : ""}>
             <img src={House} alt="drop-off" />
             <a href="/routes">Drop-Off</a>

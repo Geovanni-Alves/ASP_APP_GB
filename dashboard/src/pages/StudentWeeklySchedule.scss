@@ -1,0 +1,85 @@
+/* ---------------------------------------------
+   Layout with sidebar spacing
+--------------------------------------------- */
+.students-container {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 5rem;
+  padding: 30px 40px;
+  background: #fff;
+  border-radius: 40px;
+  overflow-y: auto;
+  box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
+  transition: left 0.3s ease;
+}
+
+.students-container.menu-open {
+  left: 15rem; /* matches your other pages */
+}
+
+/* ---------------------------------------------
+   Card & filters
+--------------------------------------------- */
+.student-weekly-card {
+  border-radius: 30px;
+  width: 60%;
+}
+
+.schedule-filters {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* ---------------------------------------------
+   Table tweaks (keeps your narrow weekday cols)
+--------------------------------------------- */
+.schedule-table {
+  width: 80%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    border-bottom: 1px solid #eaeaea;
+  }
+
+  /* widths you already like */
+  th:not(:first-child),
+  td:not(:first-child) {
+    width: 36px;
+    text-align: center;
+    font-size: 0.8rem;
+  }
+
+  th:first-child,
+  td:first-child {
+    width: 160px;
+    text-align: left;
+    padding-left: 8px;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: 180px;
+    text-align: left;
+    padding-left: 8px;
+  }
+
+  td {
+    font-size: 0.9rem;
+  }
+}
+
+/* optional: scroll if you expect > 40 kids */
+.tableWrapper {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.total-count {
+  margin-left: auto;
+  font-weight: 600;
+  align-self: center;
+}
