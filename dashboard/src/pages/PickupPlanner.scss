@@ -1,4 +1,3 @@
-/* ========== LAYOUT ROOT ========== */
 .students-container {
   position: fixed;
   top: 0;
@@ -12,7 +11,6 @@
   box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
   transition: left 0.3s ease;
 }
-
 .menu-open {
   left: 15rem;
 }
@@ -20,109 +18,64 @@
   left: 5rem;
 }
 
-/* ========== PICKUP PLANNER BLOCK ========== */
 .pickup-planner {
   padding: 20px;
-
   h1 {
     font-size: 24px;
     font-weight: bold;
     margin-bottom: 10px;
   }
-
   .total-count {
     font-weight: 500;
     margin-bottom: 10px;
   }
-
-  .planner-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    margin-bottom: 30px;
-  }
-
-  .planner-card {
-    flex: 1;
-    min-width: 300px;
-    background: #fff;
-  }
-
-  .school-wrapper {
-    width: 50%;
-  }
 }
 
-/* ========== HOVER / DRAG STATES ========== */
-.dragging-over {
-  background: #e6f7ff;
-  border: 2px dashed #1890ff;
-}
-
-/* ========== COLLAPSE PANELS (school groups) ========== */
-.school-wrapper > .ant-collapse {
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  margin-bottom: 8px;
-}
-.school-wrapper .ant-collapse-header {
-  background: #fafafa;
-  font-weight: 600;
-  padding: 6px 12px !important;
-}
-.school-wrapper .ant-collapse-item-active > .ant-collapse-header {
-  background: #d6e4ff; /* light blue when open */
-}
-
-/* ------------------------------------------
-   KIDS LIST (left column)  Name | Time
--------------------------------------------*/
-.kid-row {
+.planner-grid {
   display: grid;
-  grid-template-columns: 1fr 5rem; /* name | dismissal */
-  gap: 8px;
-  padding: 4px 6px;
-  border-bottom: 1px solid #eee;
-}
-.kid-row .col-time {
-  text-align: right;
-  min-width: 4.5rem;
+  grid-template-columns: 360px 320px 1fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "kids abs staff"
+    "kids vans vans";
+  gap: 12px;
 }
 
-/* add pill style to the dismissal chip */
-$cell-bg: #f2f7ff;
-$cell-border: #d6e4ff;
-
-.kid-row span {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: $cell-bg;
-  border: 1px solid $cell-border;
-  white-space: nowrap;
+.kids-card {
+  grid-area: kids;
+}
+.absents-card {
+  grid-area: abs;
+}
+.staff-card {
+  grid-area: staff;
+}
+.vans-card {
+  grid-area: vans;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 
-/* ------------------------------------------
-   VANS STRIP — horizontal scroll
--------------------------------------------*/
+.absents-card,
+.staff-card {
+  max-width: 320px;
+}
+
 .vans-list {
   display: flex;
-  width: 60%;
-  flex-direction: column; /* stack vertically */
+  flex-direction: column;
   gap: 20px;
-  max-height: calc(100vh - 260px); /* tweak so it fits under the date picker */
-  overflow-y: auto; /* vertical scrollbar */
-  padding-right: 6px; /* leave room so scrollbar doesn’t cover pills */
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
 }
 
 .van-card {
-  flex: 0 0 auto; /* don’t shrink */
-  width: 100%; /* full width of the column */
+  flex: 0 0 auto;
+  width: 100%;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
-  padding: 20px; /* more breathing room */
+  padding: 20px;
 }
-
-/* ---------- Van “full” state ---------- */
 .van-card.full {
   border-color: #ff4d4f;
   background: #fff1f0;
@@ -133,16 +86,106 @@ $cell-border: #d6e4ff;
   font-weight: 600;
 }
 
-/* ------------------------------------------
-   DRIVER / HELPER fixed row
--------------------------------------------*/
+.school-wrapper > .ant-collapse {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  width: 20rem;
+}
+.school-wrapper .ant-collapse-header {
+  background: #fafafa;
+  font-weight: 600;
+  padding: 6px 12px !important;
+}
+.school-wrapper .ant-collapse-item-active > .ant-collapse-header {
+  background: #d6e4ff;
+}
+.school-wrapper .ant-collapse-content {
+  border-radius: 0 0 8px 8px;
+  padding: 6px 8px;
+}
+
+$cell-bg: #f2f7ff;
+$cell-border: #d6e4ff;
+
+.kidList-row {
+  margin-bottom: 4px;
+  width: 100%;
+}
+.kid-pill {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 4px 10px;
+  border: 1px solid $cell-border;
+  border-radius: 12px;
+  background: $cell-bg;
+  box-sizing: border-box;
+  min-height: 34px;
+}
+.kid-pill.abs-row {
+  background: $cell-bg;
+}
+.kid-time {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.back-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-right: 6px;
+  color: #1677ff;
+}
+
+.van-table.header,
+.van-table.row {
+  display: grid;
+  grid-template-columns: 2rem 2.2fr 2fr 2fr 4.2rem 2rem;
+  gap: 6px;
+  padding: 4px 6px;
+}
+.van-table.header {
+  background: #fafafa;
+  font-weight: 600;
+  span {
+    background: $cell-border;
+    border: 1px solid darken($cell-border, 6%);
+    color: #000;
+  }
+}
+.van-table.row {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.van-table.row span,
+.van-table.header span {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: $cell-bg;
+  border: 1px solid $cell-border;
+  white-space: normal;
+  overflow: visible;
+}
+
+.staff-chip,
+.resp-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  font-size: 0.75rem;
+}
+
 .driver-row {
   display: flex;
   gap: 6px;
   align-items: center;
   margin-bottom: 6px;
   font-weight: 600;
-
   span {
     padding: 2px 8px;
     border-radius: 12px;
@@ -157,51 +200,11 @@ $cell-border: #d6e4ff;
   }
 }
 
-/* ------------------------------------------
-   VAN MINI-TABLE  (# | Name | School | Resp | Time)
--------------------------------------------*/
-.van-table.header,
-.van-table.row {
-  display: grid;
-  /* give Name & School more room */
-  grid-template-columns: 2rem 2.2fr 2fr 0.5fr 4.2rem;
-  gap: 6px;
-  padding: 4px 6px;
+.dragging-over {
+  background: #e6f7ff;
+  border: 2px dashed #1890ff;
 }
 
-.van-table.header {
-  background: #fafafa;
-  font-weight: 600;
-
-  span {
-    background: $cell-border;
-    border: 1px solid darken($cell-border, 6%);
-    color: #000;
-  }
-}
-
-.van-table.row {
-  border-bottom: 1px solid #f0f0f0;
-}
-
-/* pill style for every cell */
-.van-table.row span,
-.van-table.header span {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: $cell-bg;
-  border: 1px solid $cell-border;
-  white-space: normal; /* NEW */
-  overflow: visible; /* NEW */
-}
-
-/* remove old flex seat-row if it shows up anywhere */
-.seat-row {
-  display: none;
-}
-
-/* ========== Action button (unused here but kept) ========== */
 .action-btn {
   margin: 8px 0 0 8px;
   font-size: 0.8rem;

@@ -103,75 +103,141 @@ function StaffPage({ closeMenu }) {
   /* ──────────────────────────────────
      INVITE NEW STAFF
   ────────────────────────────────── */
-  async function handleSaveInvite() {
+  // async function handleSaveInvite() {
+  //   const email = inviteEmail.trim().toLowerCase();
+  //   if (!email || !inviteName.trim()) {
+  //     return alert("Name and e-mail are required.");
+  //   }
+
+  //   try {
+  //     const { data: existing } = await supabase
+  //       .from("users")
+  //       .select("id, userType")
+  //       .eq("email", email)
+  //       .single();
+
+  //     const payload = {
+  //       name: inviteName.trim(),
+  //       phoneNumber: invitePhone.trim() || null,
+  //       address: inviteAddress.trim() || null,
+  //       userType: "STAFF",
+  //       firstLogin: true,
+  //       updated_at: new Date().toISOString(),
+  //     };
+
+  //     let userId;
+  //     if (existing) {
+  //       userId = existing.id;
+  //       await supabase.from("users").update(payload).eq("id", userId);
+  //     } else {
+  //       const { data: created, error: createErr } = await supabase
+  //         .from("users")
+  //         .insert([{ ...payload, email }])
+  //         .select()
+  //         .single();
+  //       if (createErr) throw createErr;
+  //       userId = created.id;
+  //     }
+
+  //     const confirmInvite = window.confirm(`Send invite to ${email} now?`);
+  //     if (confirmInvite) {
+  //       const res = await fetch("http://localhost:3001/api/invite-contact", {
+  //         method: "POST",
+  //         headers: { "Content-Type": "application/json" },
+  //         body: JSON.stringify({ email, name: inviteName }),
+  //       });
+  //       const ok = res.ok;
+  //       if (!ok) {
+  //         const txt = await res.text();
+  //         alert(txt || "Invite failed");
+  //         return;
+  //       }
+  //       await supabase.from("users").update({ invited: true }).eq("id", userId);
+  //       alert("Invite sent!");
+  //     }
+  //     fetchStaff();
+  //     resetInviteForm();
+  //   } catch (err) {
+  //     console.error(err);
+  //     alert("Invite error.");
+  //   }
+  // }
+
+  async function handleSaveStaff() {
+    /* 1️⃣  validate */
     const email = inviteEmail.trim().toLowerCase();
     if (!email || !inviteName.trim()) {
       return alert("Name and e-mail are required.");
     }
 
+    /* 2️⃣  upsert user row */
+    const payload = {
+      name: inviteName.trim(),
+      phoneNumber: invitePhone.trim() || null,
+      address: inviteAddress.trim() || null,
+      userType: "STAFF",
+      firstLogin: true,
+      updated_at: new Date().toISOString(),
+      email, // keep email in the table
+    };
+
     try {
-      const { data: existing } = await supabase
+      // upsert by email
+      const { data: upserted, error } = await supabase
         .from("users")
-        .select("id, userType")
-        .eq("email", email)
+        .upsert(payload, { onConflict: "email" })
+        .select()
         .single();
 
-      const payload = {
-        name: inviteName.trim(),
-        phoneNumber: invitePhone.trim() || null,
-        address: inviteAddress.trim() || null,
-        userType: "STAFF",
-        firstLogin: true,
-        updated_at: new Date().toISOString(),
-      };
+      if (error) throw error;
 
-      let userId;
-      if (existing) {
-        userId = existing.id;
-        await supabase.from("users").update(payload).eq("id", userId);
-      } else {
-        const { data: created, error: createErr } = await supabase
-          .from("users")
-          .insert([{ ...payload, email }])
-          .select()
-          .single();
-        if (createErr) throw createErr;
-        userId = created.id;
-      }
+      /* 3️⃣  ask if they want to invite now */
+      Modal.confirm({
+        title: `Send onboarding invite to ${email}?`,
+        okText: "Send Invite",
+        cancelText: "Not Now",
+        async onOk() {
+          const res = await fetch("http://localhost:3001/api/invite-contact", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, name: inviteName }),
+          });
+          if (!res.ok) {
+            const txt = await res.text();
+            Modal.error({
+              title: "Invite failed",
+              content: txt || "Unknown error.",
+            });
+            return;
+          }
+          await supabase
+            .from("users")
+            .update({ invited: true })
+            .eq("id", upserted.id);
+          Modal.success({ title: "Invite sent!" });
+          fetchStaff();
+        },
+      });
 
-      const confirmInvite = window.confirm(`Send invite to ${email} now?`);
-      if (confirmInvite) {
-        const res = await fetch("http://localhost:3001/api/invite-staff", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, name: inviteName }),
-        });
-        const ok = res.ok;
-        if (!ok) {
-          const txt = await res.text();
-          alert(txt || "Invite failed");
-          return;
-        }
-        await supabase.from("users").update({ invited: true }).eq("id", userId);
-        alert("Invite sent!");
-      }
+      /* 4️⃣  refresh list + reset form either way */
       fetchStaff();
       resetInviteForm();
     } catch (err) {
       console.error(err);
-      alert("Invite error.");
+      Modal.error({ title: "Error saving staff member." });
     }
   }
 
   async function handleStaffInvite(staff) {
     if (!staff.email) return alert("No email on record.");
+
     const confirm = window.confirm(
       `${staff.invited ? "Resend" : "Send"} invite to ${staff.email}?`
     );
     if (!confirm) return;
 
     try {
-      const res = await fetch("http://localhost:3001/api/invite-staff", {
+      const res = await fetch("http://localhost:3001/api/invite-contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: staff.email, name: staff.name }),
@@ -356,10 +422,10 @@ function StaffPage({ closeMenu }) {
       <Modal
         open={isInviteModalVisible}
         onCancel={() => setIsInviteModalVisible(false)}
-        onOk={handleSaveInvite}
-        okText="Send Invite"
+        onOk={handleSaveStaff}
+        okText="Save Staff"
         cancelText="Cancel"
-        title="Invite New Staff"
+        title="Register New Staff"
       >
         <div className="invite-form">
           <label>Name *</label>
