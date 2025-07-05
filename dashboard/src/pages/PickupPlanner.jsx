@@ -291,347 +291,336 @@ export default function PickupPlanner({ closeMenu }) {
   /* ------------ UI ------------ */
   return (
     <div
-      className={`students-container ${
-        closeMenu ? "menu-closed" : "menu-open"
-      }`}
+      className={`planner-container ${closeMenu ? "menu-closed" : "menu-open"}`}
     >
-      <div className="pickup-planner">
-        <h1>Pickup Planner</h1>
+      <h1>Pickup Planner</h1>
 
-        <DatePicker
-          value={selectedDate}
-          onChange={(v) => setSelectedDate(v || nextBusinessDay())}
-          allowClear={false}
-          disabledDate={(d) => d && d.isoWeekday() >= 6}
-          style={{ marginBottom: 16 }}
-        />
+      <DatePicker
+        value={selectedDate}
+        onChange={(v) => setSelectedDate(v || nextBusinessDay())}
+        allowClear={false}
+        disabledDate={(d) => d && d.isoWeekday() >= 6}
+        style={{ marginBottom: 16 }}
+      />
 
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="planner-grid">
-            <Card title="Kids of the Day" className="kids-card">
-              <Droppable droppableId="schools" type="school">
-                {(provided) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps}>
-                    {Object.entries(groupedBySchool).map(
-                      ([schoolName, kids], idx) => (
-                        <Draggable
-                          key={schoolName}
-                          draggableId={schoolName}
-                          index={idx}
-                        >
-                          {(provided) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              className="school-wrapper"
-                            >
-                              <Collapse>
-                                <Panel
-                                  header={`${schoolName} (${kids.length})`}
-                                  key={schoolName}
-                                  extra={
-                                    <span {...provided.dragHandleProps}>⠿</span>
-                                  }
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="planner-body">
+          <Card className="kids-card" title="Kids of the Day">
+            <Droppable droppableId="schools" type="school">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps}>
+                  {Object.entries(groupedBySchool).map(
+                    ([schoolName, kids], idx) => (
+                      <Draggable
+                        key={schoolName}
+                        draggableId={schoolName}
+                        index={idx}
+                      >
+                        {(provided) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className="school-wrapper"
+                          >
+                            <Collapse>
+                              <Panel
+                                header={`${schoolName} (${kids.length})`}
+                                key={schoolName}
+                                extra={
+                                  <span {...provided.dragHandleProps}>⠿</span>
+                                }
+                              >
+                                <Droppable
+                                  droppableId={`school-${schoolName}`}
+                                  type="school"
+                                  className="SchoolKidList"
                                 >
-                                  <Droppable
-                                    droppableId={`school-${schoolName}`}
-                                    type="school"
-                                    className="SchoolKidList"
-                                  >
-                                    {(provided, snapshot) => (
-                                      <ul
-                                        ref={provided.innerRef}
-                                        {...provided.droppableProps}
-                                        className={
-                                          snapshot.isDraggingOver
-                                            ? "dragging-over"
-                                            : ""
-                                        }
-                                      >
-                                        {kids.map((kid, i) => (
-                                          <Draggable
-                                            key={kid.id}
-                                            draggableId={kid.id}
-                                            index={i}
-                                          >
-                                            {(provided) => (
-                                              <li
-                                                ref={provided.innerRef}
-                                                {...provided.draggableProps}
-                                                {...provided.dragHandleProps}
-                                                className="kidList-row"
-                                              >
-                                                <div className="kid-pill">
-                                                  <span>{kid.name}</span>
-                                                  <span className="kid-time">
-                                                    {getDismissal(kid)}
-                                                  </span>
-                                                </div>
-                                              </li>
-                                            )}
-                                          </Draggable>
-                                        ))}
-                                        {provided.placeholder}
-                                      </ul>
-                                    )}
-                                  </Droppable>
-                                </Panel>
-                              </Collapse>
-                            </div>
-                          )}
-                        </Draggable>
-                      )
-                    )}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </Card>
-
-            <Card title="Absents Drop" className="absents-card">
-              <Droppable droppableId="absents" type="school">
+                                  {(provided, snapshot) => (
+                                    <ul
+                                      ref={provided.innerRef}
+                                      {...provided.droppableProps}
+                                      className={
+                                        snapshot.isDraggingOver
+                                          ? "dragging-over"
+                                          : ""
+                                      }
+                                    >
+                                      {kids.map((kid, i) => (
+                                        <Draggable
+                                          key={kid.id}
+                                          draggableId={kid.id}
+                                          index={i}
+                                        >
+                                          {(provided) => (
+                                            <li
+                                              ref={provided.innerRef}
+                                              {...provided.draggableProps}
+                                              {...provided.dragHandleProps}
+                                              className="kidList-row"
+                                            >
+                                              <div className="kid-pill">
+                                                <span>{kid.name}</span>
+                                                <span className="kid-time">
+                                                  {getDismissal(kid)}
+                                                </span>
+                                              </div>
+                                            </li>
+                                          )}
+                                        </Draggable>
+                                      ))}
+                                      {provided.placeholder}
+                                    </ul>
+                                  )}
+                                </Droppable>
+                              </Panel>
+                            </Collapse>
+                          </div>
+                        )}
+                      </Draggable>
+                    )
+                  )}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </Card>
+          <Card className="absents-card" title="Absents Drop">
+            <Droppable droppableId="absents" type="school">
+              {(provided, snapshot) => (
+                <ul
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className={snapshot.isDraggingOver ? "dragging-over" : ""}
+                >
+                  {absents.map((kid, idx) => (
+                    <Draggable key={kid.id} draggableId={kid.id} index={idx}>
+                      {(provided) => (
+                        <li
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className="kid-pill abs-row"
+                        >
+                          {kid.name} — {kid.schools?.name || "—"}
+                          <button
+                            className="back-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              returnKid(kid);
+                            }}
+                          >
+                            ↩
+                          </button>
+                        </li>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </ul>
+              )}
+            </Droppable>
+          </Card>
+          <Card className="staff-card" title="Staff List">
+            {loadingStaff ? (
+              <Spin tip="Loading staff…" />
+            ) : (
+              <Droppable
+                droppableId="staffPool"
+                type="staff"
+                direction="horizontal"
+              >
                 {(provided, snapshot) => (
-                  <ul
+                  <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className={snapshot.isDraggingOver ? "dragging-over" : ""}
+                    style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
                   >
-                    {absents.map((kid, idx) => (
-                      <Draggable key={kid.id} draggableId={kid.id} index={idx}>
+                    {staff.map((s, idx) => (
+                      <Draggable
+                        key={s.id}
+                        draggableId={`staff-${s.id}`}
+                        index={idx}
+                      >
                         {(provided) => (
-                          <li
+                          <span
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className="kid-pill abs-row"
+                            className="staff-chip"
                           >
-                            {kid.name} — {kid.schools?.name || "—"}
-                            <button
-                              className="back-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                returnKid(kid);
-                              }}
-                            >
-                              ↩
-                            </button>
-                          </li>
+                            {s.name}
+                          </span>
                         )}
                       </Draggable>
                     ))}
                     {provided.placeholder}
-                  </ul>
+                  </div>
                 )}
               </Droppable>
-            </Card>
+            )}
+          </Card>
+          <div className="vans-card">
+            {vans.map((van) => {
+              const kidsInVan = assigned[van.id] || [];
+              const seatsLeft = (van.seats ?? 0) - kidsInVan.length;
+              const isFull = seatsLeft <= 0;
 
-            <Card title="Staff List" className="staff-card">
-              {loadingStaff ? (
-                <Spin tip="Loading staff…" />
-              ) : (
-                <Droppable
-                  droppableId="staffPool"
-                  type="staff"
-                  direction="horizontal"
+              return (
+                <Card
+                  key={van.id}
+                  title={
+                    <>
+                      {van.name}{" "}
+                      <Tag color={isFull ? "red" : "blue"}>
+                        {seatsLeft}/{van.seats} seats
+                      </Tag>
+                    </>
+                  }
+                  className={`van-card ${isFull ? "full" : ""}`}
                 >
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={snapshot.isDraggingOver ? "dragging-over" : ""}
-                      style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
-                    >
-                      {staff.map((s, idx) => (
-                        <Draggable
-                          key={s.id}
-                          draggableId={`staff-${s.id}`}
-                          index={idx}
-                        >
-                          {(provided) => (
-                            <span
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              className="staff-chip"
-                            >
-                              {s.name}
-                            </span>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              )}
-            </Card>
+                  <Droppable droppableId={van.id} type="school">
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={
+                          snapshot.isDraggingOver ? "dragging-over" : ""
+                        }
+                      >
+                        {/* --- fixed driver / helper row --- */}
+                        <div className="driver-row">
+                          <span className="driver-label">Driver:</span>
+                          <span className="driver-name">—</span>
+                          <span className="helper-label">Helpers:</span>
+                          <span className="helper-name">—</span>
+                        </div>
 
-            <div className="vans-card">
-              <div className="vans-list">
-                {vans.map((van) => {
-                  const kidsInVan = assigned[van.id] || [];
-                  const seatsLeft = (van.seats ?? 0) - kidsInVan.length;
-                  const isFull = seatsLeft <= 0;
+                        {/* --- mini-table header --- */}
+                        <div className="van-table header">
+                          <span>#</span>
+                          <span>Name</span>
+                          <span>School</span>
+                          <span>Responsible</span>
+                          <span>Dismissal Time</span>
+                          <span>↩</span>
+                        </div>
 
-                  return (
-                    <Card
-                      key={van.id}
-                      title={
-                        <>
-                          {van.name}{" "}
-                          <Tag color={isFull ? "red" : "blue"}>
-                            {seatsLeft}/{van.seats} seats
-                          </Tag>
-                        </>
-                      }
-                      className={`van-card ${isFull ? "full" : ""}`}
-                    >
-                      <Droppable droppableId={van.id} type="school">
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={
-                              snapshot.isDraggingOver ? "dragging-over" : ""
-                            }
+                        {/* --- draggable kid rows --- */}
+                        {kidsInVan.map((entry, idx) => (
+                          <Draggable
+                            key={entry.kid.id}
+                            draggableId={entry.kid.id}
+                            index={idx}
                           >
-                            {/* --- fixed driver / helper row --- */}
-                            <div className="driver-row">
-                              <span className="driver-label">Driver:</span>
-                              <span className="driver-name">—</span>
-                              <span className="helper-label">Helpers:</span>
-                              <span className="helper-name">—</span>
-                            </div>
-
-                            {/* --- mini-table header --- */}
-                            <div className="van-table header">
-                              <span>#</span>
-                              <span>Name</span>
-                              <span>School</span>
-                              <span>Responsible</span>
-                              <span>Dismissal Time</span>
-                              <span>↩</span>
-                            </div>
-
-                            {/* --- draggable kid rows --- */}
-                            {kidsInVan.map((entry, idx) => (
-                              <Draggable
-                                key={entry.kid.id}
-                                draggableId={entry.kid.id}
-                                index={idx}
+                            {(rowProvided) => (
+                              <Droppable
+                                droppableId={`resp-${entry.kid.id}`}
+                                type="staff"
                               >
-                                {(rowProvided) => (
-                                  <Droppable
-                                    droppableId={`resp-${entry.kid.id}`}
-                                    type="staff"
+                                {(respProvided, snap) => (
+                                  <div
+                                    ref={(node) => {
+                                      rowProvided.innerRef(node);
+                                      respProvided.innerRef(node);
+                                    }}
+                                    {...rowProvided.draggableProps}
+                                    {...rowProvided.dragHandleProps}
+                                    {...respProvided.droppableProps}
+                                    className="van-table row"
                                   >
-                                    {(respProvided, snap) => (
-                                      <div
-                                        ref={(node) => {
-                                          rowProvided.innerRef(node);
-                                          respProvided.innerRef(node);
-                                        }}
-                                        {...rowProvided.draggableProps}
-                                        {...rowProvided.dragHandleProps}
-                                        {...respProvided.droppableProps}
-                                        className="van-table row"
-                                      >
-                                        <span>{idx + 1}</span>
-                                        <span>{entry.kid.name}</span>
-                                        <span>
-                                          {entry.kid.schools?.name || "—"}
-                                        </span>
-                                        {/* ------- Responsible cell (column 4) ------- */}
-                                        <div
-                                          className={
-                                            snap.isDraggingOver
-                                              ? "dragging-over"
-                                              : ""
-                                          }
-                                          style={{
-                                            minHeight: 24,
-                                            display: "flex",
-                                            gap: 4,
-                                            alignItems: "center",
-                                          }}
-                                        >
-                                          {entry.staff && (
-                                            <>
-                                              <span className="resp-chip">
-                                                {entry.staff.name}
-                                              </span>
-                                              {/* ↩ for just this staff-kid link */}
-                                              <button
-                                                className="back-btn"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  unassignStaff(
-                                                    entry.kid.id,
-                                                    entry.staff
-                                                  ); // ← pass staff object
-                                                }}
-                                              >
-                                                ↩
-                                              </button>
-                                            </>
-                                          )}
-                                          {respProvided.placeholder}
-                                        </div>
-                                        <span>{getDismissal(entry.kid)}</span>
-                                        {/* ↩ button that returns the whole kid-row (kid + staff) */}
-                                        <button
-                                          className="back-btn"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
+                                    <span>{idx + 1}</span>
+                                    <span>{entry.kid.name}</span>
+                                    <span>
+                                      {entry.kid.schools?.name || "—"}
+                                    </span>
+                                    {/* ------- Responsible cell (column 4) ------- */}
+                                    <div
+                                      className={
+                                        snap.isDraggingOver
+                                          ? "dragging-over"
+                                          : ""
+                                      }
+                                      style={{
+                                        minHeight: 24,
+                                        display: "flex",
+                                        gap: 4,
+                                        alignItems: "center",
+                                      }}
+                                    >
+                                      {entry.staff && (
+                                        <>
+                                          <span className="resp-chip">
+                                            {entry.staff.name}
+                                          </span>
+                                          {/* ↩ for just this staff-kid link */}
+                                          <button
+                                            className="back-btn"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              unassignStaff(
+                                                entry.kid.id,
+                                                entry.staff
+                                              ); // ← pass staff object
+                                            }}
+                                          >
+                                            ↩
+                                          </button>
+                                        </>
+                                      )}
+                                      {respProvided.placeholder}
+                                    </div>
+                                    <span>{getDismissal(entry.kid)}</span>
+                                    {/* ↩ button that returns the whole kid-row (kid + staff) */}
+                                    <button
+                                      className="back-btn"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
 
-                                            // 1 ▸ move the staff chip (if any) back to the pool
-                                            if (entry.staff) {
-                                              setStaff((prev) =>
-                                                prev.some(
-                                                  (s) => s.id === entry.staff.id
-                                                )
-                                                  ? prev
-                                                  : [...prev, entry.staff]
-                                              );
-                                            }
+                                        // 1 ▸ move the staff chip (if any) back to the pool
+                                        if (entry.staff) {
+                                          setStaff((prev) =>
+                                            prev.some(
+                                              (s) => s.id === entry.staff.id
+                                            )
+                                              ? prev
+                                              : [...prev, entry.staff]
+                                          );
+                                        }
 
-                                            // 2 ▸ remove the kid entry from this van
-                                            setAssigned((prev) => {
-                                              const upd = { ...prev };
-                                              upd[van.id] = upd[van.id].filter(
-                                                (e) => e.kid.id !== entry.kid.id
-                                              );
-                                              return upd;
-                                            });
+                                        // 2 ▸ remove the kid entry from this van
+                                        setAssigned((prev) => {
+                                          const upd = { ...prev };
+                                          upd[van.id] = upd[van.id].filter(
+                                            (e) => e.kid.id !== entry.kid.id
+                                          );
+                                          return upd;
+                                        });
 
-                                            // 3 ▸ done – kid will re-appear in the main list automatically
-                                          }}
-                                        >
-                                          ↩
-                                        </button>
-                                      </div>
-                                    )}
-                                  </Droppable>
+                                        // 3 ▸ done – kid will re-appear in the main list automatically
+                                      }}
+                                    >
+                                      ↩
+                                    </button>
+                                  </div>
                                 )}
-                              </Draggable>
-                            ))}
+                              </Droppable>
+                            )}
+                          </Draggable>
+                        ))}
 
-                            {provided.placeholder}
-                          </div>
-                        )}
-                      </Droppable>
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
 
-                      {isFull && (
-                        <p className="warning-text">⚠ This van is full</p>
-                      )}
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
+                  {isFull && <p className="warning-text">⚠ This van is full</p>}
+                </Card>
+              );
+            })}
           </div>
-        </DragDropContext>
-      </div>
+        </div>
+      </DragDropContext>
     </div>
   );
 }
