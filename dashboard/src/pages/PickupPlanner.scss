@@ -4,7 +4,7 @@
   bottom: 0;
   left: 5rem;
   right: 0;
-  padding: 30px 40px;
+  padding: 5px 20px;
   background: #fff;
   border-radius: 40px;
   // overflow-y: auto;
@@ -21,21 +21,30 @@
 /* ================= LAYOUT (GRID) ================= */
 .planner-body {
   display: grid;
-  gap: 12px;
+  gap: 6px;
 
   /*   col-1  |  col-2  |  col-3   */
-  grid-template-columns: 360px 0.7fr 1fr;
-
+  grid-template-columns: 365px 0.8fr minmax(0, 1fr) 0.2fr;
+  // grid-template-columns: 360px 360px 360px;
   /*   lin-1 | lin-2            */
   grid-template-rows: auto 1fr;
 
   /*  grid-areas                     */
   grid-template-areas:
-    "kids   absents staff"
-    "kids   vans    vans";
+    "kids absents staffList ."
+    "kids vans    vans  vans";
 
   min-height: 0;
   height: 100%;
+}
+
+.drag-preview {
+  background: #fafafa;
+  border: 1px dashed #ccc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
 }
 
 /* ─── Areas  ──────────────────────── */
@@ -44,45 +53,61 @@
   overflow-y: auto;
 }
 
+.kids-card {
+  grid-area: kids;
+}
 .absents-card {
   grid-area: absents;
-  // max-height: 250px;
-  display: flex;
-  flex-direction: column;
+}
+.staffList-card {
+  grid-area: staffList;
+  min-width: 0;
+}
+.vans-card {
+  grid-area: vans;
+}
 
-  .ant-card-body {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    min-height: 150px;
-    max-height: 153px;
-    padding: 8px;
+.absents-card {
+  // border-color: #ff4d4f;
+  // background: #fff7f7;
+  border-left-width: 6px;
+  border-left-color: #ff4d4f;
+  .ant-card-head-title {
+    color: #cf1322; // Dark red text
+    font-weight: bold;
   }
 }
 
-.staff-card {
-  grid-area: staff;
-  display: flex; /* header + body stack */
-  flex-direction: column;
-
-  /* same 8 px radius as other cards */
+.absents-card,
+.staffList-card {
   border-radius: 8px !important;
+  min-height: 200px;
+  max-height: 200px;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+}
 
-  .ant-card-head {
-    border-bottom: 1px solid #f0f0f0 !important; /* same as default */
+.abs-row {
+  color: #cf1322;
+
+  .kid-pill > span:first-child {
+    color: #cf1322;
   }
+}
 
-  /* scrollable, wrapping chips */
-  .ant-card-body {
-    flex: 1 1 auto;
-    min-height: 150px;
-    max-height: 153px; /* four chip lines */
-    overflow-y: auto;
-    padding: 8px;
+.absents-card .ant-card-body,
+.staffList-card .ant-card-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 2px 8px;
+}
 
-    display: flex;
-    flex-direction: column;
-    gap: 6px; /* space between chips */
-  }
+.absents-card .ant-card-head,
+.staffList-card .ant-card-head {
+  width: 100%;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 0 12px;
 }
 
 .vans-card {
@@ -91,6 +116,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  max-height: 595px;
 }
 
 .kids-card {
@@ -98,8 +124,24 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-height: 802px;
   height: auto;
   overflow-y: auto;
+}
+
+.route-pill-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.school-pill {
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: grab;
+  user-select: none;
 }
 
 .vans-card {
@@ -144,18 +186,33 @@
 .school-wrapper .ant-collapse-content {
   border-radius: 0 0 8px 8px;
   padding: 6px 8px;
+  align-items: center;
 }
 
 $cell-bg: #f2f7ff;
 $cell-border: #d6e4ff;
 
 .kidList-row {
+  list-style: none;
   margin-bottom: 4px;
   width: 100%;
-  display: flex;
+  padding-left: 8px;
+  // display: flex;
 }
+
+.kidList-row-list {
+  display: flex;
+  list-style: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  gap: 4px;
+}
+
 .kid-pill {
   display: flex;
+  list-style: none;
   justify-content: space-between;
   align-items: center;
   width: 100%;
@@ -165,8 +222,10 @@ $cell-border: #d6e4ff;
   background: $cell-bg;
   box-sizing: border-box;
   min-height: 24px;
+  max-width: 480px;
 }
 .kid-pill.abs-row {
+  list-style: none;
   background: $cell-bg;
 }
 .kid-time {
@@ -185,10 +244,26 @@ $cell-border: #d6e4ff;
 .van-table.header,
 .van-table.row {
   display: grid;
-  grid-template-columns: 2rem 2.2fr 2fr 2fr 4.2rem 2rem;
+  grid-template-columns: 2rem 1fr 1fr 0.5fr 7rem 2.2rem;
   gap: 6px;
   padding: 4px 6px;
 }
+
+.resp-chip-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.resp-chip {
+  background: #d4e3ff;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .van-table.header {
   background: #fafafa;
   font-weight: 600;
@@ -212,25 +287,15 @@ $cell-border: #d6e4ff;
   overflow: visible;
 }
 
-/* ========== STAFF & RESPONSIBLE CHIP ========== */
-.staff-chip,
-.resp-chip {
-  /* visual style (keep!) */
+/* ========== STAFF  CHIP ========== */
+.staff-pill {
+  display: inline-block;
   padding: 2px 8px;
+  margin: 4px;
   border-radius: 12px;
   background: #fffbe6;
   border: 1px solid #ffe58f;
-  font-size: 0.75rem;
-
-  /* layout override */
-  display: block; /* one chip per line                       */
-  width: 100%; /* fills available width of .staff-pool    */
-}
-
-.staff-pool {
-  display: flex;
-  flex-direction: column; /* one chip per row */
-  gap: 6px;
+  font-size: 0.8rem;
 }
 
 .driver-row {

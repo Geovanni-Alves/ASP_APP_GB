@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Card, DatePicker, Spin, Collapse, Tag, message } from "antd";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { RightOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import supabase from "../lib/supabase";
@@ -39,6 +40,7 @@ export default function PickupPlanner({ closeMenu }) {
   const [loadingVans, setLoadingVans] = useState(true);
   const [staff, setStaff] = useState([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
+  const [schoolOrder, setSchoolOrder] = useState({});
 
   /* ------------ fetch vans ------------ */
   useEffect(() => {
@@ -104,6 +106,61 @@ export default function PickupPlanner({ closeMenu }) {
     return groups;
   }, [studentsToday, assignedIds, absentIds]);
 
+  // count how many kids per day (remain)
+  const kidsRemaining = useMemo(
+    () =>
+      Object.values(groupedBySchool).reduce((sum, arr) => sum + arr.length, 0),
+    [groupedBySchool]
+  );
+
+  const kidsOnRoute = useMemo(
+    () => Object.values(assigned).reduce((sum, arr) => sum + arr.length, 0),
+    [assigned]
+  );
+
+  // count absents and staff
+  const absentsCount = absents.length;
+  const staffPoolCount = staff.length;
+  const dayLabel = selectedDate.format("dddd"); // e.g. Monday
+  const totalKidsToday = studentsToday.length; // all kids scheduled for that day
+  const totalSchoolsToday = Object.keys(groupedBySchool).length; // distinct schools
+
+  /* ────────────────────────────────────────────
+   Remove orphan school IDs whenever kids move
+──────────────────────────────────────────── */
+  useEffect(() => {
+    setSchoolOrder((prev) => {
+      let changed = false;
+      const next = { ...prev };
+
+      Object.keys(prev).forEach((vanId) => {
+        /* collect the schools that still have kids in that van */
+        const present = new Set(
+          (assigned[vanId] || []).map((e) => e.kid.schools?.id ?? "no-school")
+        );
+
+        /* drop any ids that are no longer present */
+        if (next[vanId]) {
+          const filtered = next[vanId].filter((id) => present.has(id));
+          if (filtered.length !== next[vanId].length) {
+            next[vanId] = filtered;
+            changed = true;
+          }
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [assigned]);
+
+  const addSchoolToOrder = (vanId, schoolId) =>
+    setSchoolOrder((prev) => {
+      const list = prev[vanId] || [];
+      return list.includes(schoolId)
+        ? prev
+        : { ...prev, [vanId]: [...list, schoolId] };
+    });
+
   function returnKid(kid, fromVanId = null) {
     // remove from absents
     setAbsents((prev) => prev.filter((k) => k.id !== kid.id));
@@ -118,25 +175,6 @@ export default function PickupPlanner({ closeMenu }) {
         return updated;
       });
     }
-  }
-
-  // ─── helper: remove the staff from a kid and return chip to the pool ───
-  function unassignStaff(kidId, staffObj) {
-    // ① put the chip back into the pool (only if it is not there already)
-    setStaff((prev) =>
-      prev.some((s) => s.id === staffObj.id) ? prev : [...prev, staffObj]
-    );
-
-    // ② strip this staff from every van entry of that kid
-    setAssigned((prev) => {
-      const upd = { ...prev };
-      for (const v in upd) {
-        upd[v] = upd[v].map((e) =>
-          e.kid.id === kidId ? { ...e, staff: null } : e
-        );
-      }
-      return upd;
-    });
   }
 
   /* ---------------- drag-and-drop handler ---------------- */
@@ -160,42 +198,80 @@ export default function PickupPlanner({ closeMenu }) {
       return; // ignore the drop
     }
 
+    /* ─── reorder school pills inside the same van ─── */
+    if (type === "schoolOrder") {
+      if (source.droppableId === destination.droppableId) {
+        const vanId = source.droppableId.replace("order-", "");
+        setSchoolOrder((prev) => {
+          const list = [...(prev[vanId] || [])];
+          const [moved] = list.splice(source.index, 1);
+          list.splice(destination.index, 0, moved);
+          return { ...prev, [vanId]: list };
+        });
+      }
+      return; // nothing else to do
+    }
+
     /* STAFF chip onto a kid row */
     if (type === "staff" && destination.droppableId.startsWith("resp-")) {
       const kidId = destination.droppableId.replace("resp-", "");
       const staffId = draggableId.replace("staff-", "");
       const staffObj = staff.find((s) => s.id === staffId);
 
-      // If this kid already has a staff assigned, ignore the drop.
-      const alreadyHasStaff = Object.values(assigned)
-        .flat()
-        .some((e) => e.kid.id === kidId && e.staff);
+      // 1) Find the van where this kid is assigned
+      const targetVanId = Object.entries(assigned).find(([, list]) =>
+        list.some((e) => e.kid.id === kidId)
+      )?.[0];
 
-      if (alreadyHasStaff) {
-        message.info(
-          "That child already has a responsible - use the ↩ button to change it."
-        );
-        return; // <- bounce back, nothing changes
+      if (!targetVanId) {
+        message.error("Target kid not found in any van");
+        return;
       }
 
-      // ─────────────────────
+      const kidEntry = assigned[targetVanId].find((e) => e.kid.id === kidId);
+      const targetSchoolId = kidEntry?.kid.schools?.id ?? null;
 
-      // remove chip from the pool
-      setStaff((prev) => prev.filter((s) => s.id !== staffId));
+      // 2) Check if this kid already has a staff assigned
+      const kidAlreadyHasStaff = kidEntry?.staff !== null;
+      if (kidAlreadyHasStaff) {
+        message.info(
+          "This child already has a responsible. Use ↩ to remove it first."
+        );
+        return;
+      }
 
-      const targetSchoolId =
-        students.find((k) => k.id === kidId)?.schools?.id ?? null;
+      // 3) Check if the same staff is already covering another school in this van
+      const sameStaffOtherSchool = assigned[targetVanId].some(
+        (e) =>
+          e.staff?.id === staffId &&
+          (e.kid.schools?.id ?? null) !== targetSchoolId
+      );
 
+      if (sameStaffOtherSchool) {
+        const allowDup = window.confirm(
+          "This staff is already assigned to another school in this van. Allow duplicate?"
+        );
+        if (!allowDup) return;
+      }
+
+      // 4) Remove from pool if it was still there
+      const isInPool = staff.some((s) => s.id === staffId);
+      if (isInPool) {
+        setStaff((prev) => prev.filter((s) => s.id !== staffId));
+      }
+
+      // 5) Update all kids in the same school in this van with this staff
       setAssigned((prev) => {
         const upd = { ...prev };
-        for (const vid in upd) {
-          upd[vid] = upd[vid].map((e) =>
-            e.kid.schools?.id === targetSchoolId ? { ...e, staff: staffObj } : e
-          );
-        }
+        upd[targetVanId] = upd[targetVanId].map((e) =>
+          (e.kid.schools?.id ?? null) === targetSchoolId
+            ? { ...e, staff: staffObj }
+            : e
+        );
         return upd;
       });
-      return; // stop further processing
+
+      return;
     }
 
     /* ---- whole school panel ---- */
@@ -214,6 +290,8 @@ export default function PickupPlanner({ closeMenu }) {
             ...kidsToMove.map((k) => ({ kid: k, staff: null })),
           ],
         }));
+        const schoolId = kidsToMove[0]?.schools?.id ?? "no-school";
+        addSchoolToOrder(destination.droppableId, schoolId);
       }
       return;
     }
@@ -276,6 +354,8 @@ export default function PickupPlanner({ closeMenu }) {
 
         return { ...prev, [destination.droppableId]: list };
       });
+      const schoolId = kid.schools?.id ?? "no-school";
+      addSchoolToOrder(destination.droppableId, schoolId);
     }
   };
 
@@ -295,17 +375,33 @@ export default function PickupPlanner({ closeMenu }) {
     >
       <h1>Pickup Planner</h1>
 
-      <DatePicker
-        value={selectedDate}
-        onChange={(v) => setSelectedDate(v || nextBusinessDay())}
-        allowClear={false}
-        disabledDate={(d) => d && d.isoWeekday() >= 6}
-        style={{ marginBottom: 16 }}
-      />
+      <div>
+        <DatePicker
+          value={selectedDate}
+          onChange={(v) => setSelectedDate(v || nextBusinessDay())}
+          allowClear={false}
+          disabledDate={(d) => d && d.isoWeekday() >= 6}
+          style={{ marginBottom: 16 }}
+        />
+        <span> — {dayLabel}</span>
+        <span> Kids for today {totalKidsToday - absentsCount}</span>
+        <span>
+          {" "}
+          Kids on route {kidsOnRoute}{" "}
+          {kidsRemaining === 0 && (
+            <span style={{ color: "green", marginLeft: 8 }}>
+              — All kids are on route
+            </span>
+          )}
+        </span>
+      </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="planner-body">
-          <Card className="kids-card" title="Kids of the Day">
+          <Card
+            className="kids-card"
+            title={`Kids of the Day (${kidsRemaining} kids • ${totalSchoolsToday} schools)`}
+          >
             <Droppable droppableId="schools" type="school">
               {(provided) => (
                 <div ref={provided.innerRef} {...provided.droppableProps}>
@@ -384,13 +480,18 @@ export default function PickupPlanner({ closeMenu }) {
               )}
             </Droppable>
           </Card>
-          <Card className="absents-card" title="Absents Drop">
+          <Card
+            className="absents-card"
+            title={`Absents Drop (${absentsCount})`}
+          >
             <Droppable droppableId="absents" type="school">
               {(provided, snapshot) => (
                 <ul
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className={snapshot.isDraggingOver ? "dragging-over" : ""}
+                  className={`staff-pool ${
+                    snapshot.isDraggingOver ? "dragging-over" : ""
+                  }`}
                 >
                   {absents.map((kid, idx) => (
                     <Draggable key={kid.id} draggableId={kid.id} index={idx}>
@@ -420,7 +521,10 @@ export default function PickupPlanner({ closeMenu }) {
               )}
             </Droppable>
           </Card>
-          <Card className="staff-card" title="Staff List">
+          <Card
+            className="staffList-card"
+            title={`Staff List (${staffPoolCount})`}
+          >
             {loadingStaff ? (
               <Spin tip="Loading staff…" />
             ) : (
@@ -433,8 +537,7 @@ export default function PickupPlanner({ closeMenu }) {
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={snapshot.isDraggingOver ? "dragging-over" : ""}
-                    style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+                    // className={snapshot.isDraggingOver ? "dragging-over" : ""}
                   >
                     {staff.map((s, idx) => (
                       <Draggable
@@ -447,7 +550,7 @@ export default function PickupPlanner({ closeMenu }) {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className="staff-chip"
+                            className="staff-pill"
                           >
                             {s.name}
                           </span>
@@ -466,16 +569,122 @@ export default function PickupPlanner({ closeMenu }) {
               const seatsLeft = (van.seats ?? 0) - kidsInVan.length;
               const isFull = seatsLeft <= 0;
 
+              /* ── 1. group by school ── */
+              const groups = {};
+              kidsInVan.forEach((e) => {
+                const sid = e.kid.schools?.id ?? "no-school";
+                (groups[sid] ??= []).push(e);
+              });
+
+              /* ── 2. build the ordered list ── */
+              const orderedIds = (schoolOrder[van.id] || []).filter(
+                (id) => groups[id]
+              );
+              const unorderedIds = Object.keys(groups).filter(
+                (id) => !orderedIds.includes(id)
+              );
+              const flattened = [...orderedIds, ...unorderedIds].flatMap(
+                (id) => groups[id]
+              );
+
+              const groupedByStaffAndSchool = {};
+              flattened.forEach((entry) => {
+                const key = `${entry.staff?.id ?? "no-staff"}--${
+                  entry.kid.schools?.id ?? "no-school"
+                }`;
+                (groupedByStaffAndSchool[key] ??= []).push(entry);
+              });
+
               return (
                 <Card
                   key={van.id}
                   title={
-                    <>
-                      {van.name}{" "}
-                      <Tag color={isFull ? "red" : "blue"}>
-                        {seatsLeft}/{van.seats} seats
-                      </Tag>
-                    </>
+                    <Droppable
+                      droppableId={`order-${van.id}`}
+                      type="schoolOrder"
+                      direction="horizontal"
+                    >
+                      {(orderProvided) => (
+                        <span
+                          ref={orderProvided.innerRef}
+                          {...orderProvided.droppableProps}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {/* van name */}
+                          <strong>{van.name}</strong>
+
+                          {/* seats tag */}
+                          <Tag
+                            color={isFull ? "red" : "blue"}
+                            style={{ marginInlineStart: 4 }}
+                          >
+                            {seatsLeft}/{van.seats} seats
+                          </Tag>
+
+                          {/* draggable route pills */}
+                          <span>Route Order:</span>
+                          {(schoolOrder[van.id] || [])
+                            /* keep only schools that still have kids */
+                            .filter((sid) =>
+                              kidsInVan.some(
+                                (e) =>
+                                  (e.kid.schools?.id ?? "no-school") === sid
+                              )
+                            )
+
+                            /* now render a pill for each remaining school */
+                            .map((sid, idx) => {
+                              const name =
+                                kidsInVan.find(
+                                  (e) =>
+                                    (e.kid.schools?.id ?? "no-school") === sid
+                                )?.kid.schools?.name || "—";
+
+                              return (
+                                <React.Fragment key={sid}>
+                                  {idx > 0 && (
+                                    <RightOutlined
+                                      style={{
+                                        fontSize: 10,
+                                        verticalAlign: "middle",
+                                      }}
+                                    />
+                                  )}
+                                  <Draggable
+                                    draggableId={`order-${van.id}-${sid}`}
+                                    index={idx}
+                                  >
+                                    {(pillProvided) => (
+                                      <span
+                                        ref={pillProvided.innerRef}
+                                        {...pillProvided.draggableProps}
+                                        {...pillProvided.dragHandleProps}
+                                        style={{
+                                          background: "#eee",
+                                          borderRadius: 4,
+                                          padding: "0 6px",
+                                          fontSize: 10,
+                                          whiteSpace: "nowrap",
+                                          cursor: "grab",
+                                          ...pillProvided.draggableProps.style,
+                                        }}
+                                      >
+                                        {name}
+                                      </span>
+                                    )}
+                                  </Draggable>
+                                </React.Fragment>
+                              );
+                            })}
+                          {orderProvided.placeholder}
+                        </span>
+                      )}
+                    </Droppable>
                   }
                   className={`van-card ${isFull ? "full" : ""}`}
                 >
@@ -507,107 +716,126 @@ export default function PickupPlanner({ closeMenu }) {
                         </div>
 
                         {/* --- draggable kid rows --- */}
-                        {kidsInVan.map((entry, idx) => (
-                          <Draggable
-                            key={entry.kid.id}
-                            draggableId={entry.kid.id}
-                            index={idx}
-                          >
-                            {(rowProvided) => (
-                              <Droppable
-                                droppableId={`resp-${entry.kid.id}`}
-                                type="staff"
-                              >
-                                {(respProvided, snap) => (
-                                  <div
-                                    ref={(node) => {
-                                      rowProvided.innerRef(node);
-                                      respProvided.innerRef(node);
-                                    }}
-                                    {...rowProvided.draggableProps}
-                                    {...rowProvided.dragHandleProps}
-                                    {...respProvided.droppableProps}
-                                    className="van-table row"
-                                  >
-                                    <span>{idx + 1}</span>
-                                    <span>{entry.kid.name}</span>
-                                    <span>
-                                      {entry.kid.schools?.name || "—"}
-                                    </span>
-                                    {/* ------- Responsible cell (column 4) ------- */}
+                        {flattened.map((entry, idx) => {
+                          const schoolId = entry.kid.schools?.id ?? "no-school";
+                          const staffId = entry.staff?.id ?? "no-staff";
+                          const isFirstOfGroup =
+                            idx === 0 ||
+                            flattened[idx - 1].staff?.id !== staffId ||
+                            (flattened[idx - 1].kid.schools?.id ??
+                              "no-school") !== schoolId;
+
+                          return (
+                            <Draggable
+                              key={entry.kid.id}
+                              draggableId={entry.kid.id}
+                              index={idx}
+                            >
+                              {(rowProvided) => (
+                                <Droppable
+                                  droppableId={`resp-${entry.kid.id}`}
+                                  type="staff"
+                                >
+                                  {(respProvided, snap) => (
                                     <div
-                                      className={
-                                        snap.isDraggingOver
-                                          ? "dragging-over"
-                                          : ""
-                                      }
-                                      style={{
-                                        minHeight: 24,
-                                        display: "flex",
-                                        gap: 4,
-                                        alignItems: "center",
+                                      ref={(node) => {
+                                        rowProvided.innerRef(node);
+                                        respProvided.innerRef(node);
                                       }}
+                                      {...rowProvided.draggableProps}
+                                      {...rowProvided.dragHandleProps}
+                                      {...respProvided.droppableProps}
+                                      className="van-table row"
                                     >
-                                      {entry.staff && (
-                                        <>
-                                          <span className="resp-chip">
-                                            {entry.staff.name}
-                                          </span>
-                                          {/* ↩ for just this staff-kid link */}
+                                      <span>{idx + 1}</span>
+                                      <span>{entry.kid.name}</span>
+                                      <span>
+                                        {entry.kid.schools?.name || "—"}
+                                      </span>
+
+                                      {/* 🟢 Responsible cell */}
+                                      <div
+                                        className={
+                                          snap.isDraggingOver
+                                            ? "dragging-over"
+                                            : ""
+                                        }
+                                        style={{
+                                          minHeight: 24,
+                                          display: "flex",
+                                          gap: 4,
+                                          alignItems: "center",
+                                        }}
+                                      >
+                                        {entry.staff && (
+                                          <Draggable
+                                            draggableId={`staff-${entry.staff.id}`}
+                                            index={0}
+                                            type="staff"
+                                          >
+                                            {(provided) => (
+                                              <span
+                                                className="resp-chip"
+                                                ref={provided.innerRef}
+                                                {...provided.draggableProps}
+                                                {...provided.dragHandleProps}
+                                              >
+                                                {entry.staff.name}
+                                              </span>
+                                            )}
+                                          </Draggable>
+                                        )}
+
+                                        {isFirstOfGroup && entry.staff && (
                                           <button
                                             className="back-btn"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              unassignStaff(
-                                                entry.kid.id,
-                                                entry.staff
-                                              ); // ← pass staff object
+                                              setStaff((prev) =>
+                                                prev.some(
+                                                  (s) => s.id === entry.staff.id
+                                                )
+                                                  ? prev
+                                                  : [...prev, entry.staff]
+                                              );
+                                              setAssigned((prev) => {
+                                                const upd = { ...prev };
+                                                upd[van.id] = upd[van.id].map(
+                                                  (r) =>
+                                                    r.kid.schools?.id ===
+                                                    schoolId
+                                                      ? { ...r, staff: null }
+                                                      : r
+                                                );
+                                                return upd;
+                                              });
                                             }}
                                           >
                                             ↩
                                           </button>
-                                        </>
-                                      )}
-                                      {respProvided.placeholder}
+                                        )}
+
+                                        {respProvided.placeholder}
+                                      </div>
+
+                                      <span>{getDismissal(entry.kid)}</span>
+
+                                      <button
+                                        className="back-btn"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          returnKid(entry.kid, van.id);
+                                        }}
+                                      >
+                                        ↩
+                                      </button>
                                     </div>
-                                    <span>{getDismissal(entry.kid)}</span>
-                                    {/* ↩ button that returns the whole kid-row (kid + staff) */}
-                                    <button
-                                      className="back-btn"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-
-                                        // 1 ▸ move the staff chip (if any) back to the pool
-                                        if (entry.staff) {
-                                          setStaff((prev) =>
-                                            prev.some(
-                                              (s) => s.id === entry.staff.id
-                                            )
-                                              ? prev
-                                              : [...prev, entry.staff]
-                                          );
-                                        }
-
-                                        // 2 ▸ remove the kid entry from this van
-                                        setAssigned((prev) => {
-                                          const upd = { ...prev };
-                                          upd[van.id] = upd[van.id].filter(
-                                            (e) => e.kid.id !== entry.kid.id
-                                          );
-                                          return upd;
-                                        });
-
-                                        // 3 ▸ done – kid will re-appear in the main list automatically
-                                      }}
-                                    >
-                                      ↩
-                                    </button>
-                                  </div>
-                                )}
-                              </Droppable>
-                            )}
-                          </Draggable>
-                        ))}
+                                  )}
+                                </Droppable>
+                              )}
+                            </Draggable>
+                          );
+                        })}
 
                         {provided.placeholder}
                       </div>
