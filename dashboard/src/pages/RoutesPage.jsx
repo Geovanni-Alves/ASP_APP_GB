@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { API, graphqlOperation } from "aws-amplify";
+// import { API, graphqlOperation } from "aws-amplify";
 import { listVans, listKids } from "../graphql/queries";
 import {
   updateKid,
@@ -198,7 +198,7 @@ const RoutesPages = () => {
         vanID: vanId,
       };
 
-      await API.graphql(graphqlOperation(updateKid, { input: mutationInput }));
+      // await API.graphql(graphqlOperation(updateKid, { input: mutationInput }));
     } catch (error) {
       console.error("Error updating kid association:", error);
     }
@@ -398,128 +398,128 @@ const RoutesPages = () => {
     }
   };
 
-  const fetchVansData = async () => {
-    try {
-      const vansResponse = await API.graphql({
-        query: listVans,
-      });
-      const vansData = vansResponse.data.listVans.items;
-      setVans(vansData);
-    } catch (error) {
-      console.error("Error fetching vans data:", error);
-    }
-  };
+  // const fetchVansData = async () => {
+  //   try {
+  //     const vansResponse = await API.graphql({
+  //       query: listVans,
+  //     });
+  //     const vansData = vansResponse.data.listVans.items;
+  //     setVans(vansData);
+  //   } catch (error) {
+  //     console.error("Error fetching vans data:", error);
+  //   }
+  // };
 
-  const fetchKidsWithoutVan = async () => {
-    try {
-      const variables = {
-        filter: { vanID: { attributeExists: false } },
-      };
-      const kidsWithoutVanResponse = await API.graphql({
-        query: listKids,
-        variables: variables,
-      });
-      const kidsWithoutVanData = kidsWithoutVanResponse.data.listKids.items;
-      setKidsWithoutVan(kidsWithoutVanData);
-    } catch (error) {
-      console.error("Error fetching kids without van data:", error);
-    }
-  };
+  // const fetchKidsWithoutVan = async () => {
+  //   try {
+  //     const variables = {
+  //       filter: { vanID: { attributeExists: false } },
+  //     };
+  //     const kidsWithoutVanResponse = await API.graphql({
+  //       query: listKids,
+  //       variables: variables,
+  //     });
+  //     const kidsWithoutVanData = kidsWithoutVanResponse.data.listKids.items;
+  //     setKidsWithoutVan(kidsWithoutVanData);
+  //   } catch (error) {
+  //     console.error("Error fetching kids without van data:", error);
+  //   }
+  // };
 
-  const fetchKidsInVans = async () => {
-    try {
-      const vansResponse = await API.graphql(graphqlOperation(listVans));
-      const vansData = vansResponse.data.listVans.items;
+  // const fetchKidsInVans = async () => {
+  //   try {
+  //     const vansResponse = await API.graphql(graphqlOperation(listVans));
+  //     const vansData = vansResponse.data.listVans.items;
 
-      for (const van of vansData) {
-        const variables = {
-          filter: { vanID: { eq: van.id } },
-        };
+  //     for (const van of vansData) {
+  //       const variables = {
+  //         filter: { vanID: { eq: van.id } },
+  //       };
 
-        const kidsInVan = await API.graphql({
-          query: listKids,
-          variables: variables,
-        });
+  //       const kidsInVan = await API.graphql({
+  //         query: listKids,
+  //         variables: variables,
+  //       });
 
-        const kidsData = kidsInVan.data.listKids.items;
-        setKidsOnVan((prevKids) => ({ ...prevKids, [van.id]: kidsData }));
-      }
-    } catch (error) {
-      console.error("Error fetching kids in vans data:", error);
-    }
-  };
+  //       const kidsData = kidsInVan.data.listKids.items;
+  //       setKidsOnVan((prevKids) => ({ ...prevKids, [van.id]: kidsData }));
+  //     }
+  //   } catch (error) {
+  //     console.error("Error fetching kids in vans data:", error);
+  //   }
+  // };
 
-  useEffect(() => {
-    const fetchVansAndKids = async () => {
-      await fetchVansData();
-      await fetchKidsWithoutVan();
-      await fetchKidsInVans();
-    };
-    console.log("main fetch");
-    fetchVansAndKids();
-  }, []);
+  // useEffect(() => {
+  //   const fetchVansAndKids = async () => {
+  //     await fetchVansData();
+  //     await fetchKidsWithoutVan();
+  //     await fetchKidsInVans();
+  //   };
+  //   console.log("main fetch");
+  //   fetchVansAndKids();
+  // }, []);
 
-  const handleSaveRoute = async () => {
-    const currentDate = new Date();
-    const currentKids = kidsOnVan[selectedVan];
+  // const handleSaveRoute = async () => {
+  //   const currentDate = new Date();
+  //   const currentKids = kidsOnVan[selectedVan];
 
-    try {
-      // Create a new route
-      const newRouteDetails = {
-        date: currentDate.toISOString(),
-        departTime: departureTime,
-        lat: dropOffStartPoint.lat,
-        lng: dropOffStartPoint.lng,
-        routeVanId: selectedVan,
-        status: "WAITING_TO_START",
-      };
+  //   try {
+  //     // Create a new route
+  //     const newRouteDetails = {
+  //       date: currentDate.toISOString(),
+  //       departTime: departureTime,
+  //       lat: dropOffStartPoint.lat,
+  //       lng: dropOffStartPoint.lng,
+  //       routeVanId: selectedVan,
+  //       status: "WAITING_TO_START",
+  //     };
 
-      const {
-        data: { createRoute: newRoute },
-      } = await API.graphql({
-        query: createRoute,
-        variables: { input: newRouteDetails },
-      });
+  //     const {
+  //       data: { createRoute: newRoute },
+  //     } = await API.graphql({
+  //       query: createRoute,
+  //       variables: { input: newRouteDetails },
+  //     });
 
-      // Update routeID for each kid
-      const updateKidsPromises = currentKids.map(async (kid, index) => {
-        const kidDetails = {
-          id: kid.id,
-          routeID: newRoute.id,
-        };
+  //     // Update routeID for each kid
+  //     const updateKidsPromises = currentKids.map(async (kid, index) => {
+  //       const kidDetails = {
+  //         id: kid.id,
+  //         routeID: newRoute.id,
+  //       };
 
-        // Update kid details with new routeID
-        await API.graphql({
-          query: updateKid,
-          variables: { input: kidDetails },
-        });
+  //       // Update kid details with new routeID
+  //       await API.graphql({
+  //         query: updateKid,
+  //         variables: { input: kidDetails },
+  //       });
 
-        // Create addressList for the kid
-        const newAddressListDetails = {
-          order: index + 1, // Assuming order starts from 1
-          latitude: kid.lat,
-          longitude: kid.lng,
-          routeID: newRoute.id,
-          addressListKidId: kid.id,
-        };
+  //       // Create addressList for the kid
+  //       const newAddressListDetails = {
+  //         order: index + 1, // Assuming order starts from 1
+  //         latitude: kid.lat,
+  //         longitude: kid.lng,
+  //         routeID: newRoute.id,
+  //         addressListKidId: kid.id,
+  //       };
 
-        // Save the new addressList for the kid
-        return await API.graphql({
-          query: createAddressList,
-          variables: { input: newAddressListDetails },
-        });
-      });
+  //       // Save the new addressList for the kid
+  //       return await API.graphql({
+  //         query: createAddressList,
+  //         variables: { input: newAddressListDetails },
+  //       });
+  //     });
 
-      // Wait for all kid updates and addressList creations to complete
-      const updateResults = await Promise.all(updateKidsPromises);
-      console.log(updateResults);
+  //     // Wait for all kid updates and addressList creations to complete
+  //     const updateResults = await Promise.all(updateKidsPromises);
+  //     console.log(updateResults);
 
-      alert("Route saved with success!");
-    } catch (error) {
-      console.error("Error updating route on kids", error);
-      alert("Failed to save route. Please check the console for details.");
-    }
-  };
+  //     alert("Route saved with success!");
+  //   } catch (error) {
+  //     console.error("Error updating route on kids", error);
+  //     alert("Failed to save route. Please check the console for details.");
+  //   }
+  // };
 
   return (
     <div className="main-container">
@@ -647,11 +647,11 @@ const RoutesPages = () => {
             ))}
           </select>
         </div>
-        {selectedVan && isLoaded && (
+        {/* {selectedVan && isLoaded && (
           <div>
             <button onClick={handleSaveRoute}>Save Route</button>
           </div>
-        )}
+        )} */}
         {selectedVan && isLoaded && (
           <GoogleMap
             mapContainerStyle={containerStyle}

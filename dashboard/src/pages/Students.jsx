@@ -16,7 +16,7 @@ import GoogleMapsAutocomplete from "../components/GoogleMapsAutocomplete";
 import { redirect, useLocation } from "react-router-dom";
 import { useKidsContext } from "../contexts/KidsContext";
 import { usePicturesContext } from "../contexts/PicturesContext";
-import { Storage } from "aws-amplify";
+// import { Storage } from "aws-amplify";
 import RemoteImage from "../components/RemoteImage";
 import ContactModal from "./ContactModal";
 import AddressModal from "./AddressModal";

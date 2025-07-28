@@ -3,6 +3,7 @@ import { Modal, Button, Card, Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import supabase from "../lib/supabase";
 import RemoteImage from "../components/RemoteImage";
+import { InputNumber } from "antd";
 import "./Vans.css";
 
 function Vans({ closeMenu }) {
@@ -110,7 +111,7 @@ function Vans({ closeMenu }) {
 
       <div className="van-list">
         {vans.map((van) => (
-          <Card title={van.name} className="vans-card" key={van.id}>
+          <Card title={van.name} className="list-vans-card" key={van.id}>
             <RemoteImage
               path={van.image}
               name={van.name}
@@ -126,6 +127,9 @@ function Vans({ closeMenu }) {
               </div>
               <div>
                 <strong>Seats for kids:</strong> {van.seats - 2}
+              </div>
+              <div>
+                <strong>Booster Seats:</strong> {van.boosterSeats}
               </div>
             </div>
             <div className="van-actions">
@@ -163,19 +167,38 @@ function Vans({ closeMenu }) {
           { name: "model", label: "Model" },
           { name: "year", label: "Year", type: "number" },
           { name: "seats", label: "Seats", type: "number" },
+          { name: "boosterSeats", label: "Booster Seats", type: "increment" },
         ].map((field) => (
           <div key={field.name} className="form-row">
             <label>{field.label}</label>
-            <input
-              type={field.type || "text"}
-              value={formValues[field.name]}
-              onChange={(e) =>
-                setFormValues((prev) => ({
-                  ...prev,
-                  [field.name]: e.target.value,
-                }))
-              }
-            />
+            {field.type === "increment" ? (
+              <InputNumber
+                min={0}
+                max={
+                  parseInt(formValues.seats || 0, 10) > 2
+                    ? parseInt(formValues.seats || 0, 10) - 2
+                    : 0
+                }
+                value={formValues[field.name] || 0}
+                onChange={(value) =>
+                  setFormValues((prev) => ({
+                    ...prev,
+                    [field.name]: value,
+                  }))
+                }
+              />
+            ) : (
+              <input
+                type={field.type || "text"}
+                value={formValues[field.name]}
+                onChange={(e) =>
+                  setFormValues((prev) => ({
+                    ...prev,
+                    [field.name]: e.target.value,
+                  }))
+                }
+              />
+            )}
           </div>
         ))}
 

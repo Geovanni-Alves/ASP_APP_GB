@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./ParentsPage.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { API } from "aws-amplify";
+// import { API } from "aws-amplify";
 import {
   faPenToSquare,
   faTrash,
@@ -20,22 +20,22 @@ function ParentsPage() {
   const [updatedName, setUpdatedName] = useState("");
   const parentsPerPage = 4;
 
-  useEffect(() => {
-    const fetchParents = async () => {
-      const variables = {
-        filter: {
-          userType: { eq: "PARENT" },
-        },
-      };
-      const employeesResponse = await API.graphql({
-        query: listUsers,
-        variables: variables,
-      });
-      const parents = employeesResponse.data.listUsers.items;
-      setParents(parents);
-    };
-    fetchParents();
-  }, []);
+  // useEffect(() => {
+  //   const fetchParents = async () => {
+  //     const variables = {
+  //       filter: {
+  //         userType: { eq: "PARENT" },
+  //       },
+  //     };
+  //     const employeesResponse = await API.graphql({
+  //       query: listUsers,
+  //       variables: variables,
+  //     });
+  //     const parents = employeesResponse.data.listUsers.items;
+  //     setParents(parents);
+  //   };
+  //   fetchParents();
+  // }, []);
 
   const handleNextPage = () => {
     setCurrentPage((prevPage) => prevPage + 1);

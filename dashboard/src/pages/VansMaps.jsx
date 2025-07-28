@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { API, graphqlOperation } from "aws-amplify";
+// import { API, graphqlOperation } from "aws-amplify";
 import {
   GoogleMap,
   useLoadScript,
@@ -60,38 +60,38 @@ function Map() {
   const toggleVansMarkers = () => {
     setShowVansMarkers(!showVansMarkers);
   };
-  useEffect(() => {
-    const fetchAdresses = async () => {
-      try {
-        const response = await API.graphql(
-          graphqlOperation(listAddressLists, { limit: 100 })
-        );
-        const adressesData = response.data.listAddressLists.items;
-        setStudentAddresses(adressesData);
-      } catch (error) {
-        console.error("Error fetching vans:", error);
-      }
-    };
-    fetchAdresses();
-  }, []);
+  // useEffect(() => {
+  //   const fetchAdresses = async () => {
+  //     try {
+  //       const response = await API.graphql(
+  //         graphqlOperation(listAddressLists, { limit: 100 })
+  //       );
+  //       const adressesData = response.data.listAddressLists.items;
+  //       setStudentAddresses(adressesData);
+  //     } catch (error) {
+  //       console.error("Error fetching vans:", error);
+  //     }
+  //   };
+  //   fetchAdresses();
+  // }, []);
 
-  useEffect(() => {
-    const fetchRoutes = async () => {
-      try {
-        const response = await API.graphql(
-          graphqlOperation(listRoutes, {
-            filter: { status: { eq: "IN_PROGRESS" } },
-            limit: 100,
-          })
-        );
-        const routesData = response.data.listRoutes.items;
-        setRouteMarkers(routesData);
-      } catch (error) {
-        console.error("Error fetching routes:", error);
-      }
-    };
-    fetchRoutes();
-  }, []);
+  // useEffect(() => {
+  //   const fetchRoutes = async () => {
+  //     try {
+  //       const response = await API.graphql(
+  //         graphqlOperation(listRoutes, {
+  //           filter: { status: { eq: "IN_PROGRESS" } },
+  //           limit: 100,
+  //         })
+  //       );
+  //       const routesData = response.data.listRoutes.items;
+  //       setRouteMarkers(routesData);
+  //     } catch (error) {
+  //       console.error("Error fetching routes:", error);
+  //     }
+  //   };
+  //   fetchRoutes();
+  // }, []);
   return (
     <div className="google-map-container">
       <GoogleMap

@@ -8,18 +8,19 @@ import Home from "./pages/Home";
 import AuthContextProvider from "./contexts/AuthContext";
 import UsersContextProvider from "./contexts/UsersContext.js";
 import GoogleMapsLoader from "./components/GoogleMapsLoader";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 //import Navbar from "./components/Navbar";
-//import Employees from "./components/Employees";
+// import Employees from "./components/Employees";
 import Students from "./pages/Students.jsx";
-import Parents from "./pages/ParentsPage";
+// import Parents from "./pages/ParentsPage";
 import Vans from "./pages/Vans.jsx";
 // import VanDetailPage from "./pages/VanDetailPage";
 import Staff from "./pages/StaffPage";
 //import awsExports from "./aws-exports";
-import VansMaps from "./pages/VansMaps.jsx";
+// import VansMaps from "./pages/VansMaps.jsx";
 import StudentWeeklySchedule from "./pages/StudentWeeklySchedule.jsx";
-import RoutesPage from "./pages/RoutesPage";
+// import RoutesPage from "./pages/RoutesPage";
 import Sidebar from "./components/Sidebar";
 import DashBoardHome from "./pages/DashBoardHome";
 import PickupPlanner from "./pages/PickupPlanner.jsx";
@@ -60,7 +61,7 @@ function App() {
                         path="/students"
                         element={<Students closeMenu={closeMenu} />}
                       />
-                      <Route path="/parents" element={<Parents />} />
+                      {/* <Route path="/parents" element={<Parents />} /> */}
                       <Route
                         path="/staff"
                         element={<Staff closeMenu={closeMenu} />}
@@ -81,8 +82,8 @@ function App() {
                         }
                       />
                       {/* <Route path="/employees" element={<Employees />} /> */}
-                      <Route path="/routes" element={<RoutesPage />} />
-                      <Route path="/maps" element={<VansMaps />} />
+                      {/* <Route path="/routes" element={<RoutesPage />} />
+                      <Route path="/maps" element={<VansMaps />} /> */}
                     </Routes>
                   </div>
                 </div>

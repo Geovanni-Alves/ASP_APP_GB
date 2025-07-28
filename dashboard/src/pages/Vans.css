@@ -6,6 +6,8 @@
   border-radius: 40px;
   transition: left 0.3s ease;
   max-height: 900px; */
+  display: flex;
+  flex-direction: column;
   position: fixed;
   top: 0;
   bottom: 0;
@@ -28,15 +30,15 @@
 }
 
 .van-list {
-  /* display: flex; */
+  display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 20px;
   margin-top: 20px;
 }
 
-.vans-card {
-  display: flex;
-  flex-direction: column;
+.list-vans-card {
+  flex: 1 1 250px;
+  max-width: 250px;
   justify-content: space-between;
   width: 260px;
   /* background: #f9f9f9; */

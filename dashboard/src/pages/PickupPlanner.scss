@@ -53,9 +53,6 @@
   overflow-y: auto;
 }
 
-.kids-card {
-  grid-area: kids;
-}
 .absents-card {
   grid-area: absents;
 }
@@ -68,8 +65,6 @@
 }
 
 .absents-card {
-  // border-color: #ff4d4f;
-  // background: #fff7f7;
   border-left-width: 6px;
   border-left-color: #ff4d4f;
   .ant-card-head-title {
@@ -110,13 +105,38 @@
   padding: 0 12px;
 }
 
-.vans-card {
-  grid-area: vans;
-  overflow-y: auto;
+.kids-card-header {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-height: 595px;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 2;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #eee;
+}
+
+.kids-title {
+  font-weight: bold;
+  font-size: 16px;
+  margin-top: 6px;
+}
+
+.expand-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+
+  button {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    width: fit-content;
+  }
 }
 
 .kids-card {
@@ -125,8 +145,11 @@
   flex-direction: column;
   min-height: 0;
   max-height: 802px;
+  // max-height: 100%;
+  padding-right: 8px;
   height: auto;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .route-pill-row {
@@ -135,6 +158,7 @@
   flex-wrap: wrap;
   margin-bottom: 4px;
 }
+
 .school-pill {
   background: #eee;
   padding: 2px 6px;
@@ -145,27 +169,46 @@
 }
 
 .vans-card {
+  grid-area: vans;
   min-height: 0;
   width: auto;
   overflow-y: auto;
-  flex-direction: column;
   gap: 20px;
+  display: flex;
+  flex-direction: column;
+  max-height: 595px;
 }
 
 .van-card {
   flex: 0 0 auto;
   width: auto;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
-  padding: 20px;
+  padding: 10px;
 }
+
 .van-card.full {
   border-color: #ff4d4f;
   background: #fff1f0;
 }
+
 .warning-text {
   margin-top: 6px;
   color: #ff4d4f;
   font-weight: 600;
+}
+
+.absent-btn {
+  background: #ffcccc;
+  border: none;
+  padding: 2px 6px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-left: 4px;
+
+  &:hover {
+    background: #ff9999;
+  }
 }
 
 /* ================= SCHOOL / KIDS LIST ================= */
@@ -197,7 +240,7 @@ $cell-border: #d6e4ff;
   margin-bottom: 4px;
   width: 100%;
   padding-left: 8px;
-  // display: flex;
+  display: flex;
 }
 
 .kidList-row-list {
@@ -224,6 +267,7 @@ $cell-border: #d6e4ff;
   min-height: 24px;
   max-width: 480px;
 }
+
 .kid-pill.abs-row {
   list-style: none;
   background: $cell-bg;
@@ -235,7 +279,7 @@ $cell-border: #d6e4ff;
 .back-btn {
   all: unset;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
   margin-right: 6px;
   color: #1677ff;
 }
@@ -244,9 +288,11 @@ $cell-border: #d6e4ff;
 .van-table.header,
 .van-table.row {
   display: grid;
-  grid-template-columns: 2rem 1fr 1fr 0.5fr 7rem 2.2rem;
-  gap: 6px;
-  padding: 4px 6px;
+  // grid-template-columns: 1.5rem 0.8fr 0.8fr 0.5fr 5.5rem 2rem;
+  grid-template-columns: 3rem 18rem 18rem 12rem 7.5rem 5rem;
+  gap: 4px;
+  padding: 2px 3px;
+  line-height: 1.5;
 }
 
 .resp-chip-wrapper {
@@ -298,7 +344,34 @@ $cell-border: #d6e4ff;
   font-size: 0.8rem;
 }
 
-.driver-row {
+.staff-chip {
+  display: inline-block;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 13px;
+  margin-right: 6px;
+  background: transparent; // no background
+  white-space: nowrap;
+  max-width: 160px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.helper-chips {
+  display: flex;
+  flex-wrap: wrap;
+  // gap: 2px;
+}
+
+.driver-icon {
+  color: #52c41a; /* verde do Ant Design (success) */
+  margin-left: 6px;
+  vertical-align: middle;
+  font-size: 18px;
+}
+
+.staffs-row {
   display: flex;
   gap: 6px;
   align-items: center;
@@ -308,7 +381,7 @@ $cell-border: #d6e4ff;
     padding: 2px 8px;
     border-radius: 12px;
     background: $cell-bg;
-    border: 1px solid $cell-border;
+    // border: 1px solid $cell-border;
   }
   .driver-label,
   .helper-label {
@@ -316,6 +389,13 @@ $cell-border: #d6e4ff;
     border: none;
     padding: 0;
   }
+}
+
+.driver-name {
+  @extend .staff-chip;
+  border-color: #2f54eb;
+  color: #2f54eb;
+  font-weight: 600;
 }
 
 /* ================= STATES & MISC ================= */
