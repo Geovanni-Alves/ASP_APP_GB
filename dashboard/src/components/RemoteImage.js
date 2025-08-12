@@ -95,7 +95,16 @@ const RemoteImage = ({
 
   if (onlyReturnUrl) return null;
 
-  const fontSize = style?.height ? style.height / 2 : 20;
+  // const fontSize = style?.height ? style.height / 2 : 20;
+  // Safely derive a number from style.height (handles numbers, "40px", "40", etc.)
+  const rawH = style?.height;
+  const heightNum =
+    typeof rawH === "number"
+      ? rawH
+      : rawH != null
+      ? Number.parseFloat(String(rawH).replace("px", ""))
+      : NaN;
+  const fontSize = Number.isFinite(heightNum) ? heightNum / 2 : 20;
 
   const FullScreenOverlay = () => (
     <div

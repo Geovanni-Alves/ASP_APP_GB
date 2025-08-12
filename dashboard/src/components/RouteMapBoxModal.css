@@ -1,0 +1,45 @@
+.custom-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: blue; /* default color, overridden in JS */
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  border: 2px solid white;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+}
+
+.custom-marker-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  font-size: 12px;
+  color: #000;
+}
+
+.custom-marker-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 14px;
+  border: 2px solid white;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+}
+
+.custom-marker-label {
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 2px 5px;
+  border-radius: 3px;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+}

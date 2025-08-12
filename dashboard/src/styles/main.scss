@@ -1,44 +1,54 @@
 @import "./_variables";
 
 body {
-  // overflow: hidden;
-  // height: 100vh;
-  // width: 100vw;
   font-family: $fontFamily;
-  // background-color: $veryLightGreen;
-  // text-transform: capitalize;
 }
 
-// .logoutContainer {
-//   display: flex;
-//   justify-content: center;
-//   align-items: center;
-//   padding: 20px;
-// }
+.App {
+  /* text-align: center; */
+  /* background-color: #61dafb; */
+}
 
-// .logoutButton {
-//   margin-top: 30px;
-//   background-color: red;
-//   color: white;
-//   border: none;
-//   border-radius: 4px;
-//   padding: 10px;
-//   display: flex;
-//   align-items: center;
-//   justify-content: center;
-//   cursor: pointer;
-//   width: 100%;
-// }
+*,
+*:before,
+*:after {
+  box-sizing: border-box;
+}
 
-// .logoutButton .logoutIcon {
-//   width: 20px;
-//   height: 20px;
-// }
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
 
-// .logoutButton span {
-//   margin-left: 10px;
-//   font-weight: bold;
-// }
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .sidebar {
   background-color: $white;
@@ -200,15 +210,24 @@ body {
   .logoContainer {
     display: flex;
     align-items: center;
+    flex-direction: column;
     justify-content: flex-start;
     padding-bottom: 3.2rem;
     width: 100%;
+    text-align: center;
+    // background-color: red;
 
-    h2.title {
-      font-size: 20.42px;
+    .title {
+      font-size: 18px;
       color: $blue;
-      padding: 0 0 0 1rem;
+      // padding: 0 0 0 1rem;
     }
+    .address {
+      font-size: 10px;
+      margin-top: 0.1rem;
+      color: $darkGrey;
+    }
+
     .logo {
       width: 40%;
       transition: width 0.5s ease;
@@ -220,7 +239,7 @@ body {
     background-color: $green;
     position: absolute;
     right: (-35px / 2);
-    top: calc(9rem / 1.15);
+    top: calc(9rem / 1);
     width: 35px;
     height: 35px;
     border-radius: 2rem;
@@ -391,12 +410,6 @@ body {
   width: 4.8rem;
   transition: 0.5s ease;
 
-  // .profileContainer img {
-  //   width: 50px; /* Smaller image when sidebar is collapsed */
-  //   height: 50px;
-  //   transition: width 0.3s, height 0.3s;
-  // }
-
   .profileContents {
     opacity: 0; /* Hide the profile text when sidebar is collapsed */
     transition: opacity 0.3s ease;
@@ -431,12 +444,6 @@ body {
     }
   }
 
-  .profileContainer {
-    .profileContents {
-      opacity: 0;
-    }
-  }
-
   .contentsContainer {
     a {
       opacity: 0;
@@ -450,9 +457,6 @@ body {
   }
 
   .logoContainer.active {
-    h2.title {
-      opacity: 0;
-    }
     .logo {
       width: 100%;
     }

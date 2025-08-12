@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import GbIcon from "../Images/gb-logo.png";
+import supabase from "../lib/supabase";
 //import Profile from "../Images/avatar-image.png";
 import Dashboard from "../Images/dashboard.png";
 import People from "../Images/people.png";
@@ -23,6 +24,9 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const { currentUserData } = useUsersContext();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [aspSchoolName, setAspSchoolName] = useState(null);
+  const [aspSchoolAddress, setAspSchoolAddress] = useState(null);
+
   const { logout } = useAuthContext();
   const dropdownRef = useRef(null);
 
@@ -41,6 +45,30 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
+  }, []);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data, error } = await supabase
+        .from("settings")
+        .select("key, value")
+        .in("key", ["pickup_start_address", "after_school_name"]);
+
+      if (error) {
+        console.error("Error fetching settings:", error);
+        return;
+      }
+
+      const schoolName = data.find((s) => s.key === "after_school_name")?.value;
+      const schoolAddress = data.find(
+        (s) => s.key === "pickup_start_address"
+      )?.value;
+
+      if (schoolName) setAspSchoolName(schoolName);
+      if (schoolAddress) setAspSchoolAddress(schoolAddress);
+    };
+
+    fetchSettings();
   }, []);
 
   const toggleDropdown = () => {
@@ -82,7 +110,12 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
         }
       >
         <img src={GbIcon} alt="icon" className="logo" />
-        <h2 className="title">Gracie Barra</h2>
+        {!closeMenu && (
+          <>
+            <span className="title">{aspSchoolName}</span>
+            <span className="address">{aspSchoolAddress}</span>
+          </>
+        )}
       </div>
       <div
         className={
@@ -92,23 +125,6 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
         <div className="burgerTrigger" onClick={toggleMenu}></div>
         <div className="burgerMenu"></div>
       </div>
-
-      {/* <div
-        className={
-          closeMenu === false ? "profileContainer" : "profileContainer active"
-        }
-      >
-        <RemoteImage
-          path={currentUserData?.photo}
-          name={currentUserData?.name}
-          bucketName="profilePhotos"
-          className="profile"
-        />
-        <div className="profileContents">
-          <p className="name">{currentUserData?.name}</p>
-          <p>{currentUserData?.email}</p>
-        </div>
-      </div> */}
 
       {/* Profile Button (Styled as a card) */}
       <div

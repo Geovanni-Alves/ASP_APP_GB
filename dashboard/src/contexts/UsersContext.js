@@ -14,6 +14,7 @@ const UsersContextProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [showCompleteProfile, setShowCompleteProfile] = useState(false); // Track if profile completion is needed
   const { session } = useAuthContext();
+  const [staff, setStaff] = useState(null);
 
   useEffect(() => {
     if (session) {
@@ -138,6 +139,13 @@ const UsersContextProvider = ({ children }) => {
     getUsersData();
   }, [authUser]);
 
+  useEffect(() => {
+    if (!users?.length) return;
+
+    const filtered = users.filter((user) => user.userType === "Staff");
+    setStaff(filtered);
+  }, [users]);
+
   const RefreshCurrentUserData = async () => {
     await getCurrentUserData();
   };
@@ -146,6 +154,7 @@ const UsersContextProvider = ({ children }) => {
     <UsersContext.Provider
       value={{
         users,
+        staff,
         authUser,
         dbUser,
         setDbUser,
