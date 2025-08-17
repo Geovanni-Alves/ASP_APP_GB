@@ -1,7 +1,7 @@
 import { createContext, useState, useEffect, useContext } from "react";
 import supabase from "../lib/supabase";
 import { useAuthContext } from "./AuthContext";
-import CompleteProfile from "../components/CompleteProfile";
+import CompleteProfile from "../components/CompleteProfile/CompleteProfile";
 
 const UsersContext = createContext({});
 

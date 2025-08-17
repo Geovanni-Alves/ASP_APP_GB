@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import supabase from "../lib/supabase"; // Your Supabase instance
+import supabase from "../../lib/supabase"; // Your Supabase instance
 
 // In-memory cache
 const imageCache = {};

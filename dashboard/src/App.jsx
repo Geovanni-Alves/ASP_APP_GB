@@ -13,18 +13,18 @@ import "../src/styles/main.scss";
 import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
-import Home from "./pages/Home";
+// import Home from "./pages/Home";
 import AuthContextProvider from "./contexts/AuthContext";
 import UsersContextProvider from "./contexts/UsersContext.js";
-import GoogleMapsLoader from "./components/GoogleMapsLoader";
+import GoogleMapsLoader from "./components/GoogleMapsAutocomplete/GoogleMapsLoader";
 import "mapbox-gl/dist/mapbox-gl.css";
 
-import Students from "./pages/Students.jsx";
-import Vans from "./pages/Vans.jsx";
-import Staff from "./pages/StaffPage";
+import Students from "./pages/Students/Students.jsx";
+import Vans from "./pages/Vans/Vans.jsx";
+import Staff from "./pages/Staff/StaffPage.jsx";
 import StudentWeeklySchedule from "./pages/StudentWeeklySchedule.jsx";
-import Sidebar from "./components/Sidebar";
-import DashBoardHome from "./pages/DashBoardHome";
+import Sidebar from "./components/Sidebar/Sidebar.jsx";
+import DashBoardHome from "./pages/Home/DashBoardHome.jsx";
 import KidsContext from "./contexts/KidsContext";
 import PicturesContext from "./contexts/PicturesContext.js";
 import PickupPlanner from "./components/PickupPlanner/PickupPlanner";
@@ -58,7 +58,7 @@ function App() {
                   >
                     <Routes>
                       <Route path="/" element={<DashBoardHome />} />
-                      <Route path="/weekdays" element={<Home />} />
+                      {/* <Route path="/weekdays" element={<Home />} /> */}
                       <Route
                         path="/students"
                         element={<Students closeMenu={closeMenu} />}

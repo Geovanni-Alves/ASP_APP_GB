@@ -12,8 +12,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import AddVan from "./AddVan";
 import { Link } from "react-router-dom";
-import { createVan, updateVan, deleteVan } from "../graphql/mutations";
-import { listVans, getVan } from "../graphql/queries";
+import { createVan, updateVan, deleteVan } from "../../graphql/mutations";
+import { listVans, getVan } from "../../graphql/queries";
 
 function Vans() {
   const [students, setStudents] = useState([]);

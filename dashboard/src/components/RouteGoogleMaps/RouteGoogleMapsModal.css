@@ -1,0 +1,108 @@
+/* Container layout */
+.route-modal {
+  display: flex;
+  height: 80vh;
+}
+
+.route-left {
+  width: 340px;
+  padding: 1rem;
+  overflow-y: auto;
+  border-right: 1px solid #eee;
+}
+
+.route-title {
+  margin-top: 0;
+}
+
+/* Stop list */
+.stop-list-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+/* Each stop row */
+.stop-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  /* dynamic accent from JS via: style={{ '--accent': color }} */
+  border-left: 6px solid var(--accent, #e5e7eb);
+}
+
+.stop-row:hover {
+  background: #f0f5ff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  border-color: #c2dbff;
+}
+
+.stop-index {
+  width: 28px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.stop-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.stop-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.stop-eta {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Stop row actions */
+.stop-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* Buttons */
+.btn {
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: #f7f7f7;
+}
+
+.btn:active {
+  transform: translateY(0.5px);
+}
+
+.btn-up {
+  background: #e6f4ff;
+  border-color: #91caff;
+}
+
+.btn-down {
+  background: #fff1f0;
+  border-color: #ffa39e;
+}
+
+/* Footer text */
+.tip {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Map area */
+.route-map {
+  flex: 1;
+}

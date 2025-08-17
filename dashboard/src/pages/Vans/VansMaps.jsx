@@ -10,7 +10,7 @@ import "./VansMaps.css";
 import gbIcon from "../docs/gb-logo.svg";
 import houseIcon from "../docs/icon-house.png";
 import vanIcon from "../docs/van.png";
-import { listAddressLists, listRoutes } from "../graphql/queries";
+import { listAddressLists, listRoutes } from "../../graphql/queries";
 export default function VansMaps() {
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: process.env.REACT_APP_GOOGLEMAPS_APIKEY,

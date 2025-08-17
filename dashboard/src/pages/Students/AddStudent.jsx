@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { API, graphqlOperation } from "aws-amplify";
 import { DataStore } from "@aws-amplify/datastore";
-import { listVans, listKids } from "../graphql/queries";
+import { listVans, listKids } from "../../graphql/queries";
 import { Kid, Van } from "../models";
 
 const AddStudentToVan = () => {

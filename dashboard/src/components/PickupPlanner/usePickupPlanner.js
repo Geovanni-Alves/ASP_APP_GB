@@ -836,6 +836,19 @@ export function usePickupPlanner({ closeMenu }) {
     );
   }
 
+  // NEW: accept new order from the modal and save it immediately
+  function handleModalReorder(vanId, newSchoolOrderIds) {
+    setIsDirty(true);
+    setRoute((prev) => ({
+      ...prev,
+      schoolOrder: {
+        ...prev.schoolOrder,
+        [vanId]: newSchoolOrderIds, // persist order
+      },
+      vanEta: { ...prev.vanEta, [vanId]: null }, // force ETA recalc later
+    }));
+  }
+
   function handleViewRoute(van) {
     if (isRouteLocked)
       return message.warning(
@@ -1245,6 +1258,7 @@ export function usePickupPlanner({ closeMenu }) {
     localVans,
     staff,
     setStaff,
+    selectedVanId,
 
     groupedBySchool,
     expandedKeys,
@@ -1280,6 +1294,7 @@ export function usePickupPlanner({ closeMenu }) {
     savePickupRoute,
     sendPickupRoute,
     handleViewRoute,
+    handleModalReorder,
 
     // drag and drop:
     onDragStart,

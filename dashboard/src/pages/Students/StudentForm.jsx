@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import supabase from "../lib/supabase";
+import supabase from "../../lib/supabase";
 import { Card, Button, Modal } from "antd";
-import AddSchool from "../components/AddSchool";
-import { usePicturesContext } from "../contexts/PicturesContext";
+import AddSchool from "../../components/AddSchool/AddSchool";
+import { usePicturesContext } from "../../contexts/PicturesContext";
 import "./StudentForm.css";
 
 function StudentForm({ onStudentAdded }) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Modal, Input, Button } from "antd";
-import GoogleMapsAutocomplete from "../components/GoogleMapsAutocomplete";
+import GoogleMapsAutocomplete from "../../components/GoogleMapsAutocomplete/GoogleMapsAutocomplete";
 
 const AddressModal = ({ isVisible, onClose, onSave, addressToEdit }) => {
   const [addressData, setAddressData] = useState({

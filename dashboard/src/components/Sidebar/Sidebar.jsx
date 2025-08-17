@@ -1,20 +1,20 @@
 import React, { useState, useRef, useEffect } from "react";
-import GbIcon from "../Images/gb-logo.png";
-import supabase from "../lib/supabase";
+import GbIcon from "../../Images/gb-logo.png";
+import supabase from "../../lib/supabase";
 //import Profile from "../Images/avatar-image.png";
-import Dashboard from "../Images/dashboard.png";
-import People from "../Images/people.png";
-import School from "../Images/school.png";
-import House from "../Images/house.png";
-import GbBus from "../Images/vanDashboard.png";
-import Settings from "../Images/settings.png";
-import ArrowIcon from "../Images/drop-down-arrow.png";
+import Dashboard from "../../Images/dashboard.png";
+import People from "../../Images/people.png";
+import School from "../../Images/school.png";
+import House from "../../Images/house.png";
+import GbBus from "../../Images/vanDashboard.png";
+import Settings from "../../Images/settings.png";
+import ArrowIcon from "../../Images/drop-down-arrow.png";
 import { useLocation } from "react-router-dom";
-import { useUsersContext } from "../contexts/UsersContext";
-import { useAuthContext } from "../contexts/AuthContext";
+import { useUsersContext } from "../../contexts/UsersContext";
+import { useAuthContext } from "../../contexts/AuthContext";
 import { FaSignOutAlt, FaUser } from "react-icons/fa";
-import RemoteImage from "./RemoteImage";
-import DialogBox from "./UiComponents/DialogBox";
+import RemoteImage from "../../components/RemoteImage/RemoteImage.js";
+import DialogBox from "../UiComponents/DialogBox";
 
 const Sidebar = ({ closeMenu, toggleMenu }) => {
   const location = useLocation();

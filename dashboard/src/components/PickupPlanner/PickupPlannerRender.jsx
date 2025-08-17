@@ -6,7 +6,7 @@ import { RightOutlined } from "@ant-design/icons";
 import { FaCar } from "react-icons/fa";
 import { MdOutlineAirlineSeatReclineNormal } from "react-icons/md";
 import { TbSteeringWheel } from "react-icons/tb";
-import RouteGoogleMapsModal from "../RouteGoogleMapsModal.js";
+import RouteGoogleMapsModal from "../RouteGoogleMaps/RouteGoogleMapsModal.js";
 import supabase from "../../lib/supabase";
 import dayjs from "dayjs";
 import "./PickupPlanner.scss";
@@ -32,6 +32,7 @@ export default function PickupPlannerRender(props) {
     localVans,
     staff,
     setStaff,
+    selectedVanId,
 
     // derived
     groupedBySchool,
@@ -65,6 +66,7 @@ export default function PickupPlannerRender(props) {
     savePickupRoute,
     sendPickupRoute,
     handleViewRoute,
+    handleModalReorder,
 
     // dnd
     onDragStart,
@@ -158,6 +160,8 @@ export default function PickupPlannerRender(props) {
           onClose={() => setShowMap(false)}
           coordinates={routeCoords}
           onRouteETA={onRouteETA}
+          vanId={selectedVanId}
+          onReorderStops={handleModalReorder}
         />
 
         <DatePicker

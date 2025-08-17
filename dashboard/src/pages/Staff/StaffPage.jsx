@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import supabase from "../lib/supabase";
+import supabase from "../../lib/supabase";
 import "./StaffPage.css";
-import RemoteImage from "../components/RemoteImage";
+import RemoteImage from "../../components/RemoteImage/RemoteImage";
 import { Button, Modal, Input, Card } from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {

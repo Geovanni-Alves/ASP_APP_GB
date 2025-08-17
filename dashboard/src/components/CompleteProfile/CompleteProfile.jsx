@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-import { useAuthContext } from "../../src/contexts/AuthContext";
+import { useAuthContext } from "../../contexts/AuthContext";
 import "./CompleteProfile.css";
 
 const CompleteProfile = ({ email, onCreateUser }) => {

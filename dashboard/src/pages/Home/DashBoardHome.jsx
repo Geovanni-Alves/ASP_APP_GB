@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { usePicturesContext } from "../contexts/PicturesContext";
+import { usePicturesContext } from "../../contexts/PicturesContext";
 
 const DashBoardHome = () => {
   const [selectedFile, setSelectedFile] = useState(null);

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-import supabase from "../lib/supabase";
+import supabase from "../../lib/supabase";
 import { Modal, Button, Card } from "antd";
 import "./Students.css";
-import StudentForm from "../pages/StudentForm";
+import StudentForm from "./StudentForm";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPenToSquare,
@@ -12,14 +12,14 @@ import {
   faStars,
   faStar,
 } from "@fortawesome/free-solid-svg-icons";
-import GoogleMapsAutocomplete from "../components/GoogleMapsAutocomplete";
+// import GoogleMapsAutocomplete from "../components/GoogleMapsAutocomplete";
 import { redirect, useLocation } from "react-router-dom";
-import { useKidsContext } from "../contexts/KidsContext";
-import { usePicturesContext } from "../contexts/PicturesContext";
+import { useKidsContext } from "../../contexts/KidsContext";
+import { usePicturesContext } from "../../contexts/PicturesContext";
 // import { Storage } from "aws-amplify";
-import RemoteImage from "../components/RemoteImage";
-import ContactModal from "./ContactModal";
-import AddressModal from "./AddressModal";
+import RemoteImage from "../../components/RemoteImage/RemoteImage";
+import ContactModal from "../Contacts/ContactModal";
+import AddressModal from "../AddressModal/AddressModal";
 
 function Students({ closeMenu }) {
   const { kids, updateKidOnDb, fetchKidsData } = useKidsContext();

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Modal, Button, Card, Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import supabase from "../lib/supabase";
-import RemoteImage from "../components/RemoteImage";
+import supabase from "../../lib/supabase";
+import RemoteImage from "../../components/RemoteImage/RemoteImage";
 import { InputNumber } from "antd";
 import "./Vans.css";
 
