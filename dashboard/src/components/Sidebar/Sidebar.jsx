@@ -13,7 +13,7 @@ import { useLocation } from "react-router-dom";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { useAuthContext } from "../../contexts/AuthContext";
 import { FaSignOutAlt, FaUser } from "react-icons/fa";
-import RemoteImage from "../../components/RemoteImage/RemoteImage.js";
+import RemoteImage from "../../components/RemoteImage/RemoteImage.jsx";
 import DialogBox from "../UiComponents/DialogBox";
 
 const Sidebar = ({ closeMenu, toggleMenu }) => {

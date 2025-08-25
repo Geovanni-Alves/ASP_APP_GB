@@ -4,8 +4,8 @@ import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import supabase from "../../lib/supabase.js";
 import { message } from "antd";
-import { useKidsContext } from "../../contexts/KidsContext.js";
-import { useUsersContext } from "../../contexts/UsersContext.js";
+import { useKidsContext } from "../../contexts/KidsContext.jsx";
+import { useUsersContext } from "../../contexts/UsersContext.jsx";
 
 dayjs.extend(isoWeek);
 

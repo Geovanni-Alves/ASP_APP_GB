@@ -1,4 +1,4 @@
-/* Container layout */
+/* Layout */
 .route-modal {
   display: flex;
   height: 80vh;
@@ -15,13 +15,18 @@
   margin-top: 0;
 }
 
-/* Stop list */
+/* Stop list container */
 .stop-list-title {
   font-weight: 600;
   margin-bottom: 6px;
 }
 
-/* Each stop row */
+.stop-list.droppable-over .stop-row {
+  /* subtle highlight while dragging over the list */
+  transition: background 0.15s ease;
+}
+
+/* Each stop row (accent color comes from inline CSS var --accent) */
 .stop-row {
   display: flex;
   align-items: center;
@@ -33,7 +38,6 @@
   background: #fafafa;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-  /* dynamic accent from JS via: style={{ '--accent': color }} */
   border-left: 6px solid var(--accent, #e5e7eb);
 }
 
@@ -43,6 +47,26 @@
   border-color: #c2dbff;
 }
 
+.stop-row.dragging {
+  background: #eef3ff;
+  border-color: #91caff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Drag handle (like Google Maps grip) */
+.drag-handle {
+  cursor: grab;
+  font-size: 16px;
+  line-height: 1;
+  color: #8c8c8c;
+  user-select: none;
+  padding: 0 4px;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Index + text */
 .stop-index {
   width: 28px;
   text-align: right;
@@ -67,13 +91,12 @@
   opacity: 0.7;
 }
 
-/* Stop row actions */
+/* Buttons */
 .stop-actions {
   display: flex;
   gap: 4px;
 }
 
-/* Buttons */
 .btn {
   padding: 2px 6px;
   border-radius: 4px;
@@ -81,28 +104,24 @@
   border: 1px solid transparent;
   background: #f7f7f7;
 }
-
 .btn:active {
   transform: translateY(0.5px);
 }
-
 .btn-up {
   background: #e6f4ff;
   border-color: #91caff;
 }
-
 .btn-down {
   background: #fff1f0;
   border-color: #ffa39e;
 }
 
-/* Footer text */
-.tip {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
 /* Map area */
 .route-map {
   flex: 1;
+}
+
+.tip {
+  font-size: 12px;
+  opacity: 0.7;
 }

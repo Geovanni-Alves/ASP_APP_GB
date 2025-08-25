@@ -1,7 +1,8 @@
 // components/RouteMapModalGoogle.jsx
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Modal } from "antd";
-import "./RouteGoogleMapsModal.css";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import "./PickupRouteGoogleMapsModal.css";
 
 export default function RouteMapModalGoogle({
   open,
@@ -16,7 +17,7 @@ export default function RouteMapModalGoogle({
 
   const [totalTime, setTotalTime] = useState(null);
   const [etas, setETAs] = useState([]);
-  const apikey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+  const apikey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   const lastCoordsKey = useRef(null);
   const lastRouteResult = useRef(null);
@@ -24,8 +25,30 @@ export default function RouteMapModalGoogle({
   const infoRef = useRef(null);
 
   const directionsRendererRef = useRef(null);
-  const routeCacheRef = useRef(new Map());
+  const routeCacheRef = useRef(new Map()); // LRU implemented below
   const rebuildTimerRef = useRef(null);
+
+  // ---- helpers ----
+  const LRU_MAX = 20;
+  const lruGet = (key) => {
+    const cache = routeCacheRef.current;
+    if (!cache.has(key)) return null;
+    const val = cache.get(key);
+    // refresh recency
+    cache.delete(key);
+    cache.set(key, val);
+    return val;
+  };
+  const lruSet = (key, val) => {
+    const cache = routeCacheRef.current;
+    if (cache.has(key)) cache.delete(key);
+    cache.set(key, val);
+    // evict oldest
+    if (cache.size > LRU_MAX) {
+      const firstKey = cache.keys().next().value;
+      cache.delete(firstKey);
+    }
+  };
 
   const SCHOOL_COLORS = [
     "#0074D9",
@@ -99,11 +122,15 @@ export default function RouteMapModalGoogle({
     };
   }
 
+  // ----------------------------
+  // Local reorderable stops state
+  // ----------------------------
   const [stops, setStops] = useState([]);
   useEffect(() => {
     setStops(coordinates?.slice(1) ?? []);
   }, [open, coordinates]);
 
+  // Cache key for the exact order (start + ordered stops)
   const orderKey = useMemo(() => {
     if (!coordinates?.length) return "";
     const startKey = `${coordinates[0].lat},${coordinates[0].lng}`;
@@ -113,9 +140,11 @@ export default function RouteMapModalGoogle({
     return `${startKey}::${stopKey}`;
   }, [coordinates, stops]);
 
-  const debouncedRebuildRoute = () => {
+  const rebuildRoute = () => {
     if (!mapRef.current || !window.google || !coordinates?.length) return;
-    const cached = routeCacheRef.current.get(orderKey);
+
+    // Serve from cache first
+    const cached = lruGet(orderKey);
     if (cached) {
       directionsRendererRef.current.setDirections(cached);
       handleETAs(cached);
@@ -125,42 +154,44 @@ export default function RouteMapModalGoogle({
       return;
     }
 
-    const run = () => {
-      const google = window.google;
-      const directionsService = new google.maps.DirectionsService();
-      const waypoints = stops.map((coord) => ({
-        location: { lat: coord.lat, lng: coord.lng },
-        stopover: true,
-      }));
-      directionsService.route(
-        {
-          origin: { lat: coordinates[0].lat, lng: coordinates[0].lng },
-          destination: { lat: coordinates[0].lat, lng: coordinates[0].lng },
-          waypoints,
-          optimizeWaypoints: false,
-          travelMode: google.maps.TravelMode.DRIVING,
-          drivingOptions: {
-            departureTime: new Date(),
-            trafficModel: "bestguess",
-          },
-        },
-        (result, status) => {
-          if (status === "OK") {
-            routeCacheRef.current.set(orderKey, result);
-            lastCoordsKey.current = orderKey;
-            lastRouteResult.current = result;
-            directionsRendererRef.current.setDirections(result);
-            handleETAs(result);
-            drawCustomMarkers([coordinates[0], ...stops]);
-          } else {
-            console.warn("Directions request failed due to " + status);
-          }
-        }
-      );
-    };
+    const google = window.google;
+    const directionsService = new google.maps.DirectionsService();
+    const waypoints = stops.map((coord) => ({
+      location: { lat: coord.lat, lng: coord.lng },
+      stopover: true,
+    }));
 
+    directionsService.route(
+      {
+        origin: { lat: coordinates[0].lat, lng: coordinates[0].lng },
+        destination: { lat: coordinates[0].lat, lng: coordinates[0].lng },
+        waypoints,
+        optimizeWaypoints: false,
+        travelMode: google.maps.TravelMode.DRIVING,
+        drivingOptions: {
+          departureTime: new Date(),
+          trafficModel: "bestguess",
+        },
+      },
+      (result, status) => {
+        if (status === "OK") {
+          lruSet(orderKey, result);
+          lastCoordsKey.current = orderKey;
+          lastRouteResult.current = result;
+          directionsRendererRef.current.setDirections(result);
+          handleETAs(result);
+          drawCustomMarkers([coordinates[0], ...stops]);
+        } else {
+          console.warn("Directions request failed due to " + status);
+        }
+      }
+    );
+  };
+
+  // Debounced rebuild to limit Google calls
+  const debouncedRebuildRoute = () => {
     if (rebuildTimerRef.current) clearTimeout(rebuildTimerRef.current);
-    rebuildTimerRef.current = setTimeout(run, 700);
+    rebuildTimerRef.current = setTimeout(rebuildRoute, 700);
   };
 
   useEffect(() => {
@@ -168,6 +199,9 @@ export default function RouteMapModalGoogle({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderKey, open]);
 
+  // ----------------------------
+  // Google Maps bootstrap / init
+  // ----------------------------
   useEffect(() => {
     if (!open || !coordinates?.length || !mapContainer.current) return;
 
@@ -216,6 +250,9 @@ export default function RouteMapModalGoogle({
     debouncedRebuildRoute();
   };
 
+  // ----------------------------
+  // ETA + markers
+  // ----------------------------
   function handleETAs(directionsResult) {
     const legs = directionsResult.routes[0]?.legs || [];
     const etasInMinutes = legs.map((leg) =>
@@ -289,6 +326,35 @@ export default function RouteMapModalGoogle({
     });
   }
 
+  // ----------------------------
+  // Drag & Drop reordering (like Google Maps)
+  // ----------------------------
+  const reorder = (list, startIndex, endIndex) => {
+    const result = Array.from(list);
+    const [removed] = result.splice(startIndex, 1);
+    result.splice(endIndex, 0, removed);
+    return result;
+  };
+
+  const onDragEnd = (result) => {
+    const { destination, source } = result;
+    if (!destination) return;
+    if (destination.index === source.index) return;
+
+    const next = reorder(stops, source.index, destination.index);
+    setStops(next);
+
+    // Sync new order back to parent (schoolOrder[vanId])
+    onReorderStops?.(
+      vanId,
+      next.map((s) => s.schoolId ?? null).filter(Boolean)
+    );
+
+    // Hint parent that ETA should be recomputed (we clear it there)
+    if (typeof onRouteETA === "function") onRouteETA(null);
+  };
+
+  // Fallback button reordering (still here; uses same caching/debounce)
   const moveUp = (idx) => {
     if (idx <= 0) return;
     const next = stops.slice();
@@ -330,42 +396,71 @@ export default function RouteMapModalGoogle({
           </p>
 
           <div style={{ marginTop: 12 }}>
-            <div className="stop-list-title">Stops (reorder with buttons):</div>
-            {stops.map((s, idx) => {
-              // set a CSS variable for the accent based on school color
-              const accent = getSchoolColor(s.schoolId);
-              return (
-                <div
-                  key={`${s.schoolId ?? s.name ?? idx}-${idx}`}
-                  className="stop-row"
-                  style={{ "--accent": accent }}
-                >
-                  <div className="stop-index">{idx + 1}.</div>
-                  <div className="stop-meta">
-                    <div className="stop-name">{s.name || "Stop"}</div>
-                    {etas[idx] != null && (
-                      <div className="stop-eta">ETA: {etas[idx]} min</div>
-                    )}
+            <div className="stop-list-title">Stops (drag to reorder):</div>
+
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="stopsList">
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`stop-list ${
+                      snapshot.isDraggingOver ? "droppable-over" : ""
+                    }`}
+                  >
+                    {stops.map((s, idx) => {
+                      const accent = getSchoolColor(s.schoolId);
+                      const draggableId = String(
+                        s.schoolId ?? `${s.lat},${s.lng}` ?? idx
+                      );
+                      return (
+                        <Draggable
+                          key={draggableId}
+                          draggableId={draggableId}
+                          index={idx}
+                        >
+                          {(dragProvided, dragSnapshot) => (
+                            <div
+                              ref={dragProvided.innerRef}
+                              {...dragProvided.draggableProps}
+                              className={`stop-row ${
+                                dragSnapshot.isDragging ? "dragging" : ""
+                              }`}
+                              style={{
+                                "--accent": accent,
+                                ...dragProvided.draggableProps.style,
+                              }}
+                            >
+                              <div
+                                className="drag-handle"
+                                title="Drag to reorder"
+                                {...dragProvided.dragHandleProps}
+                              >
+                                ⠿
+                              </div>
+
+                              <div className="stop-index">{idx + 1}.</div>
+
+                              <div className="stop-meta">
+                                <div className="stop-name">
+                                  {s.name || "Stop"}
+                                </div>
+                                {etas[idx] != null && (
+                                  <div className="stop-eta">
+                                    ETA: {etas[idx]} min
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
                   </div>
-                  <div className="stop-actions">
-                    <button
-                      className="btn btn-up"
-                      onClick={() => moveUp(idx)}
-                      title="Move up"
-                    >
-                      ⇧
-                    </button>
-                    <button
-                      className="btn btn-down"
-                      onClick={() => moveDown(idx)}
-                      title="Move down"
-                    >
-                      ⇩
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+                )}
+              </Droppable>
+            </DragDropContext>
           </div>
 
           <hr />
@@ -375,9 +470,10 @@ export default function RouteMapModalGoogle({
               ? `${totalTime} min`
               : "—"}{" "}
           </h4>
-          <div className="tip">
-            Changes are debounced & cached to limit Google requests.
-          </div>
+          {/* <div className="tip">
+            Drag reorders are debounced & cached (LRU) to reduce Google
+            requests.
+          </div> */}
         </div>
 
         {/* MAP */}

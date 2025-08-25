@@ -1,0 +1,190 @@
+/* ---------- Layout ---------- */
+.route-modal {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 16px;
+  min-height: 880px;
+}
+
+/* Left info pane */
+.route-left {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.route-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* Map container (right side) */
+.route-map {
+  background: #f8fafc;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  min-height: 880px; /* ensure height even if inline style is changed */
+  /* overflow: hidden; */
+  position: relative;
+}
+
+/* ---------- Stop list ---------- */
+.stop-list-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.stop-list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 6px; /* room for scrollbar */
+}
+
+/* nicer scrollbars (supported browsers) */
+.stop-list::-webkit-scrollbar {
+  width: 8px;
+}
+.stop-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+}
+.stop-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.stop-row {
+  display: grid;
+  grid-template-columns: 28px 24px 1fr;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  border-left: 6px solid var(--accent, #3b82f6);
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.stop-row.dragging {
+  transform: scale(1.01);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.drag-handle {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  width: 24px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  cursor: grab;
+  user-select: none;
+  font-size: 14px;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.stop-index {
+  font-weight: 700;
+  color: #334155;
+  text-align: right;
+}
+
+.stop-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.stop-name {
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.2;
+}
+
+.stop-eta {
+  font-size: 12px;
+  color: #475569;
+}
+
+/* ---------- Headings / totals ---------- */
+.route-left h4 {
+  margin: 12px 0 0;
+  font-weight: 700;
+}
+
+/* ---------- MapLibre marker (HTML version) ---------- */
+.ml-marker {
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 50%;
+  border: 2px solid #fff; /* white ring */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  background: #1677ff; /* fallback color (JS overrides per school) */
+}
+
+.ml-marker.stop {
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 50%;
+  border: 2px solid #fff; /* white ring */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  width: 16px;
+  height: 16px;
+  background: #1677ff; /* fallback color (overridden in JS) */
+}
+
+.ml-marker.stop:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* Fix clicks inside AntD Modal stacking contexts */
+.maplibregl-canvas-container,
+.maplibregl-marker,
+.maplibregl-canvas-container,
+.ml-marker {
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.maplibregl-popup {
+  z-index: 10000; /* higher than AntD modal body if necessary */
+}
+/* MapLibre popup tweaks */
+.maplibregl-popup-content {
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .route-modal {
+    grid-template-columns: 320px 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .route-modal {
+    grid-template-columns: 1fr;
+  }
+  .route-map {
+    min-height: 420px;
+  }
+  .stop-list {
+    max-height: 260px;
+  }
+}

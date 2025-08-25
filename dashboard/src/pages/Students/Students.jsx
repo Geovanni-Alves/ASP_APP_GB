@@ -7,9 +7,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPenToSquare,
   faTrash,
-  faArrowRight,
-  faArrowLeft,
-  faStars,
   faStar,
 } from "@fortawesome/free-solid-svg-icons";
 // import GoogleMapsAutocomplete from "../components/GoogleMapsAutocomplete";

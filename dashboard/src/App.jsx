@@ -14,20 +14,20 @@ import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 // import Home from "./pages/Home";
-import AuthContextProvider from "./contexts/AuthContext";
-import UsersContextProvider from "./contexts/UsersContext.js";
-import GoogleMapsLoader from "./components/GoogleMapsAutocomplete/GoogleMapsLoader";
+import AuthContextProvider from "./contexts/AuthContext.jsx";
+import UsersContextProvider from "./contexts/UsersContext.jsx";
+import GoogleMapsLoader from "./components/GoogleMapsLoader/GoogleMapsLoader.jsx";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import Students from "./pages/Students/Students.jsx";
 import Vans from "./pages/Vans/Vans.jsx";
 import Staff from "./pages/Staff/StaffPage.jsx";
-import StudentWeeklySchedule from "./pages/StudentWeeklySchedule.jsx";
+import StudentWeeklySchedule from "./pages/Students/StudentWeeklySchedule.jsx";
 import Sidebar from "./components/Sidebar/Sidebar.jsx";
 import DashBoardHome from "./pages/Home/DashBoardHome.jsx";
-import KidsContext from "./contexts/KidsContext";
-import PicturesContext from "./contexts/PicturesContext.js";
-import PickupPlanner from "./components/PickupPlanner/PickupPlanner";
+import KidsContext from "./contexts/KidsContext.jsx";
+import PicturesContext from "./contexts/PicturesContext.jsx";
+import PickupPlanner from "./components/PickupPlanner/PickupPlanner.jsx";
 
 function App() {
   const [closeMenu, setCloseMenu] = useState(false);
@@ -38,7 +38,7 @@ function App() {
 
   return (
     <>
-      <GoogleMapsLoader />
+      {/* <GoogleMapsLoader /> */}
       <AuthContextProvider>
         <UsersContextProvider>
           <PicturesContext>

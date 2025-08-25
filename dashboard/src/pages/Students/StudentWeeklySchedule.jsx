@@ -1,7 +1,7 @@
 // src/pages/StudentWeeklySchedule.jsx
 import React, { useMemo, useState } from "react";
 import { Card, Spin, Input, Select } from "antd";
-import { useKidsContext } from "../contexts/KidsContext";
+import { useKidsContext } from "../../contexts/KidsContext";
 import "./StudentWeeklySchedule.scss";
 
 const { Option } = Select;

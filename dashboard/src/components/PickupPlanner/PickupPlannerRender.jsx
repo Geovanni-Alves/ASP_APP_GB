@@ -6,7 +6,8 @@ import { RightOutlined } from "@ant-design/icons";
 import { FaCar } from "react-icons/fa";
 import { MdOutlineAirlineSeatReclineNormal } from "react-icons/md";
 import { TbSteeringWheel } from "react-icons/tb";
-import RouteGoogleMapsModal from "../RouteGoogleMaps/RouteGoogleMapsModal.js";
+import PickupRouteGoogleMapsModal from "../RouteGoogleMaps/PickupRouteGoogleMapsModal.jsx";
+import RouteMapModalOSRM from "../RouteOSRM/RouteMapModalOSRM";
 import supabase from "../../lib/supabase";
 import dayjs from "dayjs";
 import "./PickupPlanner.scss";
@@ -155,7 +156,16 @@ export default function PickupPlannerRender(props) {
       </div>
 
       <div>
-        <RouteGoogleMapsModal
+        {/* <PickupRouteGoogleMapsModal
+          open={showMap}
+          onClose={() => setShowMap(false)}
+          coordinates={routeCoords}
+          onRouteETA={onRouteETA}
+          vanId={selectedVanId}
+          onReorderStops={handleModalReorder}
+        /> */}
+
+        <RouteMapModalOSRM
           open={showMap}
           onClose={() => setShowMap(false)}
           coordinates={routeCoords}

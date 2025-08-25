@@ -12,6 +12,7 @@
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@googlemaps/js-api-loader": "^1.16.8",
     "@iconify/react": "^4.1.1",
+    "@mapbox/polyline": "^1.2.1",
     "@react-google-maps/api": "^2.20.5",
     "@supabase/supabase-js": "^2.45.4",
     "@testing-library/jest-dom": "^5.17.0",
@@ -26,6 +27,7 @@
     "framer-motion": "^11.0.3",
     "lucide-react": "^0.325.0",
     "mapbox-gl": "^3.13.0",
+    "maplibre-gl": "^5.6.2",
     "net": "^1.0.2",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
@@ -40,12 +42,15 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "osrm": "node scripts/start-osrm.js",
+    "start-server": "npm --prefix ./server start",
+    "dev": "concurrently -n OSRM,API,WEB -c cyan,magenta,green \"npm:osrm\" \"npm run start-server\" \"vite\"",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start-cra": "react-scripts start",
+    "build-cra": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "dev": "concurrently \"npm run start\" \"npm run start-server\"",
-    "start-server": "npm --prefix ./server start"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
@@ -67,7 +72,10 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "concurrently": "^9.1.2",
-    "dotenv-webpack": "^8.0.1"
+    "@vitejs/plugin-react": "^5.0.1",
+    "concurrently": "^9.2.0",
+    "dotenv-webpack": "^8.0.1",
+    "nodemon": "^3.1.10",
+    "vite": "^7.1.3"
   }
 }
