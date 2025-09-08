@@ -6,7 +6,7 @@ import { RightOutlined } from "@ant-design/icons";
 import { FaCar } from "react-icons/fa";
 import { MdOutlineAirlineSeatReclineNormal } from "react-icons/md";
 import { TbSteeringWheel } from "react-icons/tb";
-import PickupRouteGoogleMapsModal from "../RouteGoogleMaps/PickupRouteGoogleMapsModal.jsx";
+// import PickupRouteGoogleMapsModal from "../RouteGoogleMaps/PickupRouteGoogleMapsModal.jsx";
 import RouteMapModalOSRM from "../RouteOSRM/RouteMapModalOSRM";
 import supabase from "../../lib/supabase";
 import dayjs from "dayjs";
@@ -94,8 +94,27 @@ export default function PickupPlannerRender(props) {
   }
 
   const isRouteInProgress = route.status === "in_progress";
+  // const isRouteInPlanning = route.status === "planning" || route.status === "";
   const isRouteLocked =
-    route.status === "waiting_to_start" || route.status === "in_progress";
+    route.status === "waiting_to_start" ||
+    route.status === "in_progress" ||
+    route.status === "finished";
+
+  function getRouteStatusLabel(status) {
+    switch (status) {
+      case "planning":
+      case "":
+        return "Planning"; // user is still planning
+      case "waiting_to_start":
+        return "Ready to Start"; // locked, but can be reverted
+      case "in_progress":
+        return "In Progress"; // currently running
+      case "finished":
+        return "View Only (Finished)"; // completed and blocked
+      default:
+        return "Not started";
+    }
+  }
 
   return (
     <div
@@ -127,13 +146,13 @@ export default function PickupPlannerRender(props) {
               if (!confirm) return;
               const { error } = await supabase
                 .from("routes")
-                .update({ status: "planned" })
+                .update({ status: "planning" })
                 .eq("date", route.date.format("YYYY-MM-DD"))
                 .eq("type", "pickup");
               if (error) message.error("❌ Failed to re-open the route.");
               else {
                 message.success("✅ Route is now editable again.");
-                setRoute((prev) => ({ ...prev, status: "planned" }));
+                setRoute((prev) => ({ ...prev, status: "planning" }));
               }
             }}
           >
@@ -149,7 +168,7 @@ export default function PickupPlannerRender(props) {
           </Button>
         )}
 
-        <span>{route.status}</span>
+        <span>Route Status: {getRouteStatusLabel(route.status)}</span>
         {isRouteInProgress && (
           <span>❌ Cannot re-open. This route is already in progress.</span>
         )}
@@ -172,6 +191,7 @@ export default function PickupPlannerRender(props) {
           onRouteETA={onRouteETA}
           vanId={selectedVanId}
           onReorderStops={handleModalReorder}
+          blockSchoolOrder={isRouteLocked}
         />
 
         <DatePicker
@@ -726,6 +746,10 @@ export default function PickupPlannerRender(props) {
                                 <button
                                   className="absent-btn"
                                   onClick={(e) => {
+                                    if (isRouteLocked)
+                                      return message.warning(
+                                        "❌ Route closed. If you want to change, you need to re-open."
+                                      );
                                     e.stopPropagation();
                                     setRoute((prevRoute) => {
                                       const updatedVans = prevRoute.vans.map(

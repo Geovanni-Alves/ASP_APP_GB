@@ -5,6 +5,7 @@ import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./RouteMapModalOSRM.css";
+import { message } from "antd";
 
 /**
  * Route modal using MapLibre + OSRM (via your backend)
@@ -30,11 +31,9 @@ const SCHOOL_COLORS = [
   "#FF4136",
   "#2ECC40",
   "#FF851B",
-  "#B10DC9",
   "#FFDC00",
   "#7FDBFF",
   "#39CCCC",
-  "#85144b",
   "#3D9970",
 ];
 function getSchoolColor(id) {
@@ -51,11 +50,10 @@ function getSchoolColor(id) {
 ------------------------------ */
 // Start pin (non-numbered school/bus)
 
-function buildBusIcon({ size = 36 } = {}) {
-  const w = 32,
-    h = 48;
+function buildBusIcon({ size = 20 } = {}) {
   const svg = `
-    <svg width="${w}" height="${h}" viewBox="0 0 32 48" xmlns="http://www.w3.org/2000/svg">
+    <svg width="${size}" height="${(size * 30) / 32}" viewBox="0 0 32 48"
+         xmlns="http://www.w3.org/2000/svg">
       <defs><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
         <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
       </filter></defs>
@@ -70,12 +68,12 @@ function buildBusIcon({ size = 36 } = {}) {
       <circle cx="21" cy="20" r="2" fill="#1f2937" stroke="#000" stroke-width="0.5"/>
     </svg>`;
 
-  const img = document.createElement("img"); // <-- HTMLImageElement (OK)
+  const img = document.createElement("img");
   img.src = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   img.style.width = `${size}px`;
-  img.style.height = `${size}px`;
+  img.style.height = `${(size * 48) / 32}px`; // maintain aspect ratio
   img.style.cursor = "pointer";
-  img.style.display = "block"; // avoids stray inline gap
+  img.style.display = "block";
   return img;
 }
 
@@ -83,40 +81,34 @@ function buildBusIcon({ size = 36 } = {}) {
 function buildNumberedSchoolPin({
   number = "",
   size = 26,
-  body = "#facc15",
-  outline = "#1f1f1f",
-  bus = "#fbbf24",
-  windowFill = "#93c5fd",
-  doorFill = "#e5e7eb",
-  wheel = "#1f2937",
-  text = "#111827",
+  body = "#facc15", // background color
+  outline = "#1f1f1f", // circle outline
+  text = "white", // text color
 } = {}) {
   const w = 32,
-    h = 48;
+    h = 32;
   const scale = size / 32;
   const safeNum = String(number);
 
   const svg = `
-    <svg width="${w}" height="${h}" viewBox="0 0 32 48" xmlns="http://www.w3.org/2000/svg">
-      <defs><filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
-      </filter></defs>
+    <svg width="${w}" height="${h}" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
+        </filter>
+      </defs>
 
-      <path d="M16 1C8.268 1 2 7.268 2 15c0 9.73 14 31 14 31s14-21.27 14-31C30 7.268 23.732 1 16 1z"
-        fill="${body}" stroke="${outline}" stroke-width="1.5" filter="url(#shadow)"/>
+      <!-- Background Circle -->
+      <circle cx="16" cy="16" r="14"
+        fill="${body}"
+        stroke="${outline}"
+        stroke-width="1.5"
+        filter="url(#shadow)"/>
 
-      <rect x="7" y="10" width="18" height="10" rx="2" ry="2" fill="${bus}" stroke="#000" stroke-width="1"/>
-      <rect x="9"  y="12" width="3" height="4" fill="${windowFill}" stroke="#000" stroke-width="0.5"/>
-      <rect x="13" y="12" width="3" height="4" fill="${windowFill}" stroke="#000" stroke-width="0.5"/>
-      <rect x="17" y="12" width="3" height="4" fill="${windowFill}" stroke="#000" stroke-width="0.5"/>
-      <rect x="21" y="12" width="3" height="6" fill="${doorFill}"   stroke="#000" stroke-width="0.5"/>
-      <circle cx="11" cy="20" r="2" fill="${wheel}" stroke="#000" stroke-width="0.5"/>
-      <circle cx="21" cy="20" r="2" fill="${wheel}" stroke="#000" stroke-width="0.5"/>
-
-      <circle cx="8.5" cy="8.5" r="6.8" fill="white" stroke="${outline}" stroke-width="1.2"/>
-      <text x="8.5" y="9.8" text-anchor="middle"
+      <!-- Number -->
+      <text x="16" y="21" text-anchor="middle"
             font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial"
-            font-size="7.8" font-weight="800" fill="${text}">
+            font-size="19" font-weight="400" fill="${text}">
         ${safeNum}
       </text>
     </svg>
@@ -141,12 +133,16 @@ export default function RouteMapModalOSRM({
   coordinates, // [{ lat, lng, name?, schoolId? }, ...] with coordinates[0] = origin
   onRouteETA, // (totalMinutes|null) => void
   vanId,
-  onReorderStops, // (vanId, schoolIdsInOrder[]) => void
+  onReorderStops,
+  blockSchoolOrder,
+  // (vanId, schoolIdsInOrder[]) => void
 }) {
   const mapRef = useRef(null);
   const map = useRef(null);
   const markersRef = useRef([]); // keep markers to clean up
   const rebuildTimerRef = useRef(null);
+
+  // console.log(blockSchoolOrder);
 
   // LRU cache keyed by orderKey; store { fwd, back, fwdTable, backTable }
   const LRU_MAX = 16;
@@ -494,6 +490,7 @@ export default function RouteMapModalOSRM({
 
     // Start (keep as your non-numbered school icon)
     const start = orderedPoints[0];
+    console.log("start", start);
     // const startEl = buildOriginAfterSchoolPin({ size: 28 });
     const startEl = buildBusIcon({ size: 36 });
     const startMarker = new maplibregl.Marker({
@@ -513,6 +510,7 @@ export default function RouteMapModalOSRM({
       <div style="min-width:220px">
         <div style="font-weight:600">Start</div>
         <div>${start.name || "Start Point"}</div>
+        <div>${start.address}</div>
         <div>Lat/Lng: ${Number(start.lat).toFixed(5)}, ${Number(
       start.lng
     ).toFixed(5)}</div>
@@ -525,7 +523,7 @@ export default function RouteMapModalOSRM({
     orderedPoints.slice(1).forEach((s, idx0) => {
       const i = idx0 + 1; // 1..N
       const color = getSchoolColor(s.schoolId ?? "default");
-      const el = buildNumberedSchoolPin({ number: i, size: 26, body: color });
+      const el = buildNumberedSchoolPin({ number: i, size: 30, body: color });
 
       const stopMarker = new maplibregl.Marker({
         element: el,
@@ -546,6 +544,7 @@ export default function RouteMapModalOSRM({
         <div style="min-width:220px">
           <div style="font-weight:600">Stop ${i}</div>
           <div>${s.name || "Stop"}</div>
+          <div>${s.schoolAddress}</div>
           <div>Lat/Lng: ${Number(s.lat).toFixed(5)}, ${Number(s.lng).toFixed(
         5
       )}</div>
@@ -562,6 +561,8 @@ export default function RouteMapModalOSRM({
     });
   }
 
+  // console.log("orderedPoints:", orderedPoints);
+
   /* -----------------------------
      DnD reorder
   ------------------------------ */
@@ -572,6 +573,10 @@ export default function RouteMapModalOSRM({
     return result;
   };
   const onDragEnd = (result) => {
+    if (blockSchoolOrder)
+      return message.warning(
+        "❌ Route closed. If you want to change the School Order, you need to re-open."
+      );
     const { destination, source } = result;
     if (!destination) return;
     if (destination.index === source.index) return;
@@ -600,13 +605,17 @@ export default function RouteMapModalOSRM({
       <div className="route-modal">
         {/* LEFT PANE */}
         <div className="route-left">
-          <h3 className="route-title">Route Overview</h3>
+          <h3 className="route-title">{`Route Overview${
+            blockSchoolOrder ? " (View Only)" : ""
+          }`}</h3>
           <p>
             <strong>Start:</strong> {orderedPoints[0]?.name || "Start Point"}
           </p>
 
           <div style={{ marginTop: 12 }}>
-            <div className="stop-list-title">Stops (drag to reorder):</div>
+            <div className="stop-list-title">{`Stops ${
+              !blockSchoolOrder ? "(drag to reorder)" : ""
+            }:`}</div>
             <DragDropContext onDragEnd={onDragEnd}>
               <Droppable droppableId="stopsList">
                 {(provided, snapshot) => (
