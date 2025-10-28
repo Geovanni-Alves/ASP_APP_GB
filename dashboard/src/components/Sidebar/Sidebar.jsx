@@ -29,6 +29,7 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
 
   const { logout } = useAuthContext();
   const dropdownRef = useRef(null);
+  const profileRef = useRef(null);
 
   // const handleCloseMenu = () => {
   //   setCloseMenu(!closeMenu);
@@ -37,15 +38,36 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
   // Close dropdown if clicked outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (
+        dropdownRef.current &&
+        profileRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        !profileRef.current.contains(event.target)
+      ) {
         setShowDropdown(false);
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (closeMenu) {
+      function handleClickInsideSidebar(event) {
+        const sidebarElement = document.querySelector(".sidebar");
+        if (sidebarElement && sidebarElement.contains(event.target)) {
+          toggleMenu();
+        }
+      }
+
+      document.addEventListener("mousedown", handleClickInsideSidebar);
+
+      return () => {
+        document.removeEventListener("mousedown", handleClickInsideSidebar);
+      };
+    }
+  }, [closeMenu, toggleMenu]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -153,7 +175,7 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
 
         {/* Dropdown Menu */}
         {showDropdown && (
-          <div className="dropdownMenu">
+          <div className="dropdownMenu" ref={dropdownRef}>
             <p className="dropdownTitle">User Options</p>
             <ul>
               <li>

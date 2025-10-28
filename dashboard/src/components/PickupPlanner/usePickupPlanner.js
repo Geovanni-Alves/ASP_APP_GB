@@ -40,6 +40,7 @@ export function usePickupPlanner({ closeMenu }) {
   const [isDirty, setIsDirty] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
+  const [routeDates, setRouteDates] = useState({});
   const [route, setRoute] = useState({
     id: null,
     date: nextBusinessDay(),
@@ -164,6 +165,30 @@ export function usePickupPlanner({ closeMenu }) {
     fetchStaff();
   }, []);
 
+  useEffect(() => {
+    const fetchRouteDates = async () => {
+      const { data, error } = await supabase
+        .from("routes")
+        .select("date, status")
+        .eq("type", "pickup");
+
+      if (error) {
+        console.error("❌ Failed to fetch routes:", error);
+        return;
+      }
+
+      const mapped = {};
+      data.forEach((r) => {
+        mapped[dayjs(r.date).format("YYYY-MM-DD")] = r.status;
+      });
+      // console.log(mapped);
+
+      setRouteDates(mapped);
+    };
+
+    fetchRouteDates();
+  }, []);
+
   // restore saved route for date
   useEffect(() => {
     if (!route.date || !canRestore) return;
@@ -192,6 +217,7 @@ export function usePickupPlanner({ closeMenu }) {
 
       if (!routeData) {
         // No saved route for this date → show empty vans so user can plan
+        // console.log("no route data", routeData, route.status);
         const freshVans = localVans.map((v) => ({
           ...v,
           driver: null,
@@ -204,7 +230,7 @@ export function usePickupPlanner({ closeMenu }) {
 
         setRoute((prev) => ({
           ...prev,
-          status: [],
+          status: "not_started",
           kids: {},
           schoolOrder: {},
           vanEta: {},
@@ -912,6 +938,7 @@ export function usePickupPlanner({ closeMenu }) {
   }
 
   async function savePickupRoute() {
+    // console.log(route?.status);
     const today = route.date.format("YYYY-MM-DD");
     let routeId;
 
@@ -944,7 +971,7 @@ export function usePickupPlanner({ closeMenu }) {
         .insert({
           date: today,
           type: "pickup",
-          status: route.status,
+          status: "planning",
           absents: route.absents.map((a) => a.id),
           created_by: currentUser.id,
         })
@@ -956,6 +983,7 @@ export function usePickupPlanner({ closeMenu }) {
         return;
       }
       routeId = newRoute.id;
+      setRoute((prev) => ({ ...prev, status: "planning" }));
     }
 
     for (const van of route.vans) {
@@ -1051,7 +1079,7 @@ export function usePickupPlanner({ closeMenu }) {
       .update({ status: "waiting_to_start" })
       .eq("type", "pickup")
       .eq("id", route.id);
-    console.log("route", route.id);
+    // console.log("route", route.id);
     // console.log("date", route.date);
     if (error) {
       console.error("❌ Failed to update route status:", error);
@@ -1290,6 +1318,7 @@ export function usePickupPlanner({ closeMenu }) {
     vansLoading,
     staffLoading,
     route,
+    routeDates,
     setRoute,
     isDirty,
     setIsDirty,

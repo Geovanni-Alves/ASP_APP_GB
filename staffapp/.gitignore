@@ -1,4 +1,6 @@
 .env
+.expo/
+
 node_modules
 
 #amplify-do-not-edit-begin

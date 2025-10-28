@@ -26,6 +26,7 @@ export default function PickupPlannerRender(props) {
 
     // state
     route,
+    routeDates,
     setRoute,
     isDirty,
 
@@ -194,13 +195,89 @@ export default function PickupPlannerRender(props) {
           blockSchoolOrder={isRouteLocked}
         />
 
+        {/* <DatePicker
+          value={route.date}
+          onChange={(v) => handleDateChange(v || dayjs())}
+          allowClear={false}
+          disabledDate={(d) => d && d.isoWeekday() >= 6}
+          style={{ marginBottom: 16 }}
+        /> */}
         <DatePicker
           value={route.date}
           onChange={(v) => handleDateChange(v || dayjs())}
           allowClear={false}
           disabledDate={(d) => d && d.isoWeekday() >= 6}
           style={{ marginBottom: 16 }}
+          cellRender={(current, info) => {
+            if (info.type !== "date") return info.originNode;
+
+            const dateStr = current.format("YYYY-MM-DD");
+            const selectedStr = route.date
+              ? route.date.format("YYYY-MM-DD")
+              : null;
+            const isSelected = dateStr === selectedStr;
+
+            const status = routeDates[dateStr];
+            let color = null;
+            switch (status) {
+              case "planning":
+                color = "red";
+                break;
+              case "waiting_to_start":
+                color = "blue";
+                break;
+              case "incomplete":
+                color = "red";
+                break;
+              case "finished":
+                color = "green";
+                break;
+              default:
+                color = null;
+            }
+
+            return (
+              <div
+                style={{
+                  position: "relative",
+                  textAlign: "center",
+                  width: 24,
+                  height: 25,
+                  borderRadius: 6,
+                  backgroundColor: isSelected ? "#1677ff20" : "transparent",
+                  border: isSelected
+                    ? "2px solid #1677ff"
+                    : "1px solid transparent", // 🔷
+                }}
+              >
+                <div
+                  style={{
+                    color: isSelected ? "#1677ff" : "inherit",
+                    fontWeight: isSelected ? 700 : "normal",
+                  }}
+                >
+                  {current.date()}
+                </div>
+
+                {color && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      bottom: -12,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      backgroundColor: color,
+                    }}
+                  />
+                )}
+              </div>
+            );
+          }}
         />
+
         <span> — {dayLabel}</span>
         <span> Kids for today {totalKidsToday - absentsCount}</span>
         <span>

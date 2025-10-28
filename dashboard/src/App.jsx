@@ -16,7 +16,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 // import Home from "./pages/Home";
 import AuthContextProvider from "./contexts/AuthContext.jsx";
 import UsersContextProvider from "./contexts/UsersContext.jsx";
-import GoogleMapsLoader from "./components/GoogleMapsLoader/GoogleMapsLoader.jsx";
+// import GoogleMapsLoader from "./components/GoogleMapsLoader/GoogleMapsLoader.jsx";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import Students from "./pages/Students/Students.jsx";

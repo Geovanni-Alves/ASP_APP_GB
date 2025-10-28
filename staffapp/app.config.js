@@ -88,10 +88,10 @@ export default {
   },
   extra: {
     eas: {
-      projectId: "1f3049ff-13c7-4ab4-8683-52676c43333f",
+      projectId: "f1862bff-d46d-440d-b8b3-669ecca21196",
     },
   },
-  owner: "x3_web_services",
+  owner: "geodarth",
   runtimeVersion: {
     policy: "appVersion",
   },

@@ -238,9 +238,11 @@ body {
   .burgerContainer {
     content: "";
     background-color: $green;
+    // background-color: red;
     position: absolute;
     right: math.div(-35px, 2);
-    top: math.div(35px, 2);
+    // top: math.div(35px, 2);
+    right: -20px;
     width: 35px;
     height: 35px;
     border-radius: 2rem;
@@ -299,10 +301,10 @@ body {
     content: "";
     position: absolute;
     right: 35px;
-    top: math.div(35px, 2);
+    // top: math.div(35px, 2);
     z-index: 0;
     width: calc(6rem + 15rem);
-    background-color: $lightGrey;
+    // background-color: $lightGrey;
     height: 2px;
     transition: 0.5s all;
   }
