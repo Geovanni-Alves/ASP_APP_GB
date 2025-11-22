@@ -9,14 +9,13 @@ const MessageContextProvider = ({ children }) => {
 
   const fetchUnreadMessages = async () => {
     try {
-      const { data: unreadMessages, error } = await supabase
+      const { data, error } = await supabase
         .from("message")
-        .select(`*, users(*)`)
-        .eq("isRead", false);
-      if (error) {
-        throw error;
-      }
-      setUnreadMessages(unreadMessages);
+        .select(`*, users(*), students(*)`)
+        .eq("isread", false);
+      if (error) throw error;
+
+      setUnreadMessages(data || []);
     } catch (error) {
       console.error("Error fetching unread messages:", error);
     }
@@ -27,76 +26,88 @@ const MessageContextProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const UpdatesOnMessages = supabase
+    const message = supabase
       .channel("custom-all-channel")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "message" },
-        (payload) => {
+        async (payload) => {
+          console.log("📩 Realtime event received:", payload);
           if (payload.eventType === "INSERT") {
-            const handleInsert = async () => {
-              //console.log("payload!", payload);
-              const newMessage = payload.new;
-              try {
-                const { data, error } = await supabase
-                  .from("message")
-                  .select(`*,users(*)`)
-                  .eq("id", newMessage.id)
-                  .single();
+            const newMessage = payload.new;
+            const { data, error } = await supabase
+              .from("message")
+              .select(`*, users(*), students(*)`)
+              .eq("id", newMessage.id)
+              .single();
 
-                if (error) {
-                  console.error("Error fetching related user data", error);
-                  return;
-                }
+            if (!error) {
+              setNewMessages((prev) => [...prev, data]);
+              if (!data.isRead) setUnreadMessages((prev) => [...prev, data]);
+            }
+          }
 
-                setNewMessages((prevMessages) => [...prevMessages, data]);
-                setUnreadMessages((prevUnreadMessages) => [
-                  ...prevUnreadMessages,
-                  data,
-                ]);
-              } catch (error) {
-                console.error("Error fetching new message details:", error);
-              }
-            };
-            handleInsert();
-          } else if (payload.eventType === "UPDATE") {
-            const updatedMessage = payload.new;
-            console.log("update on messages");
-            setUnreadMessages((unreadPrevMessages) => {
-              return unreadPrevMessages.map((msg) =>
-                msg.id === updatedMessage.id ? updatedMessage : msg
-              );
-            });
+          if (payload.eventType === "UPDATE") {
+            const updated = payload.new;
+            setUnreadMessages((prev) =>
+              prev.map((msg) => (msg.id === updated.id ? updated : msg))
+            );
           }
         }
       )
       .subscribe();
 
     return () => {
-      UpdatesOnMessages.unsubscribe();
+      message.unsubscribe();
     };
   }, []);
 
-  const getAllMessagesByUser = async (filter, limit) => {
+  const getMessagesByStudent = async (student_id, limit = 50) => {
     try {
-      const { data: messages, error } = await supabase
-        .from("messages")
-        .select("*")
-        .eq(filter.field, filter.value)
+      const { data, error } = await supabase
+        .from("message")
+        .select(`*, users(*), students(*)`)
+        .eq("student_id", student_id)
+        .order("created_at", { ascending: true })
         .limit(limit);
-      if (error) {
-        throw error;
-      }
-      return messages;
+      if (error) throw error;
+      return data;
     } catch (error) {
-      console.error("Error fetching messages by user:", error);
+      console.error("Error fetching messages:", error);
       return [];
     }
   };
 
-  const sendAndNotifyMsg = async (msg, kidData) => {
-    // Send notifications to all staffs in kid chat
-    // Implement your notification logic here
+  const sendAndNotifyMsg = async (student_id, sender_id, text) => {
+    try {
+      // 1️⃣ Salva mensagem
+      const { data: newMessage, error } = await supabase
+        .from("message")
+        .insert([{ student_id, sender_id, text }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // 2️⃣ Busca contatos ligados ao aluno
+      const { data: family, error: familyError } = await supabase
+        .from("student_family")
+        .select(`contacts(id, email, user_id, firstName, lastName)`)
+        .eq("student_id", student_id);
+
+      if (familyError) throw familyError;
+
+      // 3️⃣ Envia notificações (push ou e-mail)
+      for (const rel of family) {
+        const contact = rel.contacts;
+        // exemplo: enviar push/email usando sua lógica
+        console.log(`Notify ${contact.firstName} ${contact.lastName}`);
+      }
+
+      return newMessage;
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
   };
 
   return (
@@ -106,7 +117,6 @@ const MessageContextProvider = ({ children }) => {
         unreadMessages,
         setUnreadMessages,
         setNewMessages,
-        getAllMessagesByUser,
         sendAndNotifyMsg,
       }}
     >

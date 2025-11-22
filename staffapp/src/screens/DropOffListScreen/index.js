@@ -1,7 +1,7 @@
 import styles from "./styles";
 import React, { useState, useEffect } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  SafeAreaView,
   View,
   Text,
   FlatList,
@@ -18,7 +18,7 @@ import {
   useRoute,
 } from "@react-navigation/native";
 import RemoteImage from "../../components/RemoteImage";
-import { useRouteContext } from "../../contexts/RouteContext";
+import { useRouteContext } from "../../contexts/DropOffRouteContext";
 import { useUsersContext } from "../../contexts/UsersContext";
 
 const DropOffListScreen = () => {

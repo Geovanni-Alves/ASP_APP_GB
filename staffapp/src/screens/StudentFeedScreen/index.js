@@ -1,11 +1,11 @@
 import styles from "./styles";
+import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useEffect, useState } from "react";
 import {
   Text,
   View,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Modal,
   Linking,
@@ -13,7 +13,8 @@ import {
 } from "react-native";
 import { FontAwesome, Entypo } from "@expo/vector-icons";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import AntDesign from "@expo/vector-icons/AntDesign";
+// import AntDesign from "@expo/vector-icons/AntDesign";
+import { StarOutlined, StarFilled, StarTwoTone } from "@ant-design/icons";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
@@ -386,7 +387,7 @@ const StudentFeedScreen = () => {
             });
           }}
         >
-          <AntDesign name="staro" size={24} color="black" />
+          <StarOutlined size={24} color="black" />
           <Text style={styles.actionButtonText}>New Activity</Text>
         </Pressable>
         <Pressable

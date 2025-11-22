@@ -27,7 +27,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import Swiper from "react-native-swiper";
-import { Video, ResizeMode } from "expo-av";
+// import { Video, ResizeMode } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
 import { usePicturesContext } from "../contexts/PicturesContext";
 import { useKidsContext } from "../contexts/KidsContext";
 import RemoteImage from "./RemoteImage";
@@ -481,12 +482,11 @@ const OpenCamera = ({
                   />
                 ))
               : mediaUris.map((uri, index) => (
-                  <Video
+                  <VideoView
                     key={index}
                     source={{ uri: uri }}
                     style={styles.fullScreenImage}
                     useNativeControls
-                    resizeMode={ResizeMode.CONTAIN}
                     shouldPlay
                   />
                 ))}

@@ -8,13 +8,17 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useEffect, useState } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 import { useNavigation } from "@react-navigation/native";
-import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
-import { GOOGLE_MAPS_APIKEY } from "@env";
+// import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
+// import { GOOGLE_MAPS_APIKEY } from "@env";
 //import PhoneInput from "react-native-phone-number-input";
+import MapBoxAutocomplete from "../../components/MapBoxAutocomplete";
 import { supabase } from "../../lib/supabase";
 import PhoneInput from "react-native-international-phone-number";
 
@@ -106,10 +110,12 @@ const CompleteProfileScreen = () => {
 
   const onCreateUser = async () => {
     try {
+      const userType =
+        authUser.email === "geo-estevam@hotmail.com" ? "SuperAdmin" : "Staff";
       const userDetails = {
         sub: authUser.id,
         name,
-        userType: "STAFF",
+        userType,
         address,
         lng,
         lat,
@@ -134,13 +140,16 @@ const CompleteProfileScreen = () => {
   return (
     <SafeAreaView>
       <Text style={styles.title}>Complete your Profile</Text>
+      <Text style={{ textAlign: "center", fontSize: 15 }}>
+        E-mail: {authUser.email}{" "}
+      </Text>
       <TextInput
         value={name}
         onChangeText={setName}
-        placeholder="Name"
+        placeholder="Full Name"
         style={styles.input}
       />
-      <GooglePlacesAutocomplete
+      {/* <GooglePlacesAutocomplete
         nearbyPlacesAPI="GooglePlacesSearch"
         placeholder="Address"
         listViewDisplayed="auto"
@@ -161,6 +170,19 @@ const CompleteProfileScreen = () => {
           key: GOOGLE_MAPS_APIKEY,
           Language: "en",
           components: "country:ca",
+        }}
+      /> */}
+      <MapBoxAutocomplete
+        defaultValue={address}
+        onSelect={(place) => {
+          setAddress(place.address);
+          setLat(place.lat);
+          setLng(place.lng);
+          // console.log(place);
+          // flatListRef.current.scrollToOffset({
+          //   offset: 150,
+          //   animated: true,
+          // });
         }}
       />
       <View style={styles.phoneInputContainer}>
@@ -187,7 +209,8 @@ const CompleteProfileScreen = () => {
           defaultCountry="CA"
           phoneInputStyles={{
             container: {
-              width: "89%",
+              width: "85%",
+              padding: 2,
             },
           }}
         />
@@ -235,10 +258,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   input: {
-    margin: 10,
+    marginTop: 10,
+    marginLeft: 11,
+    marginRight: 21,
     backgroundColor: "white",
-    padding: 15,
-    borderRadius: 5,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
   },
   googleAutoComp: {
     padding: 20,

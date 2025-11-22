@@ -14,9 +14,11 @@ import { supabase } from "../../lib/supabase";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
-import { GOOGLE_MAPS_APIKEY } from "@env";
+// import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
+// import { GOOGLE_MAPS_APIKEY } from "@env";
 //import PhoneInput from "react-native-phone-number-input";
+// import OSMAutocomplete from "../../components/OSMAutocomplete";
+import MapBoxAutocomplete from "../../components/MapBoxAutocomplete";
 import PhoneInput from "react-native-international-phone-number";
 import { useUsersContext } from "../../contexts/UsersContext";
 import styles from "./styles";
@@ -24,6 +26,7 @@ import RemoteImage from "../../components/RemoteImage";
 import OpenCamera from "../../components/OpenCamera";
 import { usePicturesContext } from "../../contexts/PicturesContext";
 import FullScreenImage from "../../components/FullScreenImageModal";
+import { TouchableWithoutFeedback } from "react-native";
 
 const ProfileScreen = () => {
   const { setDbUser, dbUser, RefreshCurrentUserData } = useUsersContext();
@@ -51,7 +54,9 @@ const ProfileScreen = () => {
   };
 
   useEffect(() => {
+    // console.log("dbUser", dbUser);
     if (dbUser) {
+      // console.log("dbUser", dbUser);
       setName(dbUser.name || "");
       setPhoneNumber(dbUser.phoneNumber || "");
       if (dbUser.address) {
@@ -238,39 +243,16 @@ const ProfileScreen = () => {
 
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Address</Text>
-        <GooglePlacesAutocomplete
-          nearbyPlacesAPI="GooglePlacesSearch"
-          ref={userAddressRef}
-          placeholder="Address"
-          debounce={400}
-          minLength={2}
-          textInputProps={{
-            value: address,
-            onChangeText: (text) => {
-              setAddress(text);
-              flatListRef.current.scrollToOffset({
-                offset: 150,
-                animated: true,
-              });
-            },
-          }}
-          onFail={(error) => console.log(error)}
-          onNotFound={() => console.log("no results")}
-          enablePoweredByContainer={false}
-          fetchDetails={true}
-          styles={styles.autoComplete}
-          onPress={(data, details = null) => {
-            if (details) {
-              //console.log(details.formatted_address);
-              setAddress(details.formatted_address);
-              setLat(details.geometry.location.lat);
-              setLng(details.geometry.location.lng);
-            }
-          }}
-          query={{
-            key: GOOGLE_MAPS_APIKEY,
-            language: "en",
-            components: "country:ca",
+        <MapBoxAutocomplete
+          defaultValue={address}
+          onSelect={(place) => {
+            setAddress(place.address);
+            setLat(place.lat);
+            setLng(place.lng);
+            flatListRef.current.scrollToOffset({
+              offset: 150,
+              animated: true,
+            });
           }}
         />
       </View>
@@ -288,17 +270,6 @@ const ProfileScreen = () => {
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Phone Number</Text>
         <View style={styles.phoneInputContainer}>
-          {/* <PhoneInput
-            ref={phoneInputRef}
-            value={phoneNumber}
-            onChangeText={(text) => {
-              setPhoneNumber(text);
-            }}
-            defaultCode="CA"
-            layout="first"
-            placeholder="Phone Number"
-            style={styles.phoneInputField}
-          /> */}
           <PhoneInput
             value={phoneNumber}
             onChangePhoneNumber={(phone) => {
@@ -323,37 +294,6 @@ const ProfileScreen = () => {
         </View>
       </View>
 
-      {/* <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalContainer}>
-          <RemoteImage
-            path={selectedImage}
-            bucketName="profilePhotos"
-            style={styles.fullImage}
-          />
-          <TouchableOpacity
-            style={styles.closeModalButton}
-            onPress={closeModal}
-          >
-            <Entypo name="cross" size={25} color="white" />
-          </TouchableOpacity>
-        </View>
-      </Modal> */}
-
-      {/* <View style={styles.inputContainer}>
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Email"
-          style={styles.input}
-        />
-      </View> */}
-
       <TouchableOpacity
         style={[
           styles.saveButton,
@@ -375,21 +315,25 @@ const ProfileScreen = () => {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 65 : 65}
       >
-        <FullScreenImage
-          isVisible={fullScreenImageModal}
-          path={actualPhoto}
-          onClose={closeFullScreenModal}
-          targetX={containerPosition.x + 10}
-          targetY={containerPosition.y + 10}
-          bucketName="profilePhotos"
-        />
-        <FlatList
-          ref={flatListRef}
-          data={[{ key: "profile" }]}
-          renderItem={renderContent}
-          keyExtractor={(item) => item.key}
-          keyboardShouldPersistTaps="always"
-        />
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <View style={{ flex: 1 }}>
+            <FullScreenImage
+              isVisible={fullScreenImageModal}
+              path={actualPhoto}
+              onClose={closeFullScreenModal}
+              targetX={containerPosition.x + 10}
+              targetY={containerPosition.y + 10}
+              bucketName="profilePhotos"
+            />
+            <FlatList
+              ref={flatListRef}
+              data={[{ key: "profile" }]}
+              renderItem={renderContent}
+              keyExtractor={(item) => item.key}
+              keyboardShouldPersistTaps="always"
+            />
+          </View>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

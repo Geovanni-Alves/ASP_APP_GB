@@ -1,13 +1,15 @@
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as TaskManager from "expo-task-manager";
 import React, { useEffect } from "react";
 import { LogBox } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import AuthContextProvider from "./src/contexts/AuthContext";
-import RouteContextProvider from "./src/contexts/RouteContext";
+// import RouteContextProvider from "./src/contexts/DropOffRouteContext";
 import RootNavigator from "./src/navigation";
 import PushNotificationsContextProvider from "./src/contexts/PushNotificationsContext";
 import BackgroundTasksProvider from "./src/contexts/BackgroundTaskContext";
+import RoutesContextProvider from "./src/contexts/RoutesContext";
 import PicturesContextProvider from "./src/contexts/PicturesContext";
 import KidsContextProvider from "./src/contexts/KidsContext";
 import MessageContextProvider from "./src/contexts/MessageContext";
@@ -26,29 +28,31 @@ function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <NavigationContainer>
-        <PushNotificationsContextProvider>
-          <AuthContextProvider>
-            <PicturesContextProvider>
-              <UsersContextProvider>
-                <KidsContextProvider>
-                  <StaffContextProvider>
-                    <FeedContextProvider>
-                      <MessageContextProvider>
-                        <RouteContextProvider>
-                          <BackgroundTasksProvider>
-                            <RootNavigator />
-                          </BackgroundTasksProvider>
-                        </RouteContextProvider>
-                      </MessageContextProvider>
-                    </FeedContextProvider>
-                  </StaffContextProvider>
-                </KidsContextProvider>
-              </UsersContextProvider>
-            </PicturesContextProvider>
-          </AuthContextProvider>
-        </PushNotificationsContextProvider>
-      </NavigationContainer>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <PushNotificationsContextProvider>
+            <AuthContextProvider>
+              <PicturesContextProvider>
+                <UsersContextProvider>
+                  <KidsContextProvider>
+                    <StaffContextProvider>
+                      <FeedContextProvider>
+                        <MessageContextProvider>
+                          <RoutesContextProvider>
+                            <BackgroundTasksProvider>
+                              <RootNavigator />
+                            </BackgroundTasksProvider>
+                          </RoutesContextProvider>
+                        </MessageContextProvider>
+                      </FeedContextProvider>
+                    </StaffContextProvider>
+                  </KidsContextProvider>
+                </UsersContextProvider>
+              </PicturesContextProvider>
+            </AuthContextProvider>
+          </PushNotificationsContextProvider>
+        </NavigationContainer>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

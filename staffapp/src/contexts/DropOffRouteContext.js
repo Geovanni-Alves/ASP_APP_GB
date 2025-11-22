@@ -3,9 +3,9 @@ import { useUsersContext } from "./UsersContext";
 import { supabase } from "../lib/supabase";
 import { useNavigation } from "@react-navigation/native";
 
-const RouteContext = createContext({});
+const DropOffRouteContext = createContext({});
 
-const RouteContextProvider = ({ children }) => {
+const DropOffRouteContextProvider = ({ children }) => {
   const navigation = useNavigation();
   const [routesData, setRoutesData] = useState(null);
   const [currentRouteData, setCurrentRouteData] = useState(null);
@@ -162,17 +162,17 @@ const RouteContextProvider = ({ children }) => {
   }, [dbUser]);
 
   return (
-    <RouteContext.Provider
+    <DropOffRouteContext.Provider
       value={{
         routesData,
         updateRoutesData,
       }}
     >
       {children}
-    </RouteContext.Provider>
+    </DropOffRouteContext.Provider>
   );
 };
 
-export default RouteContextProvider;
+export default DropOffRouteContextProvider;
 
-export const useRouteContext = () => useContext(RouteContext);
+export const useRouteContext = () => useContext(DropOffRouteContext);

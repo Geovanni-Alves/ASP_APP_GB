@@ -33,10 +33,10 @@ export default {
       },
     ],
     [
-      "expo-av",
+      "expo-video",
       {
-        microphonePermission:
-          "Allow $(PRODUCT_NAME) to access your microphone.",
+        supportsBackgroundPlayback: true,
+        supportsPictureInPicture: true,
       },
     ],
     [
@@ -63,6 +63,7 @@ export default {
       NSLocationAlwaysUsageDescription:
         "this is a app for drive kids to home (drop off) and i need to get the location of the driver to inform the parents",
       UIBackgroundModes: ["location", "fetch"],
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
@@ -88,13 +89,11 @@ export default {
   },
   extra: {
     eas: {
-      projectId: "f1862bff-d46d-440d-b8b3-669ecca21196",
+      projectId: "1f3049ff-13c7-4ab4-8683-52676c43333f",
     },
   },
   owner: "geodarth",
-  runtimeVersion: {
-    policy: "appVersion",
-  },
+  runtimeVersion: "1.0.0",
   updates: {
     url: "https://u.expo.dev/86aaefd7-300b-4ba0-9f96-ede028a516c4",
   },

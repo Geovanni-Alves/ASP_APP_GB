@@ -44,7 +44,7 @@
   "scripts": {
     "osrm": "node scripts/start-osrm.js",
     "start-server": "npm --prefix ./server start",
-    "dev": "concurrently -n OSRM,API,WEB -c cyan,magenta,green \"npm:osrm\" \"npm run start-server\" \"vite\"",
+    "dev": "concurrently -n OSRM,API,WEB -c cyan,magenta,green \"npm:osrm\" \"npm run start-server\" \"vite --open\"",
     "build": "vite build",
     "preview": "vite preview",
     "start-cra": "react-scripts start",

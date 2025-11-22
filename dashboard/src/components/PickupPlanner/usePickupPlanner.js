@@ -153,7 +153,7 @@ export function usePickupPlanner({ closeMenu }) {
     const { data, error } = await supabase
       .from("users")
       .select("id, name")
-      .eq("userType", "STAFF")
+      .in("userType", ["STAFF", "SUPER_ADMIN"])
       .order("name");
     if (!error) {
       setStaff(data || []);
@@ -948,6 +948,7 @@ export function usePickupPlanner({ closeMenu }) {
       .eq("date", today)
       .eq("type", "pickup")
       .maybeSingle();
+
     if (fetchError) {
       console.error("❌ Failed to fetch route:", fetchError);
       message.error("Error fetching existing route.");
@@ -959,12 +960,20 @@ export function usePickupPlanner({ closeMenu }) {
         .from("routes")
         .update({ absents: route.absents.map((a) => a.id) })
         .eq("id", existingRoute.id);
+
       if (updateError) {
         console.error("❌ Failed to update route:", updateError);
         message.error("Error updating existing route.");
         return;
       }
+
       routeId = existingRoute.id;
+
+      setRoute((prev) => ({
+        ...prev,
+        id: routeId,
+        status: "planning",
+      }));
     } else {
       const { data: newRoute, error: insertError } = await supabase
         .from("routes")
@@ -983,7 +992,11 @@ export function usePickupPlanner({ closeMenu }) {
         return;
       }
       routeId = newRoute.id;
-      setRoute((prev) => ({ ...prev, status: "planning" }));
+      setRoute((prev) => ({
+        ...prev,
+        id: routeId,
+        status: "planning",
+      }));
     }
 
     for (const van of route.vans) {
@@ -1041,6 +1054,8 @@ export function usePickupPlanner({ closeMenu }) {
   async function sendPickupRoute() {
     if (isDirty) await savePickupRoute();
 
+    // console.log("route", route);
+
     const { kids = {}, vans = [], date } = route;
     if (kidsRemaining > 0) {
       message.warning("All the kids must be on the route or absent!");
@@ -1076,7 +1091,7 @@ export function usePickupPlanner({ closeMenu }) {
 
     const { error } = await supabase
       .from("routes")
-      .update({ status: "waiting_to_start" })
+      .update({ status: "waiting_to_start", sent_at: new Date().toISOString() })
       .eq("type", "pickup")
       .eq("id", route.id);
     // console.log("route", route.id);

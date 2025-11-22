@@ -23,6 +23,8 @@ import NewActivityScreen from "../screens/NewActivityScreen";
 import IncidentsScreen from "../screens/IncidentsScreen";
 import StudentSelectionScreen from "../screens/StudentSelectionScreen";
 import PromotionScreen from "../screens/PromotionScreen";
+import PickupListScreen from "../screens/PickupListScreen";
+import HelperPickupScreen from "../screens/PickupListScreen/HelperPickupScreen";
 
 const Drawer = createDrawerNavigator();
 
@@ -52,7 +54,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       headerTintColor: "#fff",
       headerTitleStyle: {
         fontWeight: "700",
-        letterSpacing: "1.5",
+        // letterSpacing: "1.5",
       },
       drawerActiveTintColor: "blue",
       drawerLabelStyle: {
@@ -71,6 +73,15 @@ const DrawerNavigator = ({ currentUserData }) => (
         ),
       }}
       component={HomeScreen}
+    />
+    <Drawer.Screen
+      name="PickupList"
+      options={{
+        drawerLabel: "Pickup",
+        title: "Pickup List",
+        drawerIcon: () => <FontAwesome name="bus" size={20} color="#808080" />,
+      }}
+      component={PickupListScreen}
     />
     <Drawer.Screen
       name="DropOffList"
@@ -104,7 +115,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       component={ProfileScreen}
     />
 
-    {/* <Drawer.Screen
+    <Drawer.Screen
       name="CheckIn"
       options={{
         drawerLabel: "Check In",
@@ -114,8 +125,8 @@ const DrawerNavigator = ({ currentUserData }) => (
         ),
       }}
       component={CheckInScreen}
-    /> */}
-    {/* <Drawer.Screen
+    />
+    <Drawer.Screen
       name="Students"
       options={{
         drawerLabel: "Students",
@@ -125,7 +136,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         ),
       }}
       component={StudentScreen}
-    /> */}
+    />
     <Drawer.Screen
       name="DropOffRoute"
       options={{
@@ -206,6 +217,15 @@ const DrawerNavigator = ({ currentUserData }) => (
       component={PromotionScreen}
       options={{
         title: "Promotions Screen",
+        drawerItemStyle: { display: "none" },
+        headerShown: true,
+      }}
+    />
+    <Drawer.Screen
+      name="HelperPickupScreen"
+      component={HelperPickupScreen}
+      options={{
+        title: "Pickup Route Screen",
         drawerItemStyle: { display: "none" },
         headerShown: true,
       }}

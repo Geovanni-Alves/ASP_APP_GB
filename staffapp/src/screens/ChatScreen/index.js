@@ -1,25 +1,21 @@
 import React, { useState, useEffect, useCallback } from "react";
-import styles from "./styles";
-import {
-  View,
-  SafeAreaView,
-  FlatList,
-  Text,
-  TouchableOpacity,
-  Image,
-} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { View, FlatList, Text, TouchableOpacity, Image } from "react-native";
 import { useKidsContext } from "../../contexts/KidsContext";
 import { useMessageContext } from "../../contexts/MessageContext";
+import styles from "./styles";
 
 const ChatScreen = ({ navigation }) => {
   const { unreadMessages } = useMessageContext();
   const { kids } = useKidsContext();
-  const [users, setUsers] = useState([]);
+  const [students, setStudents] = useState([]);
+  // const [users, setUsers] = useState([]);
 
   useEffect(() => {
     if (kids) {
-      setUsers(kids);
+      setStudents(kids);
     }
+    // console.log("unread messages", unreadMessages);
   }, [kids]);
 
   const getInitials = (name) => {
@@ -30,23 +26,27 @@ const ChatScreen = ({ navigation }) => {
       .toUpperCase();
   };
 
-  const onUserPress = (user) => {
-    navigation.navigate("ChatUser", { id: user.id });
+  const onStudentPress = (student) => {
+    navigation.navigate("ChatUser", { student });
   };
 
-  const renderUserItem = ({ item: user }) => {
+  const renderStudentItem = ({ item: student }) => {
     // Calculate the number of unread messages for each kid
-    const unreadCount = unreadMessages?.filter(
-      (message) => !message.isRead && message.senderID === user.id
-    ).length;
+    const unreadCount =
+      unreadMessages?.filter(
+        (msg) =>
+          msg.student_id === student.id &&
+          msg.sender_contact_id != null &&
+          !msg.isread
+      ).length || 0;
 
     return (
-      <TouchableOpacity onPress={() => onUserPress(user)}>
+      <TouchableOpacity onPress={() => onStudentPress(student)}>
         <View style={{ flex: 1, alignItems: "left", padding: 16 }}>
           <View style={{ position: "relative" }}>
-            {user.uriKid ? (
+            {student.uriKid ? (
               <Image
-                source={{ uri: user.uriKid }}
+                source={{ uri: student.uriKid }}
                 style={{
                   width: 60,
                   height: 60,
@@ -66,7 +66,9 @@ const ChatScreen = ({ navigation }) => {
                   marginRight: 10,
                 }}
               >
-                <Text style={{ color: "white" }}>{getInitials(user.name)}</Text>
+                <Text style={{ color: "white" }}>
+                  {getInitials(student.name)}
+                </Text>
               </View>
             )}
             {unreadCount > 0 && ( // Render the unread count only if it's greater than 0
@@ -75,7 +77,7 @@ const ChatScreen = ({ navigation }) => {
               </View>
             )}
           </View>
-          <Text>{user.name}</Text>
+          <Text>{student.name}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -84,9 +86,9 @@ const ChatScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <FlatList
-        data={users}
-        keyExtractor={(user) => user?.id}
-        renderItem={renderUserItem}
+        data={students}
+        keyExtractor={(student) => student?.id}
+        renderItem={renderStudentItem}
       />
     </SafeAreaView>
   );

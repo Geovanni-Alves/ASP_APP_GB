@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Text, Image } from "react-native";
 import { supabase } from "../lib/supabase";
-import { Video, ResizeMode } from "expo-av";
+// import { Video, ResizeMode } from "expo-av";
+import { useVideoPlayer, VideoView, VideoSource } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import CustomLoading from "../components/CustomLoading";
 
@@ -34,6 +35,14 @@ const RemoteVideo = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0); // Track loading progress
   const [error, setError] = useState<string>("");
+
+  const player = useVideoPlayer(
+    videoUrl ? ({ uri: videoUrl } as VideoSource) : null,
+    (playerInstance) => {
+      playerInstance.loop = true;
+      if (!onlyThumbnail) playerInstance.play();
+    }
+  );
 
   useEffect(() => {
     if (!path) return;
@@ -135,18 +144,22 @@ const RemoteVideo = ({
     return <Image source={{ uri: thumbnailUrl }} style={style} />;
   }
 
-  if (videoUrl) {
-    return (
-      <Video
-        source={{ uri: videoUrl }}
-        style={style}
-        useNativeControls
-        resizeMode={ResizeMode.CONTAIN}
-        isLooping
-        shouldPlay
-      />
-    );
+  if (videoUrl && player) {
+    return <VideoView player={player} style={style} nativeControls />;
   }
+
+  // if (videoUrl) {
+  //   return (
+  //     <Video
+  //       source={{ uri: videoUrl }}
+  //       style={style}
+  //       useNativeControls
+  //       resizeMode={ResizeMode.CONTAIN}
+  //       isLooping
+  //       shouldPlay
+  //     />
+  //   );
+  // }
 
   return (
     <View style={[styles.placeholderContainer, style]}>

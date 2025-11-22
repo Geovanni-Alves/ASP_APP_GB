@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import styles from "./styles";
-import { Text, View, SafeAreaView, TouchableOpacity } from "react-native";
+import { Text, View, TouchableOpacity } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import AntDesign from "@expo/vector-icons/AntDesign";
-//import FontAwesome from "@expo/vector-icons/FontAwesome";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { useMessageContext } from "../../contexts/MessageContext";
 import { useKidsContext } from "../../contexts/KidsContext";
@@ -43,7 +44,7 @@ const HomeScreen = () => {
             style={styles.chatButton}
             onPress={() => navigation.navigate("Chat")}
           >
-            <AntDesign name="message1" size={20} color="white" />
+            <AntDesign name="message" size={20} color="white" />
             <Text style={styles.buttonText}>Chat</Text>
             {msgsCount > 0 && (
               <View style={styles.messageCountBadge}>
@@ -51,11 +52,11 @@ const HomeScreen = () => {
               </View>
             )}
           </TouchableOpacity>
-          {/* <TouchableOpacity
+          <TouchableOpacity
             style={styles.checkInButton}
             onPress={() => navigation.navigate("CheckIn")}
           >
-            <AntDesign name="checkcircleo" size={20} color="white" />
+            <AntDesign name="check-circle" size={20} color="white" />
             <Text style={styles.buttonText}>Check In</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -81,12 +82,12 @@ const HomeScreen = () => {
           <TouchableOpacity
             style={styles.pickUpButton}
             onPress={() => {
-              console.log("Pickup Screen");
+              navigation.navigate("PickupList");
             }}
           >
             <FontAwesome5 name="route" size={24} color="white" />
             <Text style={styles.buttonText}>Pickup Route</Text>
-          </TouchableOpacity> */}
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.pickUpButton}
             onPress={() => {

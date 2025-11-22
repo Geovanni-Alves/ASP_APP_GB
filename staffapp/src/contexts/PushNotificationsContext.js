@@ -109,38 +109,63 @@ const PushNotificationsContextProvider = ({ children }) => {
     return token;
   }
 
+  // useEffect(() => {
+  //   registerForPushNotificationsAsync().then((token) =>
+  //     setExpoPushToken(token)
+  //   );
+  //   // notificationListener.current =
+  //   //   Notifications.addNotificationReceivedListener((notification) => {
+  //   //     //console.log("listener notication", notification);
+  //   //     setNotification(notification);
+  //   //   });
+
+  //   responseListener.current =
+  //     Notifications.addNotificationResponseReceivedListener((response) => {
+  //       // Handle notification response
+
+  //       // Extract data from the notification
+  //       const { notification } = response;
+  //       const { data } = notification.request.content;
+  //       //console.log("response", data.kidID);
+  //       // Assuming the notification contains information about the chat
+  //       // Navigate to the chat screen passing necessary data
+
+  //       //navigation.navigate("ChatUser", { id: user.id });
+  //       if (data.kidID) {
+  //         navigation.navigate("ChatUser", { id: data.kidID });
+  //       }
+  //     });
+
+  //   return () => {
+  //     Notifications.removeNotificationSubscription(
+  //       notificationListener.current
+  //     );
+  //     Notifications.removeNotificationSubscription(responseListener.current);
+  //   };
+  // }, []);
+
   useEffect(() => {
     registerForPushNotificationsAsync().then((token) =>
       setExpoPushToken(token)
     );
-    // notificationListener.current =
-    //   Notifications.addNotificationReceivedListener((notification) => {
-    //     //console.log("listener notication", notification);
-    //     setNotification(notification);
-    //   });
+
+    notificationListener.current =
+      Notifications.addNotificationReceivedListener((notification) => {
+        console.log("Notification received:", notification);
+      });
 
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
-        // Handle notification response
-
-        // Extract data from the notification
         const { notification } = response;
         const { data } = notification.request.content;
-        //console.log("response", data.kidID);
-        // Assuming the notification contains information about the chat
-        // Navigate to the chat screen passing necessary data
-
-        //navigation.navigate("ChatUser", { id: user.id });
         if (data.kidID) {
           navigation.navigate("ChatUser", { id: data.kidID });
         }
       });
 
     return () => {
-      Notifications.removeNotificationSubscription(
-        notificationListener.current
-      );
-      Notifications.removeNotificationSubscription(responseListener.current);
+      if (notificationListener.current) notificationListener.current.remove();
+      if (responseListener.current) responseListener.current.remove();
     };
   }, []);
 

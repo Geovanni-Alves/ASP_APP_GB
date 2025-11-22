@@ -54,7 +54,7 @@ const CheckIn = ({ schoolName }) => {
   return (
     <View style={styles.container}>
       <View style={styles.checkHeader}>
-        <Text style={styles.schoolName}>Gracie Barra Vancouver</Text>
+        <Text style={styles.schoolName}>Gracie Barra</Text>
       </View>
       <View style={styles.filterContainer}>
         <TextInput

@@ -11,7 +11,7 @@ const StaffContextProvider = ({ children }) => {
       const { data, error } = await supabase
         .from("users")
         .select()
-        .or(`userType.eq.STAFF,userType.eq.DRIVER`);
+        .or(`userType.eq.STAFF,userType.eq.SuperAdmin,userType.eq.DRIVER`);
       if (error) {
         throw error;
       }

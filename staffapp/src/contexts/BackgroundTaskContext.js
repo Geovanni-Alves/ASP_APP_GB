@@ -3,7 +3,8 @@ import React, { createContext, useContext } from "react";
 import * as BackgroundFetch from "expo-background-fetch";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
-import EventEmitter from "react-native/Libraries/vendor/emitter/EventEmitter";
+// import EventEmitter from "react-native/Libraries/vendor/emitter/EventEmitter";
+import { EventEmitter } from "events";
 
 const locationEmitter = new EventEmitter();
 const LOCATION_UPDATE = "LOCATION_UPDATE";

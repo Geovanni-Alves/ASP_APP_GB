@@ -3,8 +3,8 @@ import { StyleSheet } from "react-native";
 export default StyleSheet.create({
   unreadCountContainer: {
     position: "absolute",
-    top: -10,
-    right: -10,
+    top: 35,
+    left: 40,
     backgroundColor: "red",
     borderRadius: 12,
     width: 24,
