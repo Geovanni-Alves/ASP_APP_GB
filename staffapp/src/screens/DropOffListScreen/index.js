@@ -77,16 +77,16 @@ const DropOffListScreen = () => {
     navigation.goBack();
   };
 
-  useEffect(() => {
-    navigation.setOptions({
-      //title: title,
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [route]);
+  // useEffect(() => {
+  //   navigation.setOptions({
+  //     //title: title,
+  //     headerLeft: () => (
+  //       <TouchableOpacity onPress={goBack}>
+  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+  //       </TouchableOpacity>
+  //     ),
+  //   });
+  // }, [route]);
 
   const fetchData = async () => {
     setRefreshing(true);

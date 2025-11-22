@@ -3,11 +3,11 @@ import {
   FlatList,
   Text,
   View,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   RefreshControl,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useState, useEffect, useCallback } from "react";
 import { useKidsContext } from "../../contexts/KidsContext";
 import RemoteImage from "../../components/RemoteImage";
@@ -16,7 +16,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 
 const StudentScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute();
+  // const route = useRoute();
   const { kids, RefreshKidsData } = useKidsContext();
   const [searchByName, setSearchByName] = useState("");
   const [filteredStudents, setFilteredStudents] = useState(kids);
@@ -26,15 +26,15 @@ const StudentScreen = () => {
     navigation.goBack();
   };
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [route]);
+  // useEffect(() => {
+  //   navigation.setOptions({
+  //     headerLeft: () => (
+  //       <TouchableOpacity onPress={goBack}>
+  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+  //       </TouchableOpacity>
+  //     ),
+  //   });
+  // }, [route]);
 
   // Effect to filter students whenever kids data changes
   useEffect(() => {

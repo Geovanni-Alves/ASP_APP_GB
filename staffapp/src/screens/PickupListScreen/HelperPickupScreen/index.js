@@ -45,7 +45,7 @@ const HelperPickupScreen = () => {
   }, [routeId, routesData]);
 
   const goToStudentFeed = (kidId) => {
-    navigation.navigate("StudentFeed", { id: kidId });
+    navigation.navigate("StudentProfile", { id: kidId });
   };
 
   const renderStopItem = ({ item: stop }) => (

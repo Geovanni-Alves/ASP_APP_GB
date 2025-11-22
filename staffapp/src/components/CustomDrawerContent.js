@@ -11,7 +11,7 @@ import RemoteImage from "./RemoteImage";
 import { useAuthContext } from "../contexts/AuthContext";
 
 export default function CustomDrawerContent(props) {
-  const { currentUserData } = props;
+  const { navigation, currentUserData } = props;
   const [isConfirmationModalVisible, setConfirmationModalVisible] =
     useState(false);
   const { logout } = useAuthContext();

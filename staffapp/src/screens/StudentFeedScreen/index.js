@@ -13,8 +13,7 @@ import {
 } from "react-native";
 import { FontAwesome, Entypo } from "@expo/vector-icons";
 import Ionicons from "@expo/vector-icons/Ionicons";
-// import AntDesign from "@expo/vector-icons/AntDesign";
-import { StarOutlined, StarFilled, StarTwoTone } from "@ant-design/icons";
+import AntDesign from "@expo/vector-icons/AntDesign";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useRoute, useNavigation } from "@react-navigation/native";
@@ -387,7 +386,7 @@ const StudentFeedScreen = () => {
             });
           }}
         >
-          <StarOutlined size={24} color="black" />
+          <AntDesign name="star" size={24} color="black" />
           <Text style={styles.actionButtonText}>New Activity</Text>
         </Pressable>
         <Pressable
@@ -405,7 +404,7 @@ const StudentFeedScreen = () => {
             setShowStudentInfo(true);
           }}
         >
-          <AntDesign name="infocirlceo" size={24} color="black" />
+          <AntDesign name="info-circle" size={24} color="black" />
           <Text style={styles.actionButtonText}>Info</Text>
         </Pressable>
       </View>

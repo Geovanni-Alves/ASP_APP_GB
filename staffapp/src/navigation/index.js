@@ -2,7 +2,7 @@ import React from "react";
 import { SimpleLineIcons, FontAwesome5 } from "@expo/vector-icons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { createDrawerNavigator } from "@react-navigation/drawer";
-import { TouchableOpacity } from "react-native";
+import { TouchableOpacity, Text } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import CustomDrawerContent from "../components/CustomDrawerContent";
 import { useUsersContext } from "../contexts/UsersContext";
@@ -35,7 +35,20 @@ const CustomHamburgerMenu = () => {
       onPress={() => navigation.openDrawer()}
       style={{ paddingLeft: 20 }}
     >
-      <SimpleLineIcons name="menu" size={23} color="#fff" />
+      <SimpleLineIcons name="menu" size={23} color="gray" />
+    </TouchableOpacity>
+  );
+};
+
+const CustomBackButton = () => {
+  const navigation = useNavigation();
+  return (
+    <TouchableOpacity
+      style={{ paddingLeft: 20, flexDirection: "row", alignItems: "center" }}
+      onPress={() => navigation.goBack()}
+    >
+      <SimpleLineIcons name="arrow-left" size={20} color="gray" />
+      <Text style={{ marginLeft: 5, color: "gray" }}>Back</Text>
     </TouchableOpacity>
   );
 };
@@ -45,13 +58,16 @@ const DrawerNavigator = ({ currentUserData }) => (
     drawerContent={(props) => (
       <CustomDrawerContent {...props} currentUserData={currentUserData} />
     )}
+    backBehavior="history"
     screenOptions={{
+      drawerType: "front",
+      swipeEdgeWidth: 50,
       drawerStyle: {
         backgroundColor: "#fff",
         width: 190,
       },
-      headerStyle: { backgroundColor: "#ff7276" },
-      headerTintColor: "#fff",
+      headerStyle: { backgroundColor: "#FFD54F" },
+      headerTintColor: "gray",
       headerTitleStyle: {
         fontWeight: "700",
         // letterSpacing: "1.5",
@@ -80,6 +96,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         drawerLabel: "Pickup",
         title: "Pickup List",
         drawerIcon: () => <FontAwesome name="bus" size={20} color="#808080" />,
+        headerLeft: () => <CustomBackButton />,
       }}
       component={PickupListScreen}
     />
@@ -89,6 +106,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         drawerLabel: "Drop off",
         title: "Drop off List",
         drawerIcon: () => <FontAwesome name="bus" size={20} color="#808080" />,
+        headerLeft: () => <CustomBackButton />,
       }}
       component={DropOffListScreen}
     />
@@ -100,6 +118,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         drawerIcon: () => (
           <SimpleLineIcons name="bubbles" size={20} color="#808080" />
         ),
+        headerLeft: () => <CustomBackButton />,
       }}
       component={ChatScreen}
     />
@@ -111,6 +130,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         drawerIcon: () => (
           <FontAwesome5 name="user" size={20} color="#808080" />
         ),
+        headerLeft: () => <CustomBackButton />,
       }}
       component={ProfileScreen}
     />
@@ -123,6 +143,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         drawerIcon: () => (
           <SimpleLineIcons name="check" size={20} color="#808080" />
         ),
+        headerLeft: () => <CustomBackButton />,
       }}
       component={CheckInScreen}
     />
@@ -134,6 +155,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         drawerIcon: () => (
           <FontAwesome name="child" size={20} color="#808080" />
         ),
+        headerLeft: () => <CustomBackButton />,
       }}
       component={StudentScreen}
     />
@@ -142,6 +164,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       options={{
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
       component={DropOffRouteScreen}
     />
@@ -150,6 +173,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       options={{
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
       component={ChatUserScreen}
     />
@@ -158,6 +182,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       options={{
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
       component={StudentFeedScreen}
     />
@@ -167,6 +192,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       options={{
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
     />
     <Drawer.Screen
@@ -175,6 +201,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       options={{
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
     />
     <Drawer.Screen
@@ -183,6 +210,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       options={{
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
     />
     <Drawer.Screen
@@ -192,6 +220,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         title: "Activities",
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
     />
     <Drawer.Screen
@@ -201,6 +230,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         title: "Incidents",
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
     />
     <Drawer.Screen
@@ -210,6 +240,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         title: "Select Students",
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
     />
     <Drawer.Screen
@@ -219,6 +250,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         title: "Promotions Screen",
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
     />
     <Drawer.Screen
@@ -228,6 +260,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         title: "Pickup Route Screen",
         drawerItemStyle: { display: "none" },
         headerShown: true,
+        headerLeft: () => <CustomBackButton />,
       }}
     />
   </Drawer.Navigator>

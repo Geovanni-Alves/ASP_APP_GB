@@ -44,17 +44,17 @@ const NewActivityScreen = () => {
     }
   }, [kidId, kids]);
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-        </TouchableOpacity>
-      ),
+  // useEffect(() => {
+  //   navigation.setOptions({
+  //     headerLeft: () => (
+  //       <TouchableOpacity onPress={goBack}>
+  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+  //       </TouchableOpacity>
+  //     ),
 
-      title: selectedKid ? `${selectedKid.name} Activities` : "Activities",
-    });
-  }, [route, selectedKid]);
+  //     title: selectedKid ? `${selectedKid.name} Activities` : "Activities",
+  //   });
+  // }, [route, selectedKid]);
 
   const handlePhotoPress = () => {
     setCameraMode("photo");
