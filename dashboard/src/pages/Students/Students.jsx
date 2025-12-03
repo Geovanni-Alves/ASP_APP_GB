@@ -236,7 +236,7 @@ function Students({ closeMenu }) {
 
       const { data: familyRows, error } = await supabase
         .from("student_family")
-        .select("contact:contacts (*)") // renomeia a coluna embedada
+        .select("contact:contacts (*)")
         .eq("student_id", studentId);
 
       if (error) throw error;
@@ -249,6 +249,7 @@ function Students({ closeMenu }) {
     }
   };
 
+  console.log("contacts", contacts);
   const fetchAddresses = async (studentId) => {
     const { data, error } = await supabase
       .from("students_address")
@@ -458,8 +459,17 @@ function Students({ closeMenu }) {
   };
 
   const handleSaveContact = async (formData) => {
-    const { email, firstName, lastName, phone, type, canPickup, code } =
-      formData;
+    const {
+      email,
+      firstName,
+      lastName,
+      phone,
+      type,
+      canPickup,
+      code,
+      is_primary_contact,
+    } = formData;
+
     const isEditing = !!editingContact;
     let userId;
     let contactId;
@@ -512,6 +522,7 @@ function Students({ closeMenu }) {
         invited: formData.invited ?? false,
         signed: formData.signed ?? false,
         user_id: userId,
+        is_primary_contact,
       };
 
       if (isEditing) {
@@ -532,6 +543,7 @@ function Students({ closeMenu }) {
         if (error) throw error;
         contactId = data?.id;
       }
+
       const { error: linkError } = await supabase
         .from("student_family")
         .upsert([{ student_id: selectedStudent.id, contact_id: contactId }]);
@@ -1402,6 +1414,7 @@ function Students({ closeMenu }) {
                     <div style={{ flex: 1 }}>Type</div>
                     <div style={{ flex: 1 }}>Can Pickup</div>
                     <div style={{ flex: 1 }}>Signed</div>
+                    <div style={{ flex: 1 }}>Primary</div>
                     {/* <div style={{ flex: 1 }}>Code</div> */}
                     <div style={{ flex: 2 }}>Actions</div>
                   </div>
@@ -1418,6 +1431,17 @@ function Students({ closeMenu }) {
                     >
                       <div style={{ flex: 2 }}>
                         {contact.firstName} {contact.lastName}
+                        {contact.is_primary_contact && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 16,
+                              color: "#1677ff",
+                            }}
+                          >
+                            🛡
+                          </span>
+                        )}
                       </div>
                       <div style={{ flex: 2 }}>{contact.email}</div>
                       <div style={{ flex: 2 }}>{contact.phone}</div>
@@ -1427,6 +1451,9 @@ function Students({ closeMenu }) {
                       </div>
                       <div style={{ flex: 1 }}>
                         {contact.signed ? "Yes" : "No"}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        {contact.is_primary_contact ? "Yes" : ""}
                       </div>
                       {/* <div style={{ flex: 1 }}>{contact.code}</div> */}
                       <div style={{ flex: 2, display: "flex", gap: 8 }}>

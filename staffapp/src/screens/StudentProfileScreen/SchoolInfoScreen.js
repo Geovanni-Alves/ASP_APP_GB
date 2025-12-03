@@ -23,7 +23,7 @@ import CustomLoading from "../../components/CustomLoading";
 
 const { width, height } = Dimensions.get("window");
 
-const SchoolInfoScreen = ({ kid }) => {
+const SchoolInfoScreen = ({ kid, readOnly }) => {
   const [isSchoolModalVisible, setSchoolModalVisible] = useState(false);
   const [isGradeModalVisible, setGradeModalVisible] = useState(false);
   const [schoolList, setSchoolList] = useState([]);
@@ -63,7 +63,20 @@ const SchoolInfoScreen = ({ kid }) => {
       setSelectedSchool(kid.schools);
     }
     if (kid?.schoolExitPhotos) {
-      setSchoolExitPhotos(kid.schoolExitPhotos); // Load existing photos
+      // console.log("schoolExitPhotos", schoolExitPhotos);
+      // filter the valids paths case doesnt exist put null
+      const valid = kid.schoolExitPhotos.filter((p) => p && p.path);
+
+      // sort by index saved at supabase
+
+      const sorted = valid.sort((a, b) => a.index - b.index);
+      const normalized = [
+        sorted[0] || null,
+        sorted[1] || null,
+        sorted[2] || null,
+      ];
+
+      setSchoolExitPhotos(normalized); // Load existing photos
     }
   }, [kid]);
 
@@ -267,14 +280,16 @@ const SchoolInfoScreen = ({ kid }) => {
           <Text style={styles.detailTextInput}>
             {selectedSchool ? selectedSchool.name : "No school selected"}
           </Text>
-          <TouchableOpacity
-            style={styles.changeButton}
-            onPress={() => setSchoolModalVisible(true)} // Open modal to select school
-          >
-            <Text style={styles.changeButtonText}>
-              {selectedSchool ? "Change" : "Add School"}
-            </Text>
-          </TouchableOpacity>
+          {!readOnly && (
+            <TouchableOpacity
+              style={styles.changeButton}
+              onPress={() => setSchoolModalVisible(true)} // Open modal to select school
+            >
+              <Text style={styles.changeButtonText}>
+                {selectedSchool ? "Change" : "Add School"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {selectedSchool && (
@@ -288,6 +303,7 @@ const SchoolInfoScreen = ({ kid }) => {
                 setSaveVisible(true);
               }}
               placeholder="Enter teacher's name"
+              editable={!readOnly}
             />
 
             <Text style={styles.detailLabel}>Grade:</Text>
@@ -295,14 +311,16 @@ const SchoolInfoScreen = ({ kid }) => {
               <Text style={styles.detailTextInput}>
                 {selectedGrade ? selectedGrade : "No grade selected"}
               </Text>
-              <TouchableOpacity
-                style={styles.changeButton}
-                onPress={() => setGradeModalVisible(true)} // Open modal to select grade
-              >
-                <Text style={styles.changeButtonText}>
-                  {selectedGrade ? "Change" : "Select Grade"}
-                </Text>
-              </TouchableOpacity>
+              {!readOnly && (
+                <TouchableOpacity
+                  style={styles.changeButton}
+                  onPress={() => setGradeModalVisible(true)} // Open modal to select grade
+                >
+                  <Text style={styles.changeButtonText}>
+                    {selectedGrade ? "Change" : "Select Grade"}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
             <Text style={styles.detailLabel}>Division:</Text>
             <TextInput
@@ -312,13 +330,12 @@ const SchoolInfoScreen = ({ kid }) => {
                 setSchoolGradeDivision(text);
                 setSaveVisible(true);
               }}
+              editable={!readOnly}
               placeholder="Enter grade division..."
             />
 
             {/* Header text for Pickup Door and instructions */}
-            <Text style={styles.pickupDoorHeader}>
-              Pickup Door (you can put 3 pictures)
-            </Text>
+            <Text style={styles.pickupDoorHeader}>Dismissal Door Photos</Text>
           </>
         )}
 
@@ -338,12 +355,14 @@ const SchoolInfoScreen = ({ kid }) => {
                         style={styles.slotImage}
                       />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteIcon}
-                      onPress={() => handleDeletePhoto(index, "local")}
-                    >
-                      <Ionicons name="trash-outline" size={24} color="red" />
-                    </TouchableOpacity>
+                    {!readOnly && (
+                      <TouchableOpacity
+                        style={styles.deleteIcon}
+                        onPress={() => handleDeletePhoto(index, "local")}
+                      >
+                        <Ionicons name="trash-outline" size={24} color="red" />
+                      </TouchableOpacity>
+                    )}
                   </>
                 ) : schoolExitPhotos[index] && schoolExitPhotos[index].path ? (
                   // Display existing photos from Supabase
@@ -355,19 +374,23 @@ const SchoolInfoScreen = ({ kid }) => {
                     >
                       <RemoteImage
                         path={schoolExitPhotos[index].path}
-                        bucketName="schoolExitPhotos"
+                        bucketName="schoolexitphotos"
                         style={styles.slotImage}
                       />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteIcon}
-                      onPress={() => handleDeletePhoto(index, "supabase")}
-                    >
-                      <Ionicons name="trash-outline" size={24} color="red" />
-                    </TouchableOpacity>
+                    {!readOnly && (
+                      <TouchableOpacity
+                        style={styles.deleteIcon}
+                        onPress={() => handleDeletePhoto(index, "supabase")}
+                      >
+                        <Ionicons name="trash-outline" size={24} color="red" />
+                      </TouchableOpacity>
+                    )}
                   </>
+                ) : // Display the "+" icon to add a new image
+                readOnly ? (
+                  <View style={styles.emptySlotReadonly} />
                 ) : (
-                  // Display the "+" icon to add a new image
                   <TouchableOpacity onPress={() => openCameraForFrame(index)}>
                     <View style={styles.emptySlot}>
                       <MaterialIcons name="add" size={32} color="gray" />
@@ -549,7 +572,7 @@ const styles = StyleSheet.create({
   imageSlot: {
     width: (width - 30) / 3,
     height: 225,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: "#ddd",
     justifyContent: "center",
     position: "relative",
@@ -611,5 +634,12 @@ const styles = StyleSheet.create({
   modalCloseButtonText: {
     color: "#fff",
     fontWeight: "bold",
+  },
+  emptySlotReadonly: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#f2f2f2",
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

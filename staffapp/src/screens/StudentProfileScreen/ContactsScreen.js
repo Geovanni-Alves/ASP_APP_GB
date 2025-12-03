@@ -10,12 +10,14 @@ import {
   Alert,
   TouchableWithoutFeedback,
   Keyboard,
+  Linking,
+  Pressable,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { Ionicons, MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import PhoneInput from "react-native-international-phone-number";
 
-const ContactsScreen = ({ kid }) => {
+const ContactsScreen = ({ kid, readOnly }) => {
   const [contacts, setContacts] = useState([]); // Stores list of contacts
   const [isModalVisible, setIsModalVisible] = useState(false); // Controls modal visibility
   const [isEditing, setIsEditing] = useState(false); // Controls editing mode
@@ -33,18 +35,106 @@ const ContactsScreen = ({ kid }) => {
   }, []);
 
   // Fetch contacts from the database
+  // const fetchContacts = async () => {
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from("contacts")
+  //       .select("*")
+  //       .eq("student_id", kid.id); // Fetch contacts for the specific kid
+
+  //     if (error) {
+  //       throw error;
+  //     }
+  //     setContacts(data);
+  //   } catch (error) {
+  //     Alert.alert("Error", "Failed to fetch contacts");
+  //   }
+  // };
+
+  const handleCallPress = (phoneNumber) => {
+    if (!phoneNumber) {
+      Alert.alert("No phone number available");
+      return;
+    }
+
+    const phoneURL = `tel:${phoneNumber}`;
+
+    Linking.canOpenURL(phoneURL)
+      .then((supported) => {
+        if (!supported) {
+          Alert.alert("Error", "This device cannot make calls");
+        } else {
+          Linking.openURL(phoneURL);
+        }
+      })
+      .catch((err) => console.error(err));
+  };
+
+  const handleSMSPress = (phoneNumber) => {
+    if (!phoneNumber) {
+      setShowInfoModal(true);
+    } else {
+      const smsNumber = `sms:${phoneNumber}`;
+      Linking.canOpenURL(smsNumber)
+        .then((supported) => {
+          if (!supported) {
+            console.error("SMS not supported");
+          } else {
+            return Linking.openURL(smsNumber);
+          }
+        })
+        .catch((error) => console.error(error));
+    }
+  };
+
   const fetchContacts = async () => {
     try {
       const { data, error } = await supabase
-        .from("contacts")
-        .select("*")
-        .eq("student_id", kid.id); // Fetch contacts for the specific kid
+        .from("student_family")
+        .select(
+          `
+        *,
+        contacts (
+          id,
+          "firstName",
+          "lastName",
+          email,
+          phone,
+          user_id,
+          invited,
+          signed,
+          canPickup,
+          code,
+          type,
+          is_primary_contact
+        )
+      `
+        )
+        .eq("student_id", kid.id);
 
-      if (error) {
-        throw error;
-      }
-      setContacts(data);
+      if (error) throw error;
+
+      const contactsList = data.map((item) => ({
+        id: item.contacts.id,
+        name: `${item.contacts.firstName} ${
+          item.contacts.lastName ?? ""
+        }`.trim(),
+        email: item.contacts.email,
+        phone: item.contacts.phone,
+        invited: item.contacts.invited,
+        signed: item.contacts.signed,
+        user_id: item.contacts.user_id,
+        canPickup: item.contacts.canPickup,
+        code: item.contacts.code,
+        type: item.contacts.type,
+        is_primary_contact: item.contacts.is_primary_contact,
+      }));
+
+      // console.log("contacts List", contactsList);
+
+      setContacts(contactsList);
     } catch (error) {
+      console.error(error);
       Alert.alert("Error", "Failed to fetch contacts");
     }
   };
@@ -246,9 +336,21 @@ const ContactsScreen = ({ kid }) => {
   const renderContactItem = ({ item }) => (
     <View style={styles.contactContainer}>
       <View>
-        <Text style={styles.contactName}>{item.name}</Text>
-        <Text style={styles.contactEmail}>{item.email}</Text>
-        <Text style={styles.contactRelationship}>{item.relationship}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Text style={styles.contactName}>{item.name}</Text>
+
+          {item.is_primary_contact && (
+            <Ionicons
+              name="shield-checkmark"
+              size={18}
+              color="green"
+              style={{ marginLeft: 6 }}
+            />
+          )}
+        </View>
+        <Text style={styles.contactEmail}>Email: {item.email}</Text>
+        {item.phone && <Text style={styles.contactPhone}>📞 {item.phone}</Text>}
+        <Text style={styles.contactRelationship}>{item.type}</Text>
         {item.is_primary_contact && (
           <Text style={styles.primaryContact}>Primary Contact</Text>
         )}
@@ -259,34 +361,47 @@ const ContactsScreen = ({ kid }) => {
           </View>
         )}
       </View>
+      {readOnly && (
+        <View style={styles.actionButtons}>
+          <Pressable onPress={() => handleCallPress(item.phone)}>
+            <Ionicons name="call-outline" size={24} color="black" />
+            <Text>Call</Text>
+          </Pressable>
+          <Pressable onPress={() => handleSMSPress(item.phone)}>
+            <Ionicons name="chatbubble-outline" size={24} color="black" />
+            <Text>SMS</Text>
+          </Pressable>
+        </View>
+      )}
 
-      <View style={styles.actionButtons}>
-        {/* Edit contact button */}
-        <TouchableOpacity onPress={() => editContact(item)}>
-          <Ionicons name="pencil" size={24} color="blue" />
-        </TouchableOpacity>
-
-        {/* Resend invite button (if user_id is null) */}
-        {!item.user_id && (
-          <TouchableOpacity onPress={() => inviteUser(item.email, item.id)}>
-            <MaterialIcons
-              name="email"
-              size={24}
-              color={item.invited ? "green" : "red"}
-            />
+      {!readOnly && (
+        <View style={styles.actionButtons}>
+          {/* Edit contact button */}
+          <TouchableOpacity onPress={() => editContact(item)}>
+            <Ionicons name="pencil" size={24} color="blue" />
           </TouchableOpacity>
-        )}
 
-        {/* Delete contact button */}
-        <TouchableOpacity onPress={() => deleteContact(item)}>
-          <Ionicons name="trash" size={24} color="red" />
-        </TouchableOpacity>
-      </View>
+          {/* Resend invite button (if user_id is null) */}
+          {!item.user_id && (
+            <TouchableOpacity onPress={() => inviteUser(item.email, item.id)}>
+              <MaterialIcons
+                name="email"
+                size={24}
+                color={item.invited ? "green" : "red"}
+              />
+            </TouchableOpacity>
+          )}
 
-      {!item.invited && !item.user_id && (
+          {/* Delete contact button */}
+          <TouchableOpacity onPress={() => deleteContact(item)}>
+            <Ionicons name="trash" size={24} color="red" />
+          </TouchableOpacity>
+        </View>
+      )}
+      {!item.invited && !item.user_id && !readOnly && (
         <Text style={styles.inviteFailedText}>Invite not sent</Text>
       )}
-      {item.invited && (
+      {item.invited && !readOnly && (
         <View>
           <Text>Invited</Text>
         </View>
@@ -304,13 +419,15 @@ const ContactsScreen = ({ kid }) => {
       />
 
       {/* Button to open modal for adding a new contact */}
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => setIsModalVisible(true)}
-      >
-        <MaterialIcons name="add" size={24} color="white" />
-        <Text style={styles.addButtonText}>Add Contact</Text>
-      </TouchableOpacity>
+      {!readOnly && (
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setIsModalVisible(true)}
+        >
+          <MaterialIcons name="add" size={24} color="white" />
+          <Text style={styles.addButtonText}>Add Contact</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Modal for adding or editing a contact */}
       <Modal
@@ -441,6 +558,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
     backgroundColor: "#f9f9f9",
+    // backgroundColor: "red",
     borderRadius: 8,
     marginBottom: 10,
   },
@@ -460,7 +578,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "green",
     fontWeight: "bold",
-    marginTop: 5,
+    marginTop: 1,
   },
   signedContact: {
     fontSize: 14,

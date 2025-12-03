@@ -3,8 +3,9 @@ import styles from "./styles";
 import { useEffect, useCallback } from "react";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 
-const AddressInfoScreen = ({ kid }) => {
+const AddressInfoScreen = ({ kid, readOnly }) => {
   const navigation = useNavigation();
+  // console.log(kid, "kid");
 
   return (
     <View style={styles.addressContainer}>
@@ -39,19 +40,21 @@ const AddressInfoScreen = ({ kid }) => {
                 </View>
               )}
             </View>
-            <TouchableOpacity
-              style={styles.dropOffButton}
-              onPress={() => {
-                navigation.navigate("AddressList", {
-                  kidId: kid.id,
-                  useDropOff: kid.useDropOffService,
-                });
-              }}
-            >
-              <Text style={styles.dropOffButtonText}>
-                {kid.dropOffAddress ? "Change / Add more" : "Add new address"}
-              </Text>
-            </TouchableOpacity>
+            {!readOnly && (
+              <TouchableOpacity
+                style={styles.dropOffButton}
+                onPress={() => {
+                  navigation.navigate("AddressList", {
+                    kidId: kid.id,
+                    useDropOff: kid.useDropOffService,
+                  });
+                }}
+              >
+                <Text style={styles.dropOffButtonText}>
+                  {kid.dropOffAddress ? "Change / Add more" : "Add new address"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </ScrollView>
       ) : (
@@ -78,19 +81,21 @@ const AddressInfoScreen = ({ kid }) => {
                 </Text>
               </View>
               {kid.dropOffAddress ? (
-                <TouchableOpacity
-                  style={styles.dropOffButton}
-                  onPress={() => {
-                    navigation.navigate("AddAddress", {
-                      address: kid.dropOffAddress,
-                      kidId: kid?.id,
-                      mode: "update",
-                      from: "kidProfile",
-                    });
-                  }}
-                >
-                  <Text style={styles.dropOffButtonText}>Change</Text>
-                </TouchableOpacity>
+                !readOnly && (
+                  <TouchableOpacity
+                    style={styles.dropOffButton}
+                    onPress={() => {
+                      navigation.navigate("AddAddress", {
+                        address: kid.dropOffAddress,
+                        kidId: kid?.id,
+                        mode: "update",
+                        from: "kidProfile",
+                      });
+                    }}
+                  >
+                    <Text style={styles.dropOffButtonText}>Change</Text>
+                  </TouchableOpacity>
+                )
               ) : (
                 <TouchableOpacity
                   style={styles.dropOffButton}
@@ -107,18 +112,20 @@ const AddressInfoScreen = ({ kid }) => {
               )}
             </View>
           ) : (
-            <TouchableOpacity
-              style={styles.dropOffButton}
-              onPress={() => {
-                navigation.navigate("AddAddress", {
-                  kidId: kid?.id,
-                  mode: kid.dropOffAddress ? "update" : "insert",
-                  from: "kidProfile",
-                });
-              }}
-            >
-              <Text style={styles.dropOffButtonText}>Add new address</Text>
-            </TouchableOpacity>
+            !readOnly && (
+              <TouchableOpacity
+                style={styles.dropOffButton}
+                onPress={() => {
+                  navigation.navigate("AddAddress", {
+                    kidId: kid?.id,
+                    mode: kid.dropOffAddress ? "update" : "insert",
+                    from: "kidProfile",
+                  });
+                }}
+              >
+                <Text style={styles.dropOffButtonText}>Add new address</Text>
+              </TouchableOpacity>
+            )
           )}
         </View>
       )}

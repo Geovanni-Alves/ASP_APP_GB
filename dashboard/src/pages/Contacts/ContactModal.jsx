@@ -20,6 +20,7 @@ const ContactModal = ({
   const [canPickup, setCanPickup] = useState(false);
   const [invited, setInvited] = useState(false);
   const [existingEmailInput, setExistingEmailInput] = useState("");
+  const [isPrimaryContact, setIsPrimaryContact] = useState(false);
 
   const generateNumericCode = () =>
     Math.floor(100000 + Math.random() * 900000).toString();
@@ -37,6 +38,7 @@ const ContactModal = ({
       setContactType(contactToEdit.type || "Parent");
       setCanPickup(contactToEdit.canPickup || false);
       setCode(contactToEdit.code || generateNumericCode());
+      setIsPrimaryContact(contactToEdit?.is_primary_contact || false);
       setInvited(contactToEdit.invited || false);
     } else {
       // Reset everything for new add
@@ -91,6 +93,7 @@ const ContactModal = ({
       code,
       invited,
       signed: contactToEdit ? contactToEdit.signed : false,
+      is_primary_contact: isPrimaryContact,
     };
 
     onSave(contactData);
@@ -256,6 +259,13 @@ const ContactModal = ({
                 onChange={(e) => setCanPickup(e.target.checked)}
               />
               <label style={{ marginLeft: 8 }}>Can Pickup</label>
+            </div>
+            <div className="checkbox-container" style={{ marginTop: 10 }}>
+              <Checkbox
+                checked={isPrimaryContact}
+                onChange={(e) => setIsPrimaryContact(e.target.checked)}
+              />
+              <label style={{ marginLeft: 8 }}>Set as Primary Contact</label>
             </div>
 
             <Button onClick={handleSave} type="primary" className="save-btn">

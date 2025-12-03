@@ -28,13 +28,14 @@ import BasicInfoScreen from "./BasicInfoScreen";
 import SchoolInfoScreen from "./SchoolInfoScreen";
 import ContactsScreen from "./ContactsScreen";
 import AddressInfoScreen from "./AddressInfoScreen";
+import JiuJitsuInfoScreen from "./JiuJitsuInfoScreen";
 import { usePicturesContext } from "../../contexts/PicturesContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 
 const StudentProfileScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { id: kidId } = route.params;
+  const { id: kidId, readOnly } = route.params;
   const [selectedKid, setSelectedKid] = useState(null);
   const [actualPhoto, setActualPhoto] = useState(null);
   const [activeTab, setActiveTab] = useState("BasicInfo");
@@ -70,16 +71,16 @@ const StudentProfileScreen = () => {
 
   useEffect(() => {
     const formattedName = formatKidName(selectedKid?.name);
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack} style={styles.goBackIcon}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" />
-        </TouchableOpacity>
-      ),
-    });
+    // navigation.setOptions({
+    //   headerLeft: () => (
+    //     <TouchableOpacity onPress={goBack} style={styles.goBackIcon}>
+    //       <FontAwesome name="arrow-left" size={23} color="#fff" />
+    //     </TouchableOpacity>
+    //   ),
+    // });
     if (selectedKid) {
       navigation.setOptions({
-        title: `${formattedName} Profile`,
+        title: `${formattedName} Profile `,
       });
     }
   }, [route, selectedKid, activeTab]);
@@ -248,13 +249,23 @@ const StudentProfileScreen = () => {
 
             {activeTab === "BasicInfo" && (
               <View style={styles.cameraContainer}>
-                <TouchableOpacity
-                  style={styles.cameraIcon}
-                  onPress={() => setCallOpenCamera(true)}
-                >
-                  <MaterialIcons name="photo-camera" size={32} color="gray" />
-                </TouchableOpacity>
-                <Text style={styles.editText}>Edit </Text>
+                {!readOnly && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.cameraIcon}
+                      onPress={() => {
+                        setCallOpenCamera(true);
+                      }}
+                    >
+                      <MaterialIcons
+                        name="photo-camera"
+                        size={32}
+                        color="gray"
+                      />
+                    </TouchableOpacity>
+                    <Text style={styles.editText}>Edit </Text>
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -288,6 +299,7 @@ const StudentProfileScreen = () => {
                 kidId={selectedKid.id}
                 setKidDetails={setSelectedKid}
                 handleUpdateKid={handleUpdateKid}
+                readOnly={readOnly}
               />
             )}
             options={{
@@ -298,7 +310,9 @@ const StudentProfileScreen = () => {
           />
           <Tab.Screen
             name="Contacts"
-            children={() => <ContactsScreen kid={selectedKid} />}
+            children={() => (
+              <ContactsScreen kid={selectedKid} readOnly={readOnly} />
+            )}
             options={{
               tabBarIcon: ({ color, size }) => (
                 <AntDesign name="contacts" size={size} color={color} />
@@ -307,7 +321,9 @@ const StudentProfileScreen = () => {
           />
           <Tab.Screen
             name="School Info"
-            children={() => <SchoolInfoScreen kid={selectedKid} />}
+            children={() => (
+              <SchoolInfoScreen kid={selectedKid} readOnly={readOnly} />
+            )}
             options={{
               tabBarIcon: ({ color, size }) => (
                 <FontAwesome name="building" color={color} size={size} />
@@ -316,29 +332,26 @@ const StudentProfileScreen = () => {
           />
           <Tab.Screen
             name="Address Info"
-            children={() => <AddressInfoScreen kid={selectedKid} />}
+            children={() => (
+              <AddressInfoScreen kid={selectedKid} readOnly={readOnly} />
+            )}
             options={{
               tabBarIcon: ({ color, size }) => (
                 <MaterialIcons name="location-on" color={color} size={size} />
               ),
             }}
           />
-          <Tab.Screen
+          {/* <Tab.Screen
             name="Jiu Jitsu Info"
             children={() => (
-              <JiuJitsuInfoScreen
-                belt={belt}
-                stripes={stripes}
-                setBelt={setBelt}
-                setStripes={setStripes}
-              />
+              <JiuJitsuInfoScreen kid={selectedKid} readOnly={readOnly} />
             )}
             options={{
               tabBarIcon: ({ color, size }) => (
                 <FontAwesome5 name="medal" color={color} size={size} />
               ),
             }}
-          />
+          /> */}
         </Tab.Navigator>
 
         <OpenCamera
@@ -414,21 +427,3 @@ const StudentProfileScreen = () => {
 };
 
 export default StudentProfileScreen;
-
-const JiuJitsuInfoScreen = ({ belt, stripes, setBelt, setStripes }) => {
-  const [bjjCategory, setBjjCategory] = useState("Little Champions");
-  return (
-    <View style={styles.tabContainer}>
-      <Text>Actual Category</Text>
-      <Text style={styles.categoryText}>{bjjCategory}</Text>
-      <Text>Belt</Text>
-      <TextInput style={styles.input} value={belt} onChangeText={setBelt} />
-      <Text>Stripes</Text>
-      <TextInput
-        style={styles.input}
-        value={stripes.toString()}
-        onChangeText={(text) => setStripes(Number(text))}
-      />
-    </View>
-  );
-};

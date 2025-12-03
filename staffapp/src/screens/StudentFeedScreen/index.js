@@ -58,20 +58,20 @@ const StudentFeedScreen = () => {
     }
   }, [kidID, kids]);
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-        </TouchableOpacity>
-      ),
-    });
-    if (selectedKid) {
-      navigation.setOptions({
-        title: `${selectedKid?.name}`,
-      });
-    }
-  }, [route, selectedKid]);
+  // useEffect(() => {
+  //   navigation.setOptions({
+  //     headerLeft: () => (
+  //       <TouchableOpacity onPress={goBack}>
+  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+  //       </TouchableOpacity>
+  //     ),
+  //   });
+  //   if (selectedKid) {
+  //     navigation.setOptions({
+  //       title: `${selectedKid?.name}`,
+  //     });
+  //   }
+  // }, [route, selectedKid]);
 
   useEffect(() => {
     const fetchSelectedKidFeeds = async () => {

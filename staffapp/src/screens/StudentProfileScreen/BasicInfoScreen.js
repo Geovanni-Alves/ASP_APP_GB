@@ -10,7 +10,12 @@ import DateTimePickerModal from "react-native-modal-datetime-picker";
 import styles from "./styles";
 import { useKidsContext } from "../../contexts/KidsContext";
 
-const BasicInfoScreen = ({ kidId, setKidDetails, handleUpdateKid }) => {
+const BasicInfoScreen = ({
+  kidId,
+  setKidDetails,
+  handleUpdateKid,
+  readOnly,
+}) => {
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const { kids, fetchSelectedKid } = useKidsContext();
@@ -90,11 +95,12 @@ const BasicInfoScreen = ({ kidId, setKidDetails, handleUpdateKid }) => {
           style={styles.detailTextInput}
           value={kidName || ""}
           onChangeText={(text) => handleInputChange("name", text)}
+          editable={!readOnly}
         />
         <Text style={styles.detailLabel}>Birthday</Text>
         <TouchableOpacity
           onPress={() => {
-            setDatePickerVisible(true);
+            if (!readOnly) setDatePickerVisible(true);
           }}
         >
           <Text style={styles.detailTextInput}>
@@ -116,18 +122,21 @@ const BasicInfoScreen = ({ kidId, setKidDetails, handleUpdateKid }) => {
         style={styles.detailTextInput}
         value={localKid?.notes || ""}
         onChangeText={(text) => handleInputChange("notes", text)}
+        editable={!readOnly}
       />
       <Text style={styles.detailLabel}>Allergies</Text>
       <TextInput
         style={styles.detailTextInput}
         value={localKid?.allergies || ""}
         onChangeText={(text) => handleInputChange("allergies", text)}
+        editable={!readOnly}
       />
       <Text style={styles.detailLabel}>Medicine</Text>
       <TextInput
         style={styles.detailTextInput}
         value={localKid?.medicine || ""}
         onChangeText={(text) => handleInputChange("medicine", text)}
+        editable={!readOnly}
       />
       {isFormChanged && (
         <TouchableOpacity

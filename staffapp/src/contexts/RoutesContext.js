@@ -1,67 +1,74 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import { useUsersContext } from "./UsersContext";
 import { supabase } from "../lib/supabase";
+import { useUsersContext } from "./UsersContext";
 
 const RoutesContext = createContext({});
 
-export const RoutesContextProvider = ({ children, routeType = "pickup" }) => {
-  const { dbUser, isDriver, userEmail } = useUsersContext();
+export const RoutesContextProvider = ({ children, routeType = null }) => {
+  const { dbUser } = useUsersContext();
 
   const [routesData, setRoutesData] = useState([]);
   const [currentRouteData, setCurrentRouteData] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // ----------------------------------------------------
-  // FETCH ALL ROUTES + VANS + DRIVERS + HELPERS
-  // ----------------------------------------------------
+  // -----------------------------------------------------
+  // UNIVERSAL: Fetch routes (pickup OR dropoff OR both)
+  // -----------------------------------------------------
   const getRoutesData = async () => {
     try {
-      const { data: routes, error } = await supabase
-        .from("routes")
-        .select("*")
-        .eq("type", routeType)
-        .in("status", [
-          "waiting_to_start",
-          "in_progress",
-          "paused",
-          "planning",
-          "open",
-        ]);
+      setLoading(true);
+
+      // 1) Load all routes we care about
+      let query = supabase.from("routes").select("*");
+
+      if (routeType) {
+        // if staff app asks for only pickup or dropoff
+        query = query.eq("type", routeType);
+      }
+
+      // load routes that are actively relevant
+      query = query.in("status", [
+        "waiting_to_start",
+        "in_progress",
+        "planning",
+        "open",
+        "paused",
+      ]);
+
+      const { data: routes, error } = await query;
 
       if (error) throw error;
 
-      // Fetch vans + driver + helpers + van details for each route
-      const merged = await Promise.all(
+      // 2) Load vans, kids, attendance
+      const enriched = await Promise.all(
         routes.map(async (route) => {
-          const { data: routeVans, error: vansErr } = await supabase
+          const { data: vansRaw } = await supabase
             .from("route_vans")
             .select("*")
             .eq("route_id", route.id);
 
-          if (vansErr) throw vansErr;
-
-          const vansWithDetails = await Promise.all(
-            routeVans.map(async (rv) => {
-              // Fetch van details
+          const vans = await Promise.all(
+            vansRaw.map(async (rv) => {
+              // van details
               const { data: vanDetails } = await supabase
                 .from("vans")
                 .select("*")
                 .eq("id", rv.van_id)
                 .single();
 
-              // Fetch driver
-              const driverUser =
-                rv.driver_id &&
-                (
-                  await supabase
-                    .from("users")
-                    .select("*")
-                    .eq("id", rv.driver_id)
-                    .single()
-                ).data;
+              // driver
+              let driverUser = null;
+              if (rv.driver_id) {
+                const { data } = await supabase
+                  .from("users")
+                  .select("*")
+                  .eq("id", rv.driver_id)
+                  .single();
+                driverUser = data;
+              }
 
-              // Fetch helpers
+              // helpers
               const helperUsers = rv.helper_ids?.length
                 ? (
                     await supabase
@@ -71,117 +78,113 @@ export const RoutesContextProvider = ({ children, routeType = "pickup" }) => {
                   ).data
                 : [];
 
-              // -------------------------------------------------------
-              //  🆕  FETCH STOPS (kids + schools)
-              // -------------------------------------------------------
-              const { data: stopsRaw } = await supabase
+              // stops
+              const { data: stops } = await supabase
                 .from("route_stops")
                 .select("*")
                 .eq("route_van_id", rv.id)
                 .order("stop_order", { ascending: true });
 
-              const stops = await Promise.all(
-                (stopsRaw || []).map(async (stop) => {
-                  // fetch kid
-                  const { data: kid } = await supabase
-                    .from("students")
-                    .select("*")
-                    .eq("id", stop.student_id)
-                    .single();
+              const studentIds = stops.map((s) => s.student_id);
 
-                  // fetch school
-                  const { data: school } = await supabase
-                    .from("schools")
-                    .select("*")
-                    .eq("id", kid.schoolId)
-                    .single();
+              // students
+              const { data: kidsRaw } = await supabase
+                .from("students")
+                .select("*")
+                .in("id", studentIds);
 
-                  return {
-                    ...stop,
-                    kid,
-                    school,
-                  };
-                })
-              );
+              // schools
+              const schoolIds = kidsRaw.map((k) => k.schoolId);
+              const { data: schoolsRaw } = await supabase
+                .from("schools")
+                .select("*")
+                .in("id", schoolIds);
+
+              const schools = {};
+              schoolsRaw.forEach((s) => (schools[s.id] = s));
+
+              // attendance
+              const { data: attendanceRaw } = await supabase
+                .from("student_attendance")
+                .select("*")
+                .eq("date", route.date)
+                .in("student_id", studentIds);
+
+              // console.log(attendanceRaw);
+              // console.log(route);
+
+              const attendance = {};
+              attendanceRaw?.forEach((a) => (attendance[a.student_id] = a));
+
+              // assemble kids[]
+              const kids = stops.map((stop) => {
+                const kid = kidsRaw.find((k) => k.id === stop.student_id);
+                return {
+                  stopId: stop.id,
+                  responsible_staff_id: stop.responsible_staff_id,
+                  kid,
+                  school: schools[kid.schoolId],
+                  attendance: attendance[kid.id] || null,
+                };
+              });
 
               return {
                 ...rv,
-                van: vanDetails || null, // adiciona os dados completos da van
-                driverUser: driverUser || null,
-                helperUsers: helperUsers || [],
-                stops,
+                van: vanDetails,
+                driverUser,
+                helperUsers,
+                kids,
               };
             })
           );
 
           return {
             ...route,
-            vans: vansWithDetails,
+            vans,
           };
         })
       );
 
-      setRoutesData(merged);
-      return merged;
+      setRoutesData(enriched);
+
+      // check if current user has a route
+      const mine = enriched.find((route) =>
+        route.vans.some(
+          (v) =>
+            v.driver_id === dbUser?.id || v.helper_ids?.includes(dbUser?.id)
+        )
+      );
+
+      setCurrentRouteData(mine || null);
+
+      return enriched;
     } catch (err) {
-      console.error("❌ Error fetching routes:", err);
+      console.error("❌ getRoutesData:", err);
       return [];
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ----------------------------------------------------
-  // Refresh wrapper
-  // ----------------------------------------------------
-  const updateRoutesData = async () => {
+  const refreshRoutes = async () => {
     setRefreshing(true);
-    const res = await getRoutesData();
+    await getRoutesData();
     setRefreshing(false);
-    return res;
   };
 
-  // ----------------------------------------------------
-  // CHECK IF CURRENT USER IS ASSIGNED TO ANY ROUTE
-  // ----------------------------------------------------
-  const checkStaffInRoutes = (allRoutes = routesData) => {
-    if (!dbUser || !allRoutes.length) return false;
-
-    const route = allRoutes.find((route) =>
-      route.vans.some((van) =>
-        isDriver
-          ? van.driver_id === dbUser.id
-          : van.helper_ids?.includes(dbUser.id)
-      )
-    );
-
-    setCurrentRouteData(route || null);
-    return Boolean(route);
-  };
-
-  // ----------------------------------------------------
-  // FIRST LOAD
-  // ----------------------------------------------------
   useEffect(() => {
-    if (!dbUser || !userEmail) return;
-
-    const load = async () => {
-      setLoading(true);
-      const loaded = await getRoutesData();
-      checkStaffInRoutes(loaded);
-      setLoading(false);
-    };
-
-    load();
-  }, [dbUser, userEmail]);
+    if (!dbUser) return;
+    getRoutesData();
+  }, [dbUser, routeType]);
 
   return (
     <RoutesContext.Provider
       value={{
         routesData,
         currentRouteData,
-        refreshRoutes: updateRoutesData,
-        refreshing,
         loading,
-        checkStaffInRoutes,
+        refreshing,
+        refreshRoutes,
       }}
     >
       {children}

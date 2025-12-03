@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -6,10 +6,11 @@ import {
   Animated,
   Modal,
   Image,
+  TouchableOpacity,
 } from "react-native";
-import { TouchableOpacity } from "react-native-gesture-handler";
 import Entypo from "react-native-vector-icons/Entypo";
-import { PanGestureHandler, State } from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+
 import CustomLoading from "./CustomLoading";
 import RemoteImage from "./RemoteImage";
 
@@ -34,32 +35,36 @@ const FullScreenImage: React.FC<FullScreenImageProps> = ({
   targetY = height / 2,
   bucketName = "photos",
 }) => {
-  const fadeAnim = new Animated.Value(0); // Start with 0 opacity for reverse open effect
-  const scaleAnim = new Animated.Value(0.1); // Start small for reverse open effect
-  const translateXAnim = new Animated.Value(targetX - width / 2); // Start from targetX
-  const translateYAnim = new Animated.Value(targetY - height / 2); // Start from targetY
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.1)).current;
+  const translateXAnim = useRef(
+    new Animated.Value(targetX - width / 2)
+  ).current;
+  const translateYAnim = useRef(
+    new Animated.Value(targetY - height / 2)
+  ).current;
 
-  // Run opening animation (reverse sucking effect) when modal becomes visible
+  // Open animation
   useEffect(() => {
     if (isVisible) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
-          toValue: 1, // Fade in
+          toValue: 1,
           duration: 300,
           useNativeDriver: true,
         }),
         Animated.timing(scaleAnim, {
-          toValue: 1, // Scale up to full size
+          toValue: 1,
           duration: 300,
           useNativeDriver: true,
         }),
         Animated.timing(translateXAnim, {
-          toValue: 0, // Move to center
+          toValue: 0,
           duration: 300,
           useNativeDriver: true,
         }),
         Animated.timing(translateYAnim, {
-          toValue: 0, // Move to center
+          toValue: 0,
           duration: 300,
           useNativeDriver: true,
         }),
@@ -67,117 +72,99 @@ const FullScreenImage: React.FC<FullScreenImageProps> = ({
     }
   }, [isVisible]);
 
-  const handleGestureEvent = Animated.event(
-    [
-      {
-        nativeEvent: {
-          translationX: translateXAnim,
-          translationY: translateYAnim,
-        },
-      },
-    ],
-    { useNativeDriver: true }
-  );
-
-  const handleStateChange = (event: any) => {
-    const { state, translationY, translationX } = event.nativeEvent;
-
-    if (state === State.END) {
-      if (translationY > 150 || translationX < -150) {
-        // Close on a big enough swipe (down or left)
-        runCloseAnimation();
-      } else {
-        // If not enough swipe, bring the image back to center
-        Animated.spring(translateXAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-
-        Animated.spring(translateYAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      }
-    }
-  };
-
+  // Close animation
   const runCloseAnimation = () => {
-    // Close button "sucking" animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
-        toValue: 0, // Fade out
+        toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }),
       Animated.timing(scaleAnim, {
-        toValue: 0.1, // Shrink to 10% of the size
+        toValue: 0.1,
         duration: 300,
         useNativeDriver: true,
       }),
       Animated.timing(translateXAnim, {
-        toValue: targetX - width / 2, // Move towards the target X
+        toValue: targetX - width / 2,
         duration: 300,
         useNativeDriver: true,
       }),
       Animated.timing(translateYAnim, {
-        toValue: targetY - height / 2, // Move towards the target Y
+        toValue: targetY - height / 2,
         duration: 300,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      onClose(); // Close modal after animation
-    });
+    ]).start(onClose);
   };
 
-  if (!isVisible) return null; // If not visible, don't render the overlay
+  // // Pan gesture
+  // const panGesture = Gesture.Pan()
+  //   .onChange((event) => {
+  //     translateXAnim.setValue(event.translationX);
+  //     translateYAnim.setValue(event.translationY);
+  //   })
+  //   .onEnd((event) => {
+  //     if (event.translationY > 150 || event.translationX < -150) {
+  //       runCloseAnimation();
+  //     } else {
+  //       Animated.spring(translateXAnim, {
+  //         toValue: 0,
+  //         useNativeDriver: true,
+  //       }).start();
+  //       Animated.spring(translateYAnim, {
+  //         toValue: 0,
+  //         useNativeDriver: true,
+  //       }).start();
+  //     }
+  //   })
+  //   .activeOffsetX([-5, 5])
+  //   .activeOffsetY([-5, 5]);
+  // // .activeOffsetY([30, 9999]);
+
+  if (!isVisible) return null;
 
   return (
-    <Modal visible={isVisible} transparent={true} onRequestClose={onClose}>
-      {/* Close button */}
-      <Animated.View
-        style={[styles.overlay, { opacity: fadeAnim }]} // Overlay with background
-      >
+    <Modal visible={isVisible} transparent onRequestClose={onClose}>
+      <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+        {/* Botão para fechar */}
         <View style={styles.closeButton}>
           <TouchableOpacity onPress={runCloseAnimation}>
             <Entypo name="cross" size={25} color="white" />
           </TouchableOpacity>
         </View>
-        {/* Gesture handler for the image */}
-        <PanGestureHandler
-          onGestureEvent={handleGestureEvent}
-          onHandlerStateChange={handleStateChange}
+
+        {/* Imagem com animação de entrada */}
+        <Animated.View
+          style={[
+            styles.imageContainer,
+            {
+              transform: [
+                { translateX: translateXAnim },
+                { translateY: translateYAnim },
+                { scale: scaleAnim },
+              ],
+            },
+          ]}
         >
-          <Animated.View
-            style={[
-              styles.imageContainer,
-              {
-                transform: [
-                  { translateX: translateXAnim }, // Move image horizontally
-                  { translateY: translateYAnim }, // Move image vertically
-                  { scale: scaleAnim }, // Shrink or expand the image
-                ],
-              },
-            ]}
-          >
-            {path ? (
-              <RemoteImage
-                path={path}
-                bucketName={bucketName}
-                style={styles.fullImage}
+          {path ? (
+            <RemoteImage
+              path={path}
+              bucketName={bucketName}
+              style={styles.fullImage}
+            />
+          ) : source ? (
+            <Image source={{ uri: source }} style={styles.fullImage} />
+          ) : (
+            <View style={styles.loaderContainer}>
+              <CustomLoading
+                imageSize={80}
+                text="Loading..."
+                showContainer={false}
               />
-            ) : source ? (
-              <Image source={{ uri: source }} style={styles.fullImage} />
-            ) : (
-              <View style={styles.loaderContainer}>
-                <CustomLoading
-                  imageSize={80}
-                  text="Loading..."
-                  showContainer={false}
-                />
-              </View>
-            )}
-          </Animated.View>
-        </PanGestureHandler>
+            </View>
+          )}
+        </Animated.View>
       </Animated.View>
     </Modal>
   );
@@ -189,15 +176,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     left: 0,
-    width: width,
-    height: height,
-    backgroundColor: "rgba(0, 0, 0, 0.9)", // Dark overlay background
+    width,
+    height,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
     justifyContent: "center",
     alignItems: "center",
   },
   imageContainer: {
-    width: "90%",
-    height: "85%",
+    // width: "90%",
+    // height: "85%",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -214,12 +201,14 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   closeButton: {
-    top: 28,
-    left: 170,
+    position: "absolute",
+    top: 80,
+    right: 15,
+    // left: 170,
     backgroundColor: "gray",
     borderRadius: 30,
     padding: 7,
-    zIndex: 1, // Ensure close button stays on top
+    zIndex: 50,
   },
 });
 

@@ -13,7 +13,6 @@ import ChatScreen from "../screens/ChatScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import ChatUserScreen from "../screens/ChatUserScreen";
 import HomeScreen from "../screens/HomeScreen";
-import CheckInScreen from "../screens/CheckInScreen";
 import StudentScreen from "../screens/StudentScreen";
 import StudentFeedScreen from "../screens/StudentFeedScreen";
 import StudentProfileScreen from "../screens/StudentProfileScreen";
@@ -48,7 +47,7 @@ const CustomBackButton = () => {
       onPress={() => navigation.goBack()}
     >
       <SimpleLineIcons name="arrow-left" size={20} color="gray" />
-      <Text style={{ marginLeft: 5, color: "gray" }}>Back</Text>
+      {/* <Text style={{ marginLeft: 5, color: "gray" }}>Back</Text> */}
     </TouchableOpacity>
   );
 };
@@ -135,7 +134,7 @@ const DrawerNavigator = ({ currentUserData }) => (
       component={ProfileScreen}
     />
 
-    <Drawer.Screen
+    {/* <Drawer.Screen
       name="CheckIn"
       options={{
         drawerLabel: "Check In",
@@ -146,7 +145,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         headerLeft: () => <CustomBackButton />,
       }}
       component={CheckInScreen}
-    />
+    /> */}
     <Drawer.Screen
       name="Students"
       options={{
