@@ -12,6 +12,11 @@ import RemoteImage from "../../../components/RemoteImage";
 import { useRoutesContext } from "../../../contexts/RoutesContext";
 import { useUsersContext } from "../../../contexts/UsersContext";
 import { supabase } from "../../../lib/supabase";
+import { usePendingActions } from "../../../contexts/PendingActionsContext";
+import { useFeedContext } from "../../../contexts/FeedContext";
+import OpenCamera from "../../../components/OpenCamera";
+import InfoModal from "../../../components/InfoModal";
+
 import styles from "./styles";
 
 const HelperPickupScreen = () => {
@@ -25,6 +30,15 @@ const HelperPickupScreen = () => {
   const [kids, setKids] = useState([]);
   const [assignedSchool, setAssignedSchool] = useState(null);
   const [localKidsState, setLocalKidsState] = useState({});
+  const { addPendingAction, cancelPendingAction } = usePendingActions();
+  const { createNewFeedForKid } = useFeedContext();
+  const [callOpenCamera, setCallOpenCamera] = useState(false);
+  const [cameraMode, setCameraMode] = useState("photo");
+  const [bucketName, setBucketName] = useState(null);
+  const [pickupPhotoKidId, setPickupPhotoKidId] = useState([]);
+  const [showPostConfirmation, setShowPostConfirmation] = useState(false);
+  const [pickupPictureDone, setPickupPictureDone] = useState(false);
+
   const kidsStateRef = useRef({});
   // const [fullscreenVisible, setFullscreenVisible] = useState(false);
   // const [selectedPhoto, setSelectedPhoto] = useState(null);
@@ -258,23 +272,56 @@ const HelperPickupScreen = () => {
         onPress: () => {
           const kidId = item.kid.id;
 
+          // Immediate UI update
           updateKidState(kidId, {
             isChecked: true,
             isAbsent: false,
             undoEnabled: true,
-            pendingAction: "checkin",
+            pendingActionId: null, // will set soon
           });
 
-          scheduleSave(kidId, "checkin", item.kid);
+          const routeData = getRouteById(routeId);
 
-          // const t = setTimeout(() => {
-          //   updateKidState(kidId, { undoEnabled: false });
-          // }, 7000);
+          // Create a pending action
+          const id = addPendingAction({
+            type: "checkin",
+            entityId: kidId,
+            delay: 7000,
+            payload: {
+              kidId,
+              routeId,
+              vanId: routeData.vans[0].id,
+              date: routeData.date,
+            },
 
-          // updateKidState(kidId, { timer: t });
-          // const routeData = getRouteById(routeId);
+            onExecute: async ({ payload }) => {
+              console.log("⏳ Saving CHECK-IN...", payload);
 
-          // doCheckIn(item.kid, routeData);
+              const { error } = await supabase
+                .from("student_attendance")
+                .insert({
+                  student_id: payload.kidId,
+                  route_id: payload.routeId,
+                  van_id: payload.vanId,
+                  date: payload.date,
+                  checked_in: true,
+                  checked_in_at: new Date().toISOString(),
+                  checked_in_by: dbUser.id,
+                });
+
+              if (error) throw error;
+            },
+
+            onFinish: () => {
+              updateKidState(kidId, {
+                undoEnabled: false,
+                pendingActionId: null,
+              });
+            },
+          });
+
+          // Save the pending action ID in local state
+          updateKidState(kidId, { pendingActionId: id });
         },
       },
     ]);
@@ -299,6 +346,28 @@ const HelperPickupScreen = () => {
         },
       },
     ]);
+  };
+
+  const handlePhotoPress = (kidId) => {
+    // console.log({ kidId });
+    setCameraMode("photo");
+    setBucketName("feedPhotos");
+    setPickupPhotoKidId(kidId);
+    setCallOpenCamera(true);
+  };
+
+  const handleSelectPhotoVideo = (paths, selectedKids, notes) => {
+    console.log({ paths, selectedKids, notes });
+    const mediaType = cameraMode === "photo" ? "PHOTO" : "VIDEO";
+
+    if (pickupPhotoKidId) {
+      paths.forEach((path) => {
+        createNewFeedForKid(pickupPhotoKidId, path, mediaType, notes);
+      });
+    }
+
+    setShowPostConfirmation(true); // Show confirmation
+    setPickupPictureDone(true);
   };
 
   // const doCheckIn = async (kidObj, routeData) => {
@@ -392,12 +461,20 @@ const HelperPickupScreen = () => {
       {
         text: "Confirm",
         onPress: () => {
+          // 1. Cancel the local timeout (UI timer)
           clearTimeout(state.timer);
 
+          // 2. Cancel the PendingActionsContext action
+          if (state.pendingActionId) {
+            cancelPendingAction(state.pendingActionId);
+          }
+
+          // 3. Reset UI state
           updateKidState(kidId, {
             isChecked: false,
-            pendingAction: null,
             undoEnabled: false,
+            pendingAction: null,
+            pendingActionId: null,
             timer: null,
           });
         },
@@ -518,13 +595,13 @@ const HelperPickupScreen = () => {
             <Text style={styles.infoLine}>{item.school.name}</Text>
           )}
 
-          {item.kid.schoolTeacherName && (
+          {/* {item.kid.schoolTeacherName && (
             <Text style={styles.infoLine}>
               Teacher Name: {item.kid.schoolTeacherName}
             </Text>
-          )}
+          )} */}
 
-          {(item.kid.schoolGrade || item.kid.schoolGradeDivision) && (
+          {/* {(item.kid.schoolGrade || item.kid.schoolGradeDivision) && (
             <View style={styles.gradeBadge}>
               <Text style={styles.gradeBadgeText}>
                 Grade {item.kid.schoolGrade}
@@ -532,7 +609,7 @@ const HelperPickupScreen = () => {
                   ` – Division ${item.kid.schoolGradeDivision}`}
               </Text>
             </View>
-          )}
+          )} */}
 
           <View style={styles.actionButtons}>
             {!isChecked && !isAbsent && (
@@ -563,9 +640,9 @@ const HelperPickupScreen = () => {
             {isChecked && !undoEnabled && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: "#007bff" }]}
-                onPress={() => console.log("Photo pressed!")}
+                onPress={() => handlePhotoPress(item.kid.id)}
               >
-                <Text style={styles.btnText}>Photo</Text>
+                <Text style={styles.btnText}>Pickup Photo</Text>
               </TouchableOpacity>
             )}
             {isAbsent && undoEnabled && (
@@ -625,6 +702,23 @@ const HelperPickupScreen = () => {
         }
         // ListHeaderComponent={
         // }
+      />
+      <OpenCamera
+        isVisible={callOpenCamera}
+        //onPhotoTaken={handlePhotoTaken}
+        onSelectOption={handleSelectPhotoVideo}
+        onClose={() => setCallOpenCamera(false)}
+        mode={cameraMode}
+        bucketName={bucketName}
+        tag={false}
+      />
+      <InfoModal
+        isVisible={showPostConfirmation}
+        onClose={() => setShowPostConfirmation(false)}
+        infoItems={[
+          { label: "Success!", value: "New activity successfully created" },
+        ]}
+        labelStyle={{ textAlign: "center" }}
       />
       {/* <FullScreenImage
         isVisible={fullscreenVisible}

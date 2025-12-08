@@ -70,7 +70,8 @@ const RemoteImage = ({
             .createSignedUrl(path, 60 * 60); // URL valid for 1 hour
 
           if (error) {
-            throw new Error("Error fetching image");
+            console.log("data", data);
+            throw new Error("Error fetching image", error);
           }
           //console.log("render the image", data);
           if (data?.signedUrl) {

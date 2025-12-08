@@ -16,6 +16,9 @@ import MessageContextProvider from "./src/contexts/MessageContext";
 import StaffContextProvider from "./src/contexts/StaffContext";
 import UsersContextProvider from "./src/contexts/UsersContext";
 import FeedContextProvider from "./src/contexts/FeedContext";
+import PendingActionsContext, {
+  PendingActionsProvider,
+} from "./src/contexts/PendingActionsContext";
 
 LogBox.ignoreLogs(["NSLocation*UsageDescription"]);
 
@@ -40,7 +43,9 @@ function App() {
                         <MessageContextProvider>
                           <RoutesContextProvider>
                             <BackgroundTasksProvider>
-                              <RootNavigator />
+                              <PendingActionsProvider>
+                                <RootNavigator />
+                              </PendingActionsProvider>
                             </BackgroundTasksProvider>
                           </RoutesContextProvider>
                         </MessageContextProvider>

@@ -112,7 +112,7 @@ export default StyleSheet.create({
   },
 
   actionBtn: {
-    paddingVertical: 10,
+    paddingVertical: 16,
     paddingHorizontal: 18,
     borderRadius: 10,
     alignItems: "center",

@@ -23,15 +23,15 @@ const NewActivityScreen = () => {
   const { kids } = useKidsContext();
   const { createNewFeedForKid } = useFeedContext();
 
-  const goBack = () => {
-    if (from === "home") {
-      navigation.navigate("Home");
-    } else if (from === "feed") {
-      navigation.navigate("StudentFeed", { id: kidId });
-    } else {
-      navigation.navigate("Home");
-    }
-  };
+  // const goBack = () => {
+  //   if (from === "home") {
+  //     navigation.navigate("Home");
+  //   } else if (from === "feed") {
+  //     navigation.navigate("StudentFeed", { id: kidId });
+  //   } else {
+  //     navigation.navigate("Home");
+  //   }
+  // };
 
   useEffect(() => {
     if (kidId && from === "feed") {

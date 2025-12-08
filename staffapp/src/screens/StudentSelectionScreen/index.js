@@ -24,15 +24,15 @@ const StudentSelectionScreen = () => {
     navigation.navigate("Activities");
   };
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [route]);
+  // useEffect(() => {
+  //   navigation.setOptions({
+  //     headerLeft: () => (
+  //       <TouchableOpacity onPress={goBack}>
+  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+  //       </TouchableOpacity>
+  //     ),
+  //   });
+  // }, [route]);
 
   const handleSelectStudent = (student) => {
     if (selectedStudents.includes(student)) {
@@ -68,7 +68,7 @@ const StudentSelectionScreen = () => {
     student.name.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  renderStudentItem = ({ item }) => {
+  const renderStudentItem = ({ item }) => {
     return (
       <View style={{ flex: 1 }}>
         <TouchableOpacity onPress={() => handleSelectStudent(item)}>

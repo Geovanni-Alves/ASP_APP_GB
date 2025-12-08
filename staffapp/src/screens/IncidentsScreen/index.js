@@ -96,15 +96,15 @@ const IncidentsScreen = () => {
     }
   };
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={goBack}>
-          <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [route, note, incidentImage]); // Ensure dependencies track changes
+  // useEffect(() => {
+  //   navigation.setOptions({
+  //     headerLeft: () => (
+  //       <TouchableOpacity onPress={goBack}>
+  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
+  //       </TouchableOpacity>
+  //     ),
+  //   });
+  // }, [route, note, incidentImage]); // Ensure dependencies track changes
 
   const renderStudent = ({ item }) => (
     <View style={styles.studentItem}>

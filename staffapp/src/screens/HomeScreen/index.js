@@ -52,13 +52,13 @@ const HomeScreen = () => {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.checkInButton}
             onPress={() => navigation.navigate("CheckIn")}
           >
             <AntDesign name="check-circle" size={20} color="white" />
             <Text style={styles.buttonText}>Check In</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <TouchableOpacity
             style={styles.activityButton}
             onPress={() => {

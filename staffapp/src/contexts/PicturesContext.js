@@ -1,6 +1,6 @@
 import React, { createContext, useContext } from "react";
 import { supabase } from "../lib/supabase";
-import * as FileSystem from "expo-file-system";
+import { File } from "expo-file-system";
 import { randomUUID } from "expo-crypto";
 import { decode } from "base64-arraybuffer";
 
@@ -8,23 +8,32 @@ const PicturesContext = createContext({});
 
 const PicturesContextProvider = ({ children }) => {
   const savePhotoInBucket = async (image, bucketName = "photos") => {
-    const imageUri = image.uri;
-    if (!imageUri?.startsWith("file://")) {
-      console.error("Invalid image URI");
-      return null;
-    }
-
+    // const imageUri = image.uri;
     try {
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: "base64",
-      });
+      if (!image?.uri?.startsWith("file://")) {
+        console.error("Invalid image URI");
+        return null;
+      }
+
+      const file = new File(image.uri);
+
+      const base64 = await file.base64();
+
+      // const base64 = await FileSystem.readAsStringAsync(imageUri, {
+      //   encoding: "base64",
+      // });
 
       const filePath = `${randomUUID()}.png`;
-      const contentType = "image/png";
+      // const buffer = await file.readAsync();
+
+      // const contentType = "image/png";
 
       const { data, error } = await supabase.storage
         .from(bucketName)
-        .upload(filePath, decode(base64), { contentType });
+        .upload(filePath, decode(base64), {
+          contentType: "image/png",
+          upsert: false,
+        });
 
       if (error) {
         throw error;
@@ -40,15 +49,18 @@ const PicturesContextProvider = ({ children }) => {
   };
 
   const saveVideoInBucket = async (video, bucketName = "videos") => {
-    if (!video?.startsWith("file://")) {
-      console.error("Invalid video URI");
-      return null;
-    }
-
     try {
-      const base64 = await FileSystem.readAsStringAsync(video, {
-        encoding: "base64",
-      });
+      if (!video?.startsWith("file://")) {
+        console.error("Invalid video URI");
+        return null;
+      }
+
+      const file = new File(video);
+      // const base64 = await FileSystem.readAsStringAsync(video, {
+      //   encoding: "base64",
+      // });
+
+      const base64 = await file.base64();
 
       const filePath = `${randomUUID()}.mp4`;
       const contentType = "video/mp4";

@@ -27,7 +27,6 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import Swiper from "react-native-swiper";
-// import { Video, ResizeMode } from "expo-av";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { usePicturesContext } from "../contexts/PicturesContext";
 import { useKidsContext } from "../contexts/KidsContext";
@@ -39,7 +38,7 @@ const OpenCamera = ({
   isVisible,
   onSelectOption,
   onClose,
-  mode = "photo",
+  mode = "photo", // "photo" | "video"
   bucketName = "photos",
   allowMultipleImages = mode === "photo",
   imagesSelectionLimit = 0,
@@ -55,50 +54,66 @@ const OpenCamera = ({
   const [permission, requestPermission] = useCameraPermissions();
   const [microphonePermission, requestMicrophonePermission] =
     useMicrophonePermissions();
-  const [mediaUris, setMediaUris] = useState([]);
+
+  const [mediaUris, setMediaUris] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [confirmMedia, setConfirmMedia] = useState(false);
-  //const [showPostButton, setShowPostButton] = useState(false);
   const [isTakingPhoto, setIsTakingPhoto] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedTime, setRecordedTime] = useState(60);
-  const [selectedKids, setSelectedKids] = useState([]);
+
+  const [selectedKids, setSelectedKids] = useState<string[]>([]);
   const [showTagKids, setShowTagKids] = useState(false);
-  const cameraRef = useRef(null);
-  const intervalRef = useRef(null);
+
+  const cameraRef = useRef<CameraView | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const rotateValue = useRef(new Animated.Value(0)).current;
   const borderColorValue = useRef(new Animated.Value(0)).current;
+
   const { kids } = useKidsContext();
   const [searchText, setSearchText] = useState("");
   const [isCustomMessageVisible, setIsCustomMessageVisible] = useState(false);
   const [pickFromGallery, setPickFromGallery] = useState(false);
   const [showSaveOrDiscard, setShowSaveOrDiscard] = useState(false);
-  const [mediaLibraryPermission, requestMediaLibraryPermission] =
-    MediaLibrary.usePermissions(); // Request media library permissions
 
+  const [mediaLibraryPermission, requestMediaLibraryPermission] =
+    MediaLibrary.usePermissions();
+
+  // Media Library permission
   useEffect(() => {
-    if (isVisible) {
-      if (!mediaLibraryPermission?.granted) {
-        requestMediaLibraryPermission(); // Request permissions on mount if not granted
-      }
+    if (isVisible && !mediaLibraryPermission?.granted) {
+      requestMediaLibraryPermission();
     }
   }, [isVisible]);
 
+  const player = useVideoPlayer("", (playerInstance) => {
+    playerInstance.loop = false;
+  });
+
+  useEffect(() => {
+    if (mode === "video" && mediaUris.length > 0) {
+      player.replace(mediaUris[0]);
+      player.play();
+    }
+  }, [mediaUris, mode]);
+
+  // Camera / Mic permission
   useEffect(() => {
     if (isVisible) {
       const requestPermissions = async () => {
         const cameraPermissionResponse = await requestPermission();
+        if (!cameraPermissionResponse.granted) return;
+
         if (mode === "video") {
           await requestMicrophonePermission();
-        }
-        if (!cameraPermissionResponse.granted) {
-          return;
         }
       };
       requestPermissions();
     }
-  }, [isVisible]);
+  }, [isVisible, mode]);
 
+  // Reset state when modal close
   useEffect(() => {
     if (!isVisible) {
       setMediaUris([]);
@@ -107,12 +122,13 @@ const OpenCamera = ({
       setLoading(false);
       setIsTakingPhoto(false);
       setIsRecording(false);
-      clearInterval(intervalRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
       setRecordedTime(60);
       setSelectedKids([]);
       setShowTagKids(false);
       setPickFromGallery(false);
       setShowSaveOrDiscard(false);
+      setConfirmMedia(false);
     }
   }, [isVisible]);
 
@@ -147,110 +163,111 @@ const OpenCamera = ({
     );
   }
 
-  function toggleCameraFacing() {
+  const toggleCameraFacing = () => {
     setFacing((current) => (current === "back" ? "front" : "back"));
-  }
+  };
 
-  function toggleFlashMode() {
+  const toggleFlashMode = () => {
     setFlashMode((current) =>
       current === "off" ? "on" : current === "on" ? "auto" : "off"
     );
-  }
+  };
 
-  async function takePicture() {
-    if (cameraRef.current && !isTakingPhoto) {
+  const takePicture = async () => {
+    if (!cameraRef.current || isTakingPhoto) return;
+    try {
       setIsTakingPhoto(true);
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.5 });
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.5,
+      });
       setMediaUris([photo.uri]);
       setConfirmMedia(true);
+    } catch (error) {
+      console.error("Error taking picture:", error);
+    } finally {
       setIsTakingPhoto(false);
     }
-  }
+  };
 
-  async function startRecording() {
-    if (cameraRef.current && !isRecording) {
-      setIsRecording(true);
-      animateRecordButton();
-
-      setRecordedTime(60);
-
-      intervalRef.current = setInterval(() => {
-        setRecordedTime((time) => {
-          if (time <= 1) {
-            clearInterval(intervalRef.current); // Stop the interval
-            stopRecording(); // Stop recording when time reaches 0
-            return 0;
-          }
-          return time - 1; // Decrement time
-        });
-      }, 1000);
-
-      try {
-        const video = await cameraRef.current.recordAsync({
-          maxDuration: 60, // 1 minute
-        });
-
-        clearInterval(intervalRef.current); // Clear the interval after recording
-        setMediaUris([video.uri]); // Set the video URI after recording
-        setConfirmMedia(true); // Trigger confirmation state
-      } catch (error) {
-        console.error("Recording failed:", error);
-        clearInterval(intervalRef.current); // Ensure interval is cleared on error
-      } finally {
-        resetRecordButtonAnimation();
-        setIsRecording(false);
-        setRecordedTime(60); // Reset timer
-      }
-    }
-  }
-
-  async function stopRecording() {
-    if (cameraRef.current && isRecording) {
-      clearInterval(intervalRef.current); // Clear the interval
-      try {
-        await cameraRef.current.stopRecording();
-      } catch (error) {
-        console.error("Error stopping recording:", error);
-      }
-      setConfirmMedia(true); // Ensure this is called after stopping recording
-      setIsRecording(false);
-      setRecordedTime(60);
-    }
-  }
-
-  function animateRecordButton() {
+  const animateRecordButton = () => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(borderColorValue, {
           toValue: 1,
-          duration: 2000, // Duration for full transition
-          useNativeDriver: false, // Needs to be false for color interpolation
+          duration: 800,
+          useNativeDriver: false,
         }),
         Animated.timing(borderColorValue, {
           toValue: 0,
-          duration: 2000, // Duration for transition back
+          duration: 800,
           useNativeDriver: false,
         }),
       ])
     ).start();
-  }
+  };
+
+  const resetRecordButtonAnimation = () => {
+    borderColorValue.stopAnimation();
+    borderColorValue.setValue(0);
+  };
 
   const borderColorInterpolation = borderColorValue.interpolate({
     inputRange: [0, 1],
-    outputRange: ["white", "red"], // Or any colors you prefer
+    outputRange: ["white", "red"],
   });
 
-  function resetRecordButtonAnimation() {
-    rotateValue.setValue(0); // Reset rotation value
-    rotateValue.stopAnimation(); // Stop any ongoing animation
-  }
+  const startRecording = async () => {
+    if (!cameraRef.current || isRecording) return;
 
-  const rotateInterpolation = rotateValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
+    try {
+      console.log("Starting recording...");
+      setIsRecording(true);
+      animateRecordButton();
+      setRecordedTime(60);
 
-  async function pickImageFromGallery() {
+      intervalRef.current = setInterval(() => {
+        setRecordedTime((t) => {
+          if (t <= 1) {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            stopRecording();
+            return 0;
+          }
+          return t - 1;
+        });
+      }, 1000);
+
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: 60,
+      });
+
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      setMediaUris([video.uri]);
+      setConfirmMedia(true);
+    } catch (error) {
+      console.error("Recording failed:", error);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    } finally {
+      resetRecordButtonAnimation();
+      // setIsRecording(false);
+      setRecordedTime(60);
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!cameraRef.current || !isRecording) return;
+
+    try {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      await cameraRef.current.stopRecording();
+    } catch (error) {
+      console.error("Error stopping recording:", error);
+    } finally {
+      setIsRecording(false);
+      setRecordedTime(60);
+    }
+  };
+
+  const pickImageFromGallery = async () => {
     try {
       setPickFromGallery(true);
       setIsTakingPhoto(true);
@@ -262,20 +279,22 @@ const OpenCamera = ({
             ? ImagePicker.MediaTypeOptions.Videos
             : ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        quality: 0.5, // 1
-        allowsMultipleSelection: allowMultipleImages, //mode === "photo",
+        quality: 0.5,
+        allowsMultipleSelection: allowMultipleImages,
         selectionLimit: imagesSelectionLimit,
         preferredAssetRepresentationMode: "current",
         videoMaxDuration: 60 * 1000,
       });
 
       if (!result.canceled) {
-        const videoDurationInSeconds = result.assets[0].duration / 1000;
-        if (mode === "video" && videoDurationInSeconds > 60) {
-          alert("Please select a video that is less than 60 seconds long.");
-          return;
+        const first = result.assets[0];
+        if (mode === "video" && first.duration) {
+          const videoDurationInSeconds = first.duration / 1000;
+          if (videoDurationInSeconds > 60) {
+            alert("Please select a video that is less than 60 seconds long.");
+            return;
+          }
         }
-        // Check if the selected video duration exceeds the limit
 
         const uris = result.assets.map((asset) => asset.uri);
         setMediaUris(uris);
@@ -287,44 +306,25 @@ const OpenCamera = ({
       setLoading(false);
       setIsTakingPhoto(false);
     }
-  }
+  };
 
-  const handleAskForNote = async () => {
+  const handleAskForNote = () => {
     if (allowNotes) {
       setIsCustomMessageVisible(true);
     } else {
       handleFinishPhotoOrVideo();
-      return;
     }
   };
 
-  // const handleFinishPhotoOrVideo = async (notes = "") => {
-  //   const savedMediaPaths = await saveMedia(); // Save media paths
-
-  //   if (selectedKids.length > 0) {
-  //     setShowTagKids(false);
-  //     const validKids = selectedKids.filter((kidId) => kidId !== "all");
-
-  //     // Always pass parameters in the same order: media paths, valid kids, and notes
-  //     onSelectOption(savedMediaPaths, validKids, notes);
-  //   } else {
-  //     // Pass media paths, an empty array for selected kids, and notes
-  //     onSelectOption(savedMediaPaths, [], notes);
-  //   }
-
-  //   onClose(); // Close the modal
-  // };
-
   const handleFinishPhotoOrVideo = async (notes = "") => {
-    let savedMediaPaths = [];
+    let savedMediaPaths: string[] = [];
 
     if (saveMediaOnCamera) {
-      savedMediaPaths = await saveMedia(); // Save media to storage
+      savedMediaPaths = await saveMedia();
     } else {
-      savedMediaPaths = mediaUris; // Directly return mediaUris if not saving
+      savedMediaPaths = mediaUris;
     }
 
-    // Return the media paths via onSelectOption callback
     if (selectedKids.length > 0) {
       setShowTagKids(false);
       const validKids = selectedKids.filter((kidId) => kidId !== "all");
@@ -333,81 +333,68 @@ const OpenCamera = ({
       onSelectOption(savedMediaPaths, [], notes);
     }
 
-    onClose(); // Close the modal
+    onClose();
   };
 
-  // const handleSaveWithoutTag = async () => {
-  //   const mediaPath = await saveMedia();
-  //   onSelectOption(mediaPath[0]);
-  //   onClose();
-  // };
-
-  // const handleTaggingComplete = async () => {
-  //   setShowTagKids(false); // Close the tagging modal
-  //   //setIsCustomMessageVisible(true);
-  //   const savedMediaPaths = await saveMedia();
-
-  //   const validKids = selectedKids.filter((kidId) => kidId !== "all");
-  //   onSelectOption(savedMediaPaths, validKids); // Pass the saved media path to the parent
-  //   onClose();
-  // };
-
-  const handleSaveToGallery = async (uri) => {
+  const handleSaveToGallery = async (uri: string) => {
     try {
       if (!mediaLibraryPermission?.granted) {
         const permission = await requestMediaLibraryPermission();
         if (!permission.granted) {
           alert("Permission to access gallery is required!");
+          return;
         }
       }
       await MediaLibrary.createAssetAsync(uri);
-      alert("media saved at gallery");
+      alert("Media saved to gallery");
     } catch (error) {
-      console.error("Error saving media to gallery:");
+      console.error("Error saving media to gallery:", error);
     }
   };
 
-  async function saveMedia() {
+  const saveMedia = async (): Promise<string[]> => {
     setLoading(true);
     try {
-      const mediaPaths = [];
-      let mediaPath = "";
+      const mediaPaths: string[] = [];
 
       if (mode === "photo") {
         for (const uri of mediaUris) {
-          mediaPath = await savePhotoInBucket({ uri }, bucketName);
-          mediaPaths.push(mediaPath);
+          const mediaPath = await savePhotoInBucket({ uri }, bucketName);
+          if (mediaPath) mediaPaths.push(mediaPath);
         }
-      } else if (mode === "video") {
-        mediaPath = await saveVideoInBucket(mediaUris[0], bucketName);
-        mediaPaths.push(mediaPath);
+      } else if (mode === "video" && mediaUris[0]) {
+        const mediaPath = await saveVideoInBucket(mediaUris[0], bucketName);
+        if (mediaPath) mediaPaths.push(mediaPath);
       }
+
       return mediaPaths;
     } catch (error) {
       console.error("Error saving media to storage", error);
+      return [];
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  const handleCloseRetake = async () => {
+  const handleCloseRetake = () => {
     setShowSaveOrDiscard(true);
   };
 
   const handleSave = async () => {
-    //console.log("handle save...");
     setShowSaveOrDiscard(false);
+    if (mediaUris[0]) {
+      await handleSaveToGallery(mediaUris[0]);
+    }
     setMediaUris([]);
-    setConfirmMedia(false); // Close confirmation screen
+    setConfirmMedia(false);
     setRecordedTime(60);
-    setIsTakingPhoto(false); // Reset camera state
-    await handleSaveToGallery(mediaUris[0]);
+    setIsTakingPhoto(false);
   };
 
-  const handleClose = async () => {
+  const handleCloseDiscard = () => {
     setShowSaveOrDiscard(false);
     setMediaUris([]);
-    setConfirmMedia(false); // Close confirmation screen
+    setConfirmMedia(false);
     setRecordedTime(60);
     setIsTakingPhoto(false);
   };
@@ -421,11 +408,11 @@ const OpenCamera = ({
           <View
             style={[
               styles.imageContainer,
-              isSelected && styles.selectedImageContainer, // Apply border if selected
+              isSelected && styles.selectedImageContainer,
             ]}
           >
             <RemoteImage
-              path={item.photo}
+              path={item.id !== "all" ? item.photo : undefined}
               name={item.name}
               style={styles.image}
               bucketName="profilePhotos"
@@ -437,12 +424,12 @@ const OpenCamera = ({
     );
   };
 
-  const toggleKidSelection = (kidId) => {
+  const toggleKidSelection = (kidId: string) => {
     if (kidId === "all") {
       if (selectedKids.includes("all")) {
-        setSelectedKids([]); // Deselect all if "All" is already selected
+        setSelectedKids([]);
       } else {
-        setSelectedKids(["all", ...kids.map((kid) => kid.id)]); // Select all kids
+        setSelectedKids(["all", ...kids.map((kid) => kid.id)]);
       }
     } else {
       setSelectedKids((prevSelected) =>
@@ -457,7 +444,6 @@ const OpenCamera = ({
     return (
       <Modal visible={isVisible} animationType="slide" transparent={true}>
         <CustomLoading imageSize={80} text="Loading..." />
-        {/* <Text style={styles.loadingText}>Loading...</Text> */}
       </Modal>
     );
   }
@@ -465,7 +451,7 @@ const OpenCamera = ({
   if (mediaUris?.length > 0) {
     return (
       <Modal visible={isVisible} animationType="slide" transparent={false}>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, backgroundColor: "black" }}>
           <Swiper
             loop={false}
             showsPagination={true}
@@ -476,21 +462,30 @@ const OpenCamera = ({
               ? mediaUris.map((uri, index) => (
                   <Image
                     key={index}
-                    source={{ uri: uri }}
+                    source={{ uri }}
                     style={styles.fullScreenImage}
                     resizeMode="contain"
                   />
                 ))
               : mediaUris.map((uri, index) => (
+                  // <VideoView
+                  //   key={index}
+                  //   style={styles.fullScreenImage}
+                  //   video={{ uri }}
+                  //   useNativeControls
+                  //   shouldPlay
+                  //   resizeMode="contain"
+                  // />
                   <VideoView
                     key={index}
-                    source={{ uri: uri }}
+                    player={player}
                     style={styles.fullScreenImage}
-                    useNativeControls
-                    shouldPlay
+                    // nativeControls={true}
+                    contentFit="contain"
                   />
                 ))}
           </Swiper>
+
           {confirmMedia && (
             <>
               <TouchableOpacity
@@ -508,6 +503,7 @@ const OpenCamera = ({
               >
                 <Ionicons name="close" size={25} color="white" />
               </TouchableOpacity>
+
               <View style={styles.bottomContainer}>
                 <TouchableOpacity
                   style={styles.bottomButton}
@@ -524,20 +520,19 @@ const OpenCamera = ({
                 >
                   <Text style={styles.bottomText}>Retake</Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.bottomButton}
                   onPress={() => {
                     setConfirmMedia(false);
                     if (tag) {
                       setShowTagKids(true);
-                    } else if (bucketName != "profilePhotos") {
+                    } else if (bucketName !== "profilePhotos") {
                       if (allowNotes) {
                         setIsCustomMessageVisible(true);
                       } else {
                         handleFinishPhotoOrVideo();
                       }
-
-                      //setShowPostButton(true);
                     } else {
                       handleFinishPhotoOrVideo();
                     }
@@ -574,7 +569,7 @@ const OpenCamera = ({
                     placeholder="Search Kid"
                     placeholderTextColor="gray"
                     value={searchText}
-                    onChangeText={(text) => setSearchText(text)}
+                    onChangeText={setSearchText}
                   />
                   <FlatList
                     data={filteredKids}
@@ -586,7 +581,6 @@ const OpenCamera = ({
                   {selectedKids?.length > 0 && (
                     <TouchableOpacity
                       style={styles.doneButton}
-                      //onPress={handleTaggingComplete}
                       onPress={handleAskForNote}
                     >
                       <Text style={styles.doneButtonText}>
@@ -598,65 +592,43 @@ const OpenCamera = ({
               </KeyboardAvoidingView>
             </View>
           )}
-          {/* {showPostButton && (
-            <View style={styles.tagOverlay}>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => {
-                  setShowPostButton(false);
-                  setConfirmMedia(true);
-                }}
-              >
-                <Ionicons name="arrow-back" size={25} color="white" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.doneButton}
-                //onPress={handleSaveWithoutTag}
-                onPress={handleAskForNote}
-              >
-                <Text style={styles.doneButtonText}>
-                  Post {mode === "video" ? "Video" : "Photo"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )} */}
+
+          <CustomMessageBox
+            isVisible={isCustomMessageVisible}
+            onClose={() => setIsCustomMessageVisible(false)}
+            header={`Do you want to add a note to this ${
+              mode === "photo" ? "photo" : "video"
+            }?`}
+            infoItems={[]}
+            showTextInput={true}
+            textInputPlaceholder="Write a note..."
+            confirmButtonText="Yes, add a note"
+            cancelButtonText="No, post without notes"
+            onSubmit={(action, inputValue) => {
+              if (inputValue) {
+                handleFinishPhotoOrVideo(inputValue);
+              } else {
+                handleFinishPhotoOrVideo();
+              }
+            }}
+          />
+
+          <CustomMessageBox
+            isVisible={showSaveOrDiscard}
+            onClose={() => setShowSaveOrDiscard(false)}
+            header={`Save ${mode === "photo" ? "photo" : "video"} to gallery?`}
+            infoItems={[]}
+            confirmButtonText="Save"
+            cancelButtonText="Discard"
+            onSubmit={(action) => {
+              if (action === "Yes") {
+                handleSave();
+              } else {
+                handleCloseDiscard();
+              }
+            }}
+          />
         </View>
-        <CustomMessageBox
-          isVisible={isCustomMessageVisible}
-          onClose={() => setIsCustomMessageVisible(false)}
-          header={`Do you want to add a note to this ${
-            mode === "photo" ? "photo" : "video"
-          }?`}
-          infoItems={[]}
-          showTextInput={true}
-          textInputPlaceholder="Write a note..."
-          confirmButtonText="Yes, add a note" // Custom confirm button text
-          cancelButtonText="No, post without notes" // Custom cancel button text
-          onSubmit={(action, inputValue) => {
-            if (inputValue) {
-              handleFinishPhotoOrVideo(inputValue);
-            } else {
-              //console.log("no note added");
-              handleFinishPhotoOrVideo();
-            }
-          }}
-        />
-        <CustomMessageBox
-          isVisible={showSaveOrDiscard}
-          onClose={() => setShowSaveOrDiscard(false)}
-          header={`Save ${mode === "photo" ? "photo" : "video"} to gallery?`}
-          infoItems={[]}
-          confirmButtonText="Save"
-          cancelButtonText="Discard"
-          onSubmit={(action) => {
-            if (action === "Yes") {
-              handleSave();
-            } else {
-              handleClose();
-            }
-            //setShowSaveOrDiscard(false);
-          }}
-        />
       </Modal>
     );
   }
@@ -665,121 +637,113 @@ const OpenCamera = ({
     <Modal visible={isVisible} animationType="slide" transparent={false}>
       <View style={styles.container}>
         <CameraView
-          style={styles.camera}
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
           facing={facing}
           flash={flashMode}
-          mode={mode}
-          ref={cameraRef}
-          autofocus="on"
-        >
-          <View style={styles.cameraContainer}>
-            <View style={styles.topBar}>
-              {mode === "video" && (
-                <Text style={styles.timerText}>{formatTime(recordedTime)}</Text>
-              )}
-              {!isRecording && (
-                <>
-                  <TouchableOpacity
-                    style={styles.closeButton}
-                    onPress={onClose}
-                  >
-                    <Ionicons name="close" size={29} color="white" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.flashButton}
-                    onPress={toggleFlashMode}
-                  >
-                    <MaterialIcons
-                      name={
-                        flashMode === "on"
-                          ? "flash-on"
-                          : flashMode === "auto"
-                          ? "flash-auto"
-                          : "flash-off"
-                      }
-                      size={25}
-                      color="white"
-                    />
-                  </TouchableOpacity>
-                </>
-              )}
-            </View>
-            <View style={styles.bottomBar}>
-              {!isRecording && (
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={pickImageFromGallery}
-                >
-                  <View style={styles.iconBackground}>
-                    <Ionicons name="images-outline" size={25} color="white" />
-                  </View>
-                </TouchableOpacity>
-              )}
-              {mode === "photo" ? (
-                <>
-                  <TouchableOpacity
-                    style={styles.takePictureButton}
-                    onPress={takePicture}
-                    disabled={isTakingPhoto}
-                  >
-                    <View style={styles.outerCircle}>
-                      <View style={styles.innerCircle} />
-                    </View>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <TouchableOpacity
-                    style={styles.takePictureButton}
-                    onPress={isRecording ? stopRecording : startRecording}
-                  >
-                    <Animated.View
-                      style={[
-                        styles.outerCircleVideo,
-                        {
-                          transform: [
-                            {
-                              rotate: rotateInterpolation, // Apply rotation animation
-                            },
-                          ],
-                          borderColor: isRecording
-                            ? borderColorInterpolation
-                            : "white",
-                        },
-                      ]}
-                    >
-                      {isRecording ? (
-                        <View style={styles.innerSquareVideo} />
-                      ) : (
-                        <View style={styles.innerCircleVideo} />
-                      )}
-                    </Animated.View>
-                  </TouchableOpacity>
-                </>
-              )}
-              {!isRecording && (
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={toggleCameraFacing}
-                >
-                  <View style={styles.iconBackground}>
-                    <Ionicons
-                      name="camera-reverse-outline"
-                      size={25}
-                      color="white"
-                    />
-                  </View>
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </CameraView>
+          mode={mode === "video" ? "video" : "picture"}
+        />
+
+        {/* TOP BAR */}
+        <View style={styles.topBar}>
+          {mode === "video" && (
+            <Text style={styles.timerText}>{formatTime(recordedTime)}</Text>
+          )}
+
+          {!isRecording && (
+            <>
+              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                <Ionicons name="close" size={29} color="white" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.roundButton}
+                onPress={toggleFlashMode}
+              >
+                <MaterialIcons
+                  name={
+                    flashMode === "on"
+                      ? "flash-on"
+                      : flashMode === "auto"
+                      ? "flash-auto"
+                      : "flash-off"
+                  }
+                  size={25}
+                  color="gold"
+                />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* BOTTOM BAR */}
+        <View style={styles.bottomBar}>
+          {!isRecording && (
+            <TouchableOpacity
+              style={styles.button}
+              onPress={pickImageFromGallery}
+            >
+              <View style={styles.iconBackground}>
+                <Ionicons name="images-outline" size={25} color="white" />
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {mode === "photo" ? (
+            <TouchableOpacity
+              // style={styles.takePictureButton}
+              onPress={takePicture}
+              disabled={isTakingPhoto}
+            >
+              <View style={styles.captureButton}>
+                <View style={styles.captureInner} />
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.recordOuter}
+              onPress={isRecording ? stopRecording : startRecording}
+            >
+              <Animated.View
+                style={[
+                  styles.outerCircleVideo,
+                  {
+                    borderColor: isRecording
+                      ? borderColorInterpolation
+                      : "white",
+                  },
+                ]}
+              >
+                {isRecording ? (
+                  <View style={styles.recordInner} />
+                ) : (
+                  <View style={styles.captureInner} />
+                )}
+              </Animated.View>
+            </TouchableOpacity>
+          )}
+
+          {!isRecording && (
+            <TouchableOpacity
+              style={styles.button}
+              onPress={toggleCameraFacing}
+            >
+              <View style={styles.iconBackground}>
+                <Ionicons
+                  name="camera-reverse-outline"
+                  size={25}
+                  color="white"
+                />
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </Modal>
   );
 };
 
-function formatTime(seconds) {
+function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
@@ -790,60 +754,52 @@ export default OpenCamera;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-  },
-  cameraContainer: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
-  topBar: {
-    height: 70, // Smaller height for top bar
     backgroundColor: "black",
-    //flexDirection: "row",
-    justifyContent: "space-between",
+  },
+
+  // TOP OVERLAY
+  topBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 70,
+    backgroundColor: "black",
+    justifyContent: "center",
     alignItems: "center",
+  },
+  timerText: {
+    color: "white",
+    fontSize: 18,
+    backgroundColor: "red",
     paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 28,
   },
+
+  // flashButton: {
+  //   position: "absolute",
+  //   top: 23,
+  //   right: 20,
+  //   zIndex: 10,
+  //   backgroundColor: "rgba(0, 0, 0, 0.5)",
+  //   borderRadius: 50,
+  //   padding: 10,
+  // },
+
   bottomBar: {
-    height: 130, // Adjusted height for bottom bar
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 130,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
   },
-  buttonContainer: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "transparent",
-    justifyContent: "space-around",
-    alignItems: "flex-end",
-    marginBottom: 20,
-  },
-  closeButton: {
-    position: "absolute",
-    top: 20,
-    left: 20,
-    zIndex: 10,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 50,
-    padding: 10,
-  },
-  searchInput: {
-    backgroundColor: "#fff",
-    borderRadius: 5,
-    padding: 10,
-    marginVertical: 10,
-    color: "#000",
-  },
-  flashButton: {
-    position: "absolute",
-    top: 23,
-    right: 20,
-    zIndex: 10,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 50,
-    padding: 10,
-  },
+
   permissionContainer: {
     flex: 1,
     justifyContent: "center",
@@ -854,11 +810,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingBottom: 10,
   },
-  camera: {
-    flex: 1,
-    //width: Dimensions.get("window").width,
-    //height: Dimensions.get("window").height,
-  },
 
   button: {
     alignItems: "center",
@@ -867,9 +818,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   outerCircle: {
-    width: 60,
-    height: 60,
+    width: 70,
+    height: 70,
     borderRadius: 35,
     borderWidth: 5,
     borderColor: "white",
@@ -877,52 +829,89 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   innerCircle: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderRadius: 25,
     backgroundColor: "white",
   },
-  innerSquareVideo: {
-    width: 25,
-    height: 25,
-    backgroundColor: "red",
-    borderRadius: 3,
-  },
+
   outerCircleVideo: {
-    width: 60,
-    height: 60,
+    width: 70,
+    height: 70,
     borderRadius: 35,
     borderWidth: 5,
     justifyContent: "center",
     alignItems: "center",
   },
   innerCircleVideo: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderRadius: 25,
     backgroundColor: "red",
   },
+  innerSquareVideo: {
+    width: 30,
+    height: 30,
+    backgroundColor: "red",
+    borderRadius: 4,
+  },
+
   iconBackground: {
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 50,
     padding: 10,
   },
+
   fullScreenImage: {
     width: Dimensions.get("window").width,
     height: Dimensions.get("window").height,
-    position: "absolute",
-    top: 0,
-    left: 0,
     backgroundColor: "black",
   },
+
+  captureButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 6,
+    borderColor: "white",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  captureInner: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "white",
+  },
+
+  recordOuter: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 6,
+    borderColor: "red",
+  },
+
+  recordInner: {
+    width: 40,
+    height: 40,
+    backgroundColor: "red",
+    borderRadius: 8,
+  },
+
   bottomContainer: {
     position: "absolute",
-    bottom: 20,
+    bottom: 95,
     left: 20,
     right: 20,
     flexDirection: "row",
     justifyContent: "space-between",
-    zIndex: 10,
+    paddingHorizontal: 10,
+    zIndex: 9999,
+    pointerEvents: "box-none",
   },
   bottomButton: {
     padding: 10,
@@ -933,25 +922,7 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 15,
   },
-  loadingOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  loadingContainer: {
-    width: 200,
-    padding: 20,
-    backgroundColor: "white",
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 18,
-    color: "#000",
-  },
+
   activeDot: {
     backgroundColor: "white",
     width: 8,
@@ -964,28 +935,17 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  timerText: {
-    color: "white",
-    fontSize: 18,
-    alignSelf: "center",
-    marginTop: 32,
-    backgroundColor: "red",
-    paddingLeft: 10,
-    paddingRight: 10,
-    paddingTop: 2,
-    paddingBottom: 2,
-  },
+
   tagOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    justifyContent: "flex-end", // aligns tagContainer at the bottom
+    justifyContent: "flex-end",
     paddingBottom: 5,
   },
   tagContainer: {
-    //backgroundColor: "black",
     backgroundColor: "rgba(0, 0, 0, 0.3)",
     paddingTop: 2,
     paddingBottom: 2,
@@ -996,15 +956,19 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 18,
     fontWeight: "600",
-    //marginBottom: 10,
+  },
+  searchInput: {
+    backgroundColor: "#fff",
+    borderRadius: 5,
+    padding: 10,
+    marginVertical: 10,
+    color: "#000",
   },
   kidContainer: {
-    //backgroundColor: "red",
     padding: 1,
     marginRight: 5,
     alignItems: "center",
     justifyContent: "center",
-    textAlign: "center",
   },
   imageContainer: {
     borderRadius: 50,
@@ -1017,9 +981,8 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   kidName: {
-    color: "white", //"#000",
+    color: "white",
     fontWeight: "400",
-    //marginTop: 3,
   },
   doneButton: {
     marginTop: 5,
@@ -1032,10 +995,30 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    //marginRight: 10,
   },
   doneButtonText: {
     color: "#fff",
     textAlign: "center",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 75,
+    left: 20,
+    width: 45,
+    height: 45,
+    borderRadius: 30,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+  roundButton: {
+    position: "absolute",
+    top: 75,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    borderRadius: 50,
+    padding: 10,
   },
 });
