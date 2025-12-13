@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect, useContext } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 import { supabase } from "../lib/supabase";
 import { usePushNotificationsContext } from "./PushNotificationsContext";
 import { useAuthContext } from "./AuthContext";
@@ -15,7 +15,7 @@ const UsersContextProvider = ({ children }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const { session } = useAuthContext();
-  const { expoPushToken } = usePushNotificationsContext();
+  const { fcmToken, expoToken, deviceType } = usePushNotificationsContext();
 
   useEffect(() => {
     if (session) {
@@ -24,24 +24,24 @@ const UsersContextProvider = ({ children }) => {
     }
   }, [session]);
 
-  const updatePushToken = async (id, updatedPushToken) => {
-    //console.log("pushToken", expoPushToken);
-    try {
-      const { data, error } = await supabase
-        .from("users")
-        .update({ pushToken: updatedPushToken })
-        .eq("id", id)
-        .select();
+  // const updatePushToken = async (id, updatedPushToken) => {
+  //   console.log({ updatePushToken });
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from("users")
+  //       .update({ pushToken: updatedPushToken })
+  //       .eq("id", id)
+  //       .select();
 
-      if (error) {
-        throw error;
-      }
+  //     if (error) {
+  //       throw error;
+  //     }
 
-      console.log("Push token updated successfully:");
-    } catch (error) {
-      console.log("Error updating push token:", error);
-    }
-  };
+  //     console.log("Push token updated successfully:");
+  //   } catch (error) {
+  //     console.log("Error updating push token:", error);
+  //   }
+  // };
 
   const listUser = async () => {
     try {
@@ -92,20 +92,60 @@ const UsersContextProvider = ({ children }) => {
     }
   }, [dbUser]);
 
+  // useEffect(() => {
+  //   console.log({ expoToken, fcmToken, deviceType });
+  //   // const checkPushToken = async () => {
+  //   //   if (currentUserData && pushToken) {
+  //   //     const actualPushToken = currentUserData.pushToken;
+  //   //     if (actualPushToken !== pushToken.data || actualPushToken === null) {
+  //   //       await updatePushToken(currentUserData.id, pushToken.data);
+  //   //     }
+  //   //   }
+  //   // };
+  //   // checkPushToken();
+  // }, [expoToken, fcmToken]);
+
   useEffect(() => {
-    const checkPushToken = async () => {
-      if (currentUserData && expoPushToken) {
-        const actualPushToken = currentUserData.pushToken;
-        if (
-          actualPushToken !== expoPushToken.data ||
-          actualPushToken === null
-        ) {
-          await updatePushToken(currentUserData.id, expoPushToken.data);
-        }
+    const updateTokensIfNeeded = async () => {
+      // current tokens from Db Users Table
+      const currentIosToken = currentUserData.pushToken;
+      const currentAndroidToken = currentUserData.fcmToken;
+
+      // console.log({ currentAndroidToken, currentIosToken });
+
+      if (!currentUserData) return;
+
+      const updates = {};
+
+      // iOS Expo token
+      if (expoToken && currentIosToken !== expoToken) {
+        updates.pushToken = expoToken;
+      }
+
+      // Android FCM token
+      if (fcmToken && currentAndroidToken !== fcmToken) {
+        updates.fcmToken = fcmToken;
+      }
+
+      if (Object.keys(updates).length === 0) return;
+
+      console.log("🔄 Updating tokens:", updates);
+
+      const { error } = await supabase
+        .from("users")
+        .update(updates)
+        .eq("id", currentUserData.id);
+
+      if (error) {
+        console.log("❌ Token update failed:", error);
+      } else {
+        console.log("✅ Tokens updated!");
+        getCurrentUserData();
       }
     };
-    checkPushToken();
-  }, [expoPushToken]);
+
+    updateTokensIfNeeded();
+  }, []);
 
   const getUsersData = async () => {
     let { data, error } = await supabase.from("users").select("*");

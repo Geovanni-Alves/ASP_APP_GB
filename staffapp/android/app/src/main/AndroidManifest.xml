@@ -46,6 +46,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="your-app-scheme"/>
+        <data android:scheme="exp+asp-app-staff"/>
       </intent-filter>
     </activity>
   </application>

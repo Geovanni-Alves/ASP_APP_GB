@@ -8,7 +8,8 @@ const FeedContext = createContext({});
 const FeedContextProvider = ({ children }) => {
   const [feeds, setFeeds] = useState([]);
   const { currentUserData } = useUsersContext();
-  const { sendPushNotification } = usePushNotificationsContext();
+  const { sendNotification, expoToken, fcmToken } =
+    usePushNotificationsContext();
 
   const createNewFeedForKid = async (
     kidId,
@@ -58,60 +59,130 @@ const FeedContextProvider = ({ children }) => {
       }
 
       // 1️⃣ Fetch all contacts linked to this student via student_family
-      const { data: familyLinks, error: familyError } = await supabase
+      // 1️⃣ Fetch contacts linked to this student
+      const { data: familyRows, error: familyError } = await supabase
         .from("student_family")
         .select("contact_id")
         .eq("student_id", kidId);
 
       if (familyError) {
-        console.error("❌ Error fetching family links:", familyError);
-      } else if (familyLinks.length > 0) {
-        // Extract only the contact IDs
-        const contactIds = familyLinks.map((f) => f.contact_id);
-
-        // 2️⃣ Fetch user_id for each contact
-        const { data: contacts, error: contactsError } = await supabase
-          .from("contacts")
-          .select("id, user_id")
-          .in("id", contactIds);
-
-        if (contactsError) {
-          console.error("❌ Error fetching contacts:", contactsError);
-        } else {
-          // Extract valid user_ids
-          const userIds = contacts
-            .map((c) => c.user_id)
-            .filter((uid) => uid !== null);
-
-          if (userIds.length === 0) {
-            console.log("⚠ No linked users found for contacts.");
-          } else {
-            // 3️⃣ Fetch Expo tokens from users table
-            const { data: userRows, error: usersError } = await supabase
-              .from("users")
-              .select("id, pushToken")
-              .in("id", userIds);
-
-            console.log({ userRows });
-
-            if (usersError) {
-              console.error("❌ Error fetching users:", usersError);
-            } else {
-              // 4️⃣ Send notification to each user that has a valid Expo token
-              for (const user of userRows) {
-                if (user.pushToken) {
-                  await sendPushNotification(
-                    user.pushToken,
-                    "Photo",
-                    "A new pickup photo has been uploaded for your child.",
-                    { kidID: kidId }
-                  );
-                }
-              }
-            }
-          }
-        }
+        console.error("Error fetching student_family:", familyError);
+        return;
       }
+
+      const contactIds = familyRows.map((r) => r.contact_id);
+
+      // 2️⃣ Fetch contacts and their corresponding user_id
+      const { data: contactsRows, error: contactsError } = await supabase
+        .from("contacts")
+        .select("id, user_id")
+        .in("id", contactIds);
+
+      if (contactsError) {
+        console.error("Error fetching contacts:", contactsError);
+        return;
+      }
+
+      const userIds = contactsRows
+        .map((c) => c.user_id)
+        .filter((u) => u !== null);
+
+      // console.log("User IDs:", userIds);
+
+      // 3️⃣ Fetch Expo push tokens from users table
+      const { data: userRows, error: usersError } = await supabase
+        .from("users")
+        .select(
+          `
+            id,
+            "pushToken",
+            "fcmToken"
+          `
+        )
+        .in("id", userIds);
+
+      // console.log({ userRows });
+
+      if (usersError) {
+        console.error("Error fetching users:", usersError);
+        return;
+      }
+
+      // console.log("User rows:", userRows);
+      // Separate tokens for clarity
+      const iosTokens = [];
+      const androidTokens = [];
+
+      // const filteredUsers = userRows.filter((u) => u.id !== currentUserData.id);
+
+      userRows.forEach((u) => {
+        if (u.pushToken && u.pushToken.startsWith("ExponentPushToken")) {
+          iosTokens.push(u.pushToken);
+        }
+
+        if (u.fcmToken && u.fcmToken.length > 5) {
+          androidTokens.push(u.fcmToken);
+        }
+      });
+
+      console.log({ userRows });
+
+      console.log("📱 FINAL TOKEN GROUPS:");
+      console.log("🍎 iOS Expo Tokens:", iosTokens);
+      console.log("🤖 Android FCM Tokens:", androidTokens);
+
+      // // 5️⃣ Send notifications using the shared PushNotificationsContext
+      // await Promise.all([
+      //   ...iosTokens.map((token) =>
+      //     sendNotification({
+      //       token,
+      //       device: "ios",
+      //       title: "New Update",
+      //       body: feedText,
+      //       data: { kidID: kidId },
+      //     })
+      //   ),
+      //   ...androidTokens.map((token) =>
+      //     sendNotification({
+      //       token,
+      //       device: "android",
+      //       title: "New Update",
+      //       body: feedText,
+      //       data: { kidID: kidId },
+      //     })
+      //   ),
+      // ]);
+
+      const pushPromises = [
+        ...iosTokens.map((token) =>
+          sendNotification({
+            token,
+            device: "ios",
+            title: "New Update",
+            body: feedText,
+          })
+        ),
+        ...androidTokens.map((token) =>
+          sendNotification({
+            token,
+            device: "android",
+            title: "New Update",
+            body: feedText,
+          })
+        ),
+      ];
+
+      const results = await Promise.allSettled(pushPromises);
+
+      results.forEach((r, index) => {
+        if (r.status === "rejected") {
+          console.log(`⚠️ Push ${index} failed:`, r.reason);
+        }
+      });
+
+      console.log("📨 Push notifications processed");
+
+      console.log("📨 Notifications sent!");
     } catch (error) {
       console.error(`Error creating feed for kid ${kidId}:`, error);
     }
