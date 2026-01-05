@@ -125,11 +125,11 @@ const FeedContextProvider = ({ children }) => {
         }
       });
 
-      console.log({ userRows });
+      // console.log({ userRows });
 
-      console.log("📱 FINAL TOKEN GROUPS:");
-      console.log("🍎 iOS Expo Tokens:", iosTokens);
-      console.log("🤖 Android FCM Tokens:", androidTokens);
+      // console.log("📱 FINAL TOKEN GROUPS:");
+      // console.log("🍎 iOS Expo Tokens:", iosTokens);
+      // console.log("🤖 Android FCM Tokens:", androidTokens);
 
       // // 5️⃣ Send notifications using the shared PushNotificationsContext
       // await Promise.all([

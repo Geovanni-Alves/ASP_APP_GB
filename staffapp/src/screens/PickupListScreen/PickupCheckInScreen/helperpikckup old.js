@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -138,6 +138,46 @@ const HelperPickupScreen = () => {
     }
   }, [kids]);
 
+  const isKidFinalized = (state) => {
+    if (!state) return false;
+
+    const isDone = state.isChecked || state.isAbsent;
+    const noPending = !state.pendingActionId;
+    const noUndo = !state.undoEnabled;
+
+    return isDone && noPending && noUndo;
+  };
+
+  const isPickupCompleted =
+    kids.length > 0 &&
+    kids.every((item) => isKidFinalized(localKidsState[item.kid.id]));
+
+  const pickupCompleted = useMemo(() => {
+    if (!kids.length) return false;
+
+    return kids.every((item) => {
+      const state = localKidsState[item.kid.id];
+      if (!state) return false;
+
+      return (
+        (state.isChecked || state.isAbsent) &&
+        !state.pendingActionId &&
+        !state.undoEnabled
+      );
+    });
+  }, [kids, localKidsState]);
+
+  const ListHeader = () => {
+    if (!pickupCompleted) return null;
+
+    return (
+      <View style={styles.pickupDoneHeader}>
+        <Text style={styles.pickupDoneText}>Pickup completed</Text>
+        <Text style={styles.pickupDoneSubtext}>Waiting for driver arrival</Text>
+      </View>
+    );
+  };
+
   const updateKidState = (kidId, newState) => {
     setLocalKidsState((prev) => ({
       ...prev,
@@ -148,120 +188,8 @@ const HelperPickupScreen = () => {
     }));
   };
 
-  const handlePushNotification = (type, kid) => {
-    console.log("🔔 NEED TO SEND A NOTIFICATION →", type.toUpperCase());
-    console.log("Kid:", kid.name, kid.id);
-  };
-
   const goToStudentFeed = (kidId) => {
     navigation.navigate("StudentProfile", { id: kidId, readOnly: true });
-  };
-
-  const scheduleSave = (kidId, action, kidObj) => {
-    const t = setTimeout(async () => {
-      // const state = localKidsState[kidId];
-      const state = kidsStateRef.current[kidId];
-      console.log("state", state);
-
-      // canceled already
-      if (state.pendingAction !== action) return;
-
-      try {
-        if (action === "checkin") {
-          await saveCheckInToDB(kidObj);
-        } else if (action === "absent") {
-          await saveAbsentToDB(kidObj);
-        }
-
-        handlePushNotification(action, kidObj);
-
-        updateKidState(kidId, {
-          undoEnabled: false,
-          saved: true,
-          timer: null,
-          pendingAction: null,
-        });
-      } catch (err) {
-        console.error("SAVE ERROR:", err);
-        Alert.alert("Error", "Could not save status.");
-      }
-    }, 8000); // 8 seconds
-
-    updateKidState(kidId, { timer: t });
-  };
-
-  const saveCheckInToDB = async (kidObj) => {
-    const routeData = getRouteById(routeId);
-
-    const { data, error } = await supabase
-      .from("student_attendance")
-      .insert({
-        student_id: kidObj.id,
-        route_id: routeData.id,
-        van_id: routeData.vans[0].id,
-        date: routeData.date,
-        checked_in: true,
-        checked_in_at: new Date().toISOString(),
-        checked_in_by: dbUser.id,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  };
-
-  const saveAbsentToDB = async (kidObj) => {
-    // console.log("saving absent");
-    const routeData = getRouteById(routeId);
-
-    const { data, error } = await supabase
-      .from("student_attendance")
-      .insert({
-        student_id: kidObj.id,
-        route_id: routeData.id,
-        van_id: routeData.vans[0].id,
-        date: routeData.date,
-        is_absent: true,
-        absent_at: new Date().toISOString(),
-        absent_by: dbUser.id,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  };
-
-  const handleUndoAbsent = (item) => {
-    const kidId = item.kid.id;
-    const state = kidsStateRef.current[kidId];
-
-    if (!state.undoEnabled) {
-      return Alert.alert(
-        "Undo expired",
-        "This action can no longer be undone."
-      );
-    }
-
-    Alert.alert("Undo Absent", `Undo absent for ${item.kid.name}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Confirm",
-        onPress: () => {
-          clearTimeout(state.timer);
-
-          updateKidState(kidId, {
-            isAbsent: false,
-            pendingAction: null,
-            undoEnabled: false,
-            timer: null,
-          });
-
-          console.log("UNDO ABSENT → canceled queued save");
-        },
-      },
-    ]);
   };
 
   const handleCheckIn = (item) => {
@@ -286,7 +214,7 @@ const HelperPickupScreen = () => {
           const id = addPendingAction({
             type: "checkin",
             entityId: kidId,
-            delay: 7000,
+            delay: 5000,
             payload: {
               kidId,
               routeId,
@@ -310,6 +238,14 @@ const HelperPickupScreen = () => {
                 });
 
               if (error) throw error;
+
+              // Create new feed check in and send push nots for contacts
+              await createNewFeedForKid(
+                payload.kidId,
+                "", // no media
+                "ATTENDANCE", //attendance type
+                "Picked up from school"
+              );
             },
 
             onFinish: () => {
@@ -335,20 +271,68 @@ const HelperPickupScreen = () => {
         onPress: () => {
           const kidId = item.kid.id;
 
+          // Immediate UI update
           updateKidState(kidId, {
             isAbsent: true,
             isChecked: false,
             undoEnabled: true,
-            pendingAction: "absent",
+            pendingActionId: null,
           });
 
-          scheduleSave(kidId, "absent", item.kid);
+          const routeData = getRouteById(routeId);
+
+          const id = addPendingAction({
+            type: "absent",
+            entityId: kidId,
+            delay: 5000,
+            payload: {
+              kidId,
+              routeId,
+              vanId: routeData.vans[0].id,
+              date: routeData.date,
+            },
+
+            onExecute: async ({ payload }) => {
+              console.log("⏳ Saving ABSENT...", payload);
+
+              const { error } = await supabase
+                .from("student_attendance")
+                .insert({
+                  student_id: payload.kidId,
+                  route_id: payload.routeId,
+                  van_id: payload.vanId,
+                  date: payload.date,
+                  is_absent: true,
+                  absent_at: new Date().toISOString(),
+                  absent_by: dbUser.id,
+                });
+
+              if (error) throw error;
+
+              // 🔔 Create feed + send push
+              await createNewFeedForKid(
+                payload.kidId,
+                "",
+                "ATTENDANCE",
+                "Marked as absent"
+              );
+            },
+
+            onFinish: () => {
+              updateKidState(kidId, {
+                undoEnabled: false,
+                pendingActionId: null,
+              });
+            },
+          });
+
+          updateKidState(kidId, { pendingActionId: id });
         },
       },
     ]);
   };
 
-  const handlePhotoPress = (kidId) => {
+  const handlePickupPhotoPress = (kidId) => {
     // console.log({ kidId });
     setCameraMode("photo");
     setBucketName("feedPhotos");
@@ -357,7 +341,7 @@ const HelperPickupScreen = () => {
   };
 
   const handleSelectPhotoVideo = (paths, selectedKids, notes) => {
-    console.log({ paths, selectedKids, notes });
+    // console.log({ paths, selectedKids, notes });
     const mediaType = cameraMode === "photo" ? "PHOTO" : "VIDEO";
 
     if (pickupPhotoKidId) {
@@ -370,177 +354,45 @@ const HelperPickupScreen = () => {
     setPickupPictureDone(true);
   };
 
-  // const doCheckIn = async (kidObj, routeData) => {
-  //   // console.log({ kidObj, routeData });
-
-  //   try {
-  //     const routeDate = routeData.date;
-  //     const routeId = routeData.id;
-  //     const vanId = routeData?.vans[0].id;
-  //     const kidId = kidObj.id;
-
-  //     // console.log({ routeDate, routeId, vanId, kidId });
-
-  //     const { data: inserted, error: insertError } = await supabase
-  //       .from("student_attendance")
-  //       .insert([
-  //         {
-  //           student_id: kidId,
-  //           route_id: routeId,
-  //           van_id: vanId,
-  //           date: routeDate,
-  //           checked_in: true,
-  //           checked_in_at: new Date().toISOString(),
-  //           checked_in_by: dbUser.id,
-  //         },
-  //       ])
-  //       .select()
-  //       .single();
-
-  //     if (insertError) throw insertError;
-
-  //     updateKidState(kidId, {
-  //       attendanceId: inserted.id,
-  //     });
-  //   } catch (err) {
-  //     console.error("CHECK-IN ERROR", err);
-  //     Alert.alert("Error", "Could not save check-in.");
-  //   }
-  // };
-
-  // const handleUndoCheckIn = (item) => {
-  //   const kidId = item.kid.id;
-  //   const state = localKidsState[kidId];
-  //   const attendanceId = state.attendanceId;
-
-  //   console.log(item);
-
-  //   if (!state.undoEnabled) {
-  //     return Alert.alert(
-  //       "Undo expired",
-  //       "You can no longer undo this check-in."
-  //     );
-  //   }
-
-  //   Alert.alert("Undo Check-in", `Undo check-in for ${item.kid.name}?`, [
-  //     { text: "Cancel", style: "cancel" },
-  //     {
-  //       text: "Confirm",
-  //       onPress: () => {
-  //         clearTimeout(state.timer);
-
-  //         updateKidState(kidId, {
-  //           isChecked: false,
-  //           undoEnabled: false,
-  //           timer: null,
-  //         });
-
-  //         console.log(attendanceId);
-
-  //         if (attendanceId) {
-  //           doUndoCheckIn(attendanceId);
-  //         }
-  //       },
-  //     },
-  //   ]);
-  // };
-
   const handleUndoCheckIn = (item) => {
     const kidId = item.kid.id;
     const state = localKidsState[kidId];
 
-    if (!state.undoEnabled) {
-      return Alert.alert(
-        "Undo expired",
-        "This action can no longer be undone."
-      );
+    if (!state?.undoEnabled) return;
+
+    // 1️⃣ cancel pending FIRST
+    if (state.pendingActionId) {
+      cancelPendingAction(state.pendingActionId);
     }
 
-    Alert.alert("Undo Check-in", `Undo check-in for ${item.kid.name}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Confirm",
-        onPress: () => {
-          // 1. Cancel the local timeout (UI timer)
-          clearTimeout(state.timer);
-
-          // 2. Cancel the PendingActionsContext action
-          if (state.pendingActionId) {
-            cancelPendingAction(state.pendingActionId);
-          }
-
-          // 3. Reset UI state
-          updateKidState(kidId, {
-            isChecked: false,
-            undoEnabled: false,
-            pendingAction: null,
-            pendingActionId: null,
-            timer: null,
-          });
-        },
-      },
-    ]);
+    // 2️⃣ revert UI
+    updateKidState(kidId, {
+      isChecked: false,
+      undoEnabled: false,
+      pendingActionId: null,
+      pendingAction: null,
+      timer: null,
+    });
   };
 
-  // const doUndoCheckIn = async (attendanceId) => {
-  //   // console.log(attendanceId);
-  //   try {
-  //     const { error } = await supabase
-  //       .from("student_attendance")
-  //       .delete()
-  //       .eq("id", attendanceId);
+  const handleUndoAbsent = (item) => {
+    const kidId = item.kid.id;
+    const state = localKidsState[kidId];
 
-  //     if (error) throw error;
+    if (!state?.undoEnabled) return;
 
-  //     console.log("Attendance removed:", attendanceId);
-  //   } catch (err) {
-  //     console.error("UNDO ERROR", err);
-  //     Alert.alert("Error", "Could not undo the check-in.");
-  //   }
-  // };
+    if (state.pendingActionId) {
+      cancelPendingAction(state.pendingActionId);
+    }
 
-  // const handleAbsent = (item) => {
-  //   Alert.alert("Mark Absent", `Mark ${item.kid.name} as absent?`, [
-  //     { text: "Cancel", style: "cancel" },
-  //     {
-  //       text: "Confirm",
-  //       onPress: () => {
-  //         const kidId = item.kid.id;
-
-  //         updateKidState(kidId, {
-  //           isAbsent: true,
-  //           isChecked: false,
-  //           undoEnabled: false,
-  //         });
-
-  //         // Salvar no DB depois, mas sem undo
-  //         // doMarkAbsent(item.kid);
-  //       },
-  //     },
-  //   ]);
-  // };
-
-  // const doMarkAbsent = async (item) => {
-  //   try {
-  //     const routeData = getRouteById(routeId);
-  //     const routeIdValue = routeData.id;
-  //     const vanId = routeData.vans[0].id;
-
-  //     await supabase.from("student_attendance").insert([
-  //       {
-  //         student_id: item.kid.id,
-  //         route_id: routeIdValue,
-  //         van_id: vanId,
-  //         date: routeData.date,
-  //         is_absent: true,
-  //         absent_marked_by: dbUser.id,
-  //       },
-  //     ]);
-  //   } catch (err) {
-  //     console.error("ABSENT ERROR", err);
-  //     Alert.alert("Error", "Could not mark absent.");
-  //   }
-  // };
+    updateKidState(kidId, {
+      isAbsent: false,
+      undoEnabled: false,
+      pendingActionId: null,
+      pendingAction: null,
+      timer: null,
+    });
+  };
 
   const renderKidItem = ({ item, index }) => {
     const kidId = item.kid.id;
@@ -555,13 +407,6 @@ const HelperPickupScreen = () => {
       isChecked && styles.stopCardChecked,
       isAbsent && styles.stopCardAbsent,
     ];
-    // const gradeText =
-    //   item.kid.schoolGrade &&
-    //   `Grade ${item.kid.schoolGrade}${
-    //     item.kid.schoolGradeDivision
-    //       ? ` (Div ${item.kid.schoolGradeDivision})`
-    //       : ""
-    //   }`;
 
     return (
       <TouchableOpacity
@@ -589,27 +434,10 @@ const HelperPickupScreen = () => {
 
         <View style={styles.infoContainer}>
           <Text style={styles.kidName}>{item.kid.name}</Text>
-          {/* <Text style={styles.kidName}>{item.kid.id}</Text> */}
 
           {item.school.name && (
             <Text style={styles.infoLine}>{item.school.name}</Text>
           )}
-
-          {/* {item.kid.schoolTeacherName && (
-            <Text style={styles.infoLine}>
-              Teacher Name: {item.kid.schoolTeacherName}
-            </Text>
-          )} */}
-
-          {/* {(item.kid.schoolGrade || item.kid.schoolGradeDivision) && (
-            <View style={styles.gradeBadge}>
-              <Text style={styles.gradeBadgeText}>
-                Grade {item.kid.schoolGrade}
-                {item.kid.schoolGradeDivision &&
-                  ` – Division ${item.kid.schoolGradeDivision}`}
-              </Text>
-            </View>
-          )} */}
 
           <View style={styles.actionButtons}>
             {!isChecked && !isAbsent && (
@@ -640,7 +468,7 @@ const HelperPickupScreen = () => {
             {isChecked && !undoEnabled && (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: "#007bff" }]}
-                onPress={() => handlePhotoPress(item.kid.id)}
+                onPress={() => handlePickupPhotoPress(item.kid.id)}
               >
                 <Text style={styles.btnText}>Pickup Photo</Text>
               </TouchableOpacity>
@@ -700,8 +528,7 @@ const HelperPickupScreen = () => {
             <Text>No assigned kids.</Text>
           </View>
         }
-        // ListHeaderComponent={
-        // }
+        ListHeaderComponent={<ListHeader />}
       />
       <OpenCamera
         isVisible={callOpenCamera}
@@ -720,12 +547,6 @@ const HelperPickupScreen = () => {
         ]}
         labelStyle={{ textAlign: "center" }}
       />
-      {/* <FullScreenImage
-        isVisible={fullscreenVisible}
-        path={selectedPhoto}
-        bucketName="profilePhotos"
-        onClose={() => setFullscreenVisible(false)}
-      /> */}
     </>
   );
 };

@@ -23,7 +23,9 @@ import IncidentsScreen from "../screens/IncidentsScreen";
 import StudentSelectionScreen from "../screens/StudentSelectionScreen";
 import PromotionScreen from "../screens/PromotionScreen";
 import PickupListScreen from "../screens/PickupListScreen";
-import HelperPickupScreen from "../screens/PickupListScreen/HelperPickupScreen";
+// import HelperPickupScreen from "../screens/PickupListScreen/PickupCheckInScreen";
+import PickupCheckInScreen from "../screens/PickupListScreen/PickupCheckInScreen";
+import DriverPickupScreen from "../screens/PickupListScreen/DriverPickupScreen";
 
 const Drawer = createDrawerNavigator();
 
@@ -50,6 +52,10 @@ const CustomBackButton = () => {
       {/* <Text style={{ marginLeft: 5, color: "gray" }}>Back</Text> */}
     </TouchableOpacity>
   );
+};
+
+const PickupCheckInScreenWrapper = ({ route }) => {
+  return <PickupCheckInScreen routeId={route.params.routeId} />;
 };
 
 const DrawerNavigator = ({ currentUserData }) => (
@@ -253,10 +259,20 @@ const DrawerNavigator = ({ currentUserData }) => (
       }}
     />
     <Drawer.Screen
-      name="HelperPickupScreen"
-      component={HelperPickupScreen}
+      name="PickupCheckInScreen"
+      component={PickupCheckInScreenWrapper}
       options={{
-        title: "Pickup Route Screen",
+        title: "Check In Route Screen",
+        drawerItemStyle: { display: "none" },
+        headerShown: true,
+        headerLeft: () => <CustomBackButton />,
+      }}
+    />
+    <Drawer.Screen
+      name="DriverPickupScreen"
+      component={DriverPickupScreen}
+      options={{
+        title: "Driver Route Screen",
         drawerItemStyle: { display: "none" },
         headerShown: true,
         headerLeft: () => <CustomBackButton />,

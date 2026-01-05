@@ -128,14 +128,15 @@ const PickupListScreen = () => {
 
         <TouchableOpacity
           style={styles.routeContainer}
-          onPress={() =>
+          onPress={() => {
+            // console.log({ lastRoute });
             navigation.navigate(
               userRole === "Driver"
                 ? "DriverPickupScreen"
-                : "HelperPickupScreen",
+                : "PickupCheckInScreen",
               { routeId: lastRoute.id }
-            )
-          }
+            );
+          }}
         >
           <Text style={styles.routeTitle}>Route</Text>
           <Text>Date: {lastRoute.date}</Text>

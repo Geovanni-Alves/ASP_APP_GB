@@ -4,7 +4,7 @@ const { width } = Dimensions.get("window");
 
 export default StyleSheet.create({
   header: {
-    margin: 12,
+    margin: 10,
   },
   headerText: {
     fontSize: 16,
@@ -16,14 +16,14 @@ export default StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     padding: 10,
-    marginBottom: 12,
+    marginBottom: 5,
     alignItems: "center",
     shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 5,
     elevation: 3,
 
-    minHeight: 180,
+    minHeight: 130,
   },
   absentBtn: {
     backgroundColor: "#e74c3c",
@@ -152,5 +152,22 @@ export default StyleSheet.create({
     color: "white",
     fontSize: 20,
     fontWeight: "900",
+  },
+  pickupDoneHeader: {
+    backgroundColor: "#e6f4ea",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    alignItems: "center",
+  },
+  pickupDoneText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1e7e34",
+  },
+  pickupDoneSubtext: {
+    fontSize: 13,
+    color: "#155724",
+    marginTop: 4,
   },
 });
