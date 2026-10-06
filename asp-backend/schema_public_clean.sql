@@ -1,0 +1,308 @@
+-- =====================================================================
+-- Schema "public" limpo (ASP - After School Program)
+-- Extraido do dump do Supabase. Funciona em PostgreSQL comum (13+).
+-- REMOVIDO: schemas auth/storage, roles (anon, authenticated, ...),
+--           GRANT, OWNER TO, RLS e POLICY.
+-- A seguranca/permissoes passam a ser feitas na API.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- TIPOS (ENUMs)
+-- ---------------------------------------------------------------------
+CREATE TYPE feed_type AS ENUM (
+    'ATTENDANCE', 'PHOTO', 'PROMOTION', 'ACTIVITY', 'VIDEO', 'INCIDENT'
+);
+
+CREATE TYPE route_status AS ENUM (
+    'IN_PROGRESS', 'FINISHED', 'WAITING_TO_START', 'PAUSED', 'NOT_STARTED', 'PLANNING'
+);
+
+CREATE TYPE states_check_in_out AS ENUM (
+    'CHECK_IN', 'CHECK_OUT', 'ABSENT'
+);
+
+CREATE TYPE user_types AS ENUM (
+    'PARENT', 'STAFF', 'DRIVER'
+);
+
+CREATE TYPE waypoint_status AS ENUM (
+    'FINISHED', 'IN_PROGRESS', 'WAITING_TO_START', 'PAUSED'
+);
+
+-- ---------------------------------------------------------------------
+-- TABELAS
+-- ---------------------------------------------------------------------
+CREATE TABLE users (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    sub           text UNIQUE,
+    name          text,
+    email         text UNIQUE,
+    "unitNumber"  text,
+    address       text,
+    lng           double precision,
+    lat           double precision,
+    "phoneNumber" text,
+    "userType"    text,
+    photo         text,
+    "pushToken"   text,
+    updated_at    timestamptz,
+    "firstLogin"  boolean,
+    invited       boolean DEFAULT false,
+    "fcmToken"    text
+);
+
+CREATE TABLE vans (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name           text,
+    image          text,
+    plate          text,
+    model          text,
+    year           integer,
+    seats          integer,
+    "boosterSeats" integer
+);
+
+CREATE TABLE schools (
+    id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name    text,
+    address text,
+    lat     double precision,
+    lng     double precision
+);
+
+CREATE TABLE settings (
+    key   text PRIMARY KEY,
+    value text
+);
+
+CREATE TABLE events (
+    id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name  text,
+    image text,
+    link  text,
+    date  date
+);
+
+CREATE TABLE contacts (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "firstName"        text NOT NULL,
+    email              text NOT NULL,
+    phone              text,
+    is_primary_contact boolean DEFAULT false,
+    invited            boolean DEFAULT false,
+    user_id            uuid REFERENCES users(id),
+    signed             boolean,
+    "lastName"         text,
+    "canPickup"        boolean,
+    code               text,
+    type               text
+);
+
+-- Modelo antigo de rotas (legado)
+CREATE TABLE drop_off_route (
+    id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    date                 text,
+    "departTime"         text,
+    lat                  double precision,
+    lng                  double precision,
+    driver               text,
+    helper               text,
+    "vanId"              uuid REFERENCES vans(id),
+    status               route_status,
+    "currentDestination" text,
+    "finishedTime"       text
+);
+
+CREATE TABLE students (
+    id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name                    text NOT NULL,
+    lat                     double precision,
+    lng                     double precision,
+    photo                   text,
+    "vanId"                 uuid REFERENCES vans(id),
+    "checkedIn"             boolean,
+    "lastCheckIn"           timestamp without time zone,
+    "currentStateId"        uuid,
+    notes                   text,
+    allergies               text,
+    medicine                text,
+    "birthDate"             date,
+    "currentDropOffAddress" uuid,
+    "dropOffRouteId"        uuid REFERENCES drop_off_route(id),
+    "schoolId"              uuid REFERENCES schools(id),
+    "useDropOffService"     boolean,
+    "schoolExitPhotos"      jsonb,
+    "schoolGrade"           text,
+    "schoolGradeDivision"   text,
+    "schoolTeacherName"     text,
+    "dismissalTime"         time without time zone,
+    doctor                  text,
+    status                  text
+);
+
+CREATE TABLE drop_off_address_order (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "order"     integer,
+    latitude    double precision,
+    longitude   double precision,
+    "routeId"   uuid REFERENCES drop_off_route(id),
+    "studentId" uuid REFERENCES students(id),
+    status      waypoint_status
+);
+
+CREATE TABLE "kidFeeds" (
+    id          bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    type        feed_type NOT NULL,
+    "dateTime"  timestamp without time zone,
+    "studentId" uuid REFERENCES students(id),
+    text        text NOT NULL,
+    "creatorId" uuid REFERENCES users(id),
+    "mediaName" text,
+    notes       text
+);
+
+CREATE TABLE message (
+    id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id        uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    sender_user_id    uuid REFERENCES users(id) ON DELETE SET NULL,
+    sender_contact_id uuid REFERENCES contacts(id) ON DELETE SET NULL,
+    content           text NOT NULL,
+    isread            boolean DEFAULT false,
+    created_at        timestamptz DEFAULT now()
+);
+
+CREATE TABLE pictures (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    picture     text,
+    "studentId" uuid REFERENCES students(id)
+);
+
+CREATE TABLE students_address (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "studentId"    uuid REFERENCES students(id),
+    "houseName"    text,
+    "addressLine1" text,
+    "addressLine2" text,
+    "addressNotes" text,
+    "unitNumber"   text,
+    "isDefault"    boolean,
+    city           text,
+    province       text,
+    "zipCode"      text,
+    country        text,
+    lat            double precision,
+    lng            double precision
+);
+
+CREATE TABLE students_schedule (
+    id          bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    "studentId" uuid REFERENCES students(id),
+    monday      boolean,
+    tuesday     boolean,
+    wednesday   boolean,
+    thursday    boolean,
+    friday      boolean
+);
+
+CREATE TABLE student_family (
+    student_id uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    contact_id uuid NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+    PRIMARY KEY (student_id, contact_id)
+);
+
+CREATE TABLE student_details (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id     uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    type           text NOT NULL,
+    belt           text,
+    stripes        integer DEFAULT 0,
+    has_red_stripe boolean DEFAULT false,
+    category       text,
+    created_at     timestamp without time zone DEFAULT now(),
+    updated_at     timestamp without time zone DEFAULT now(),
+    has_black_tip  boolean DEFAULT true
+);
+
+CREATE TABLE week_day_routes (
+    id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    date                    date,
+    weekday                 text,
+    "vanId"                 uuid REFERENCES vans(id),
+    "studentId"             uuid REFERENCES students(id),
+    "Order"                 text,
+    "studentName"           text,
+    "studentDropOffAddress" text
+);
+
+-- Modelo novo de rotas
+CREATE TABLE routes (
+    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    date       date NOT NULL,
+    type       text NOT NULL,
+    status     text NOT NULL DEFAULT 'not_started',
+    sent_at    timestamptz,
+    notes      text,
+    created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+    created_at timestamptz DEFAULT now(),
+    absents    uuid[] DEFAULT '{}'::uuid[],
+    CONSTRAINT routes_status_check CHECK (status = ANY (ARRAY[
+        'not_started','planning','open','waiting_to_start',
+        'in_progress','incomplete','finished'])),
+    CONSTRAINT routes_type_check CHECK (type = ANY (ARRAY['pickup','dropoff']))
+);
+
+CREATE TABLE route_vans (
+    id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    route_id          uuid NOT NULL,
+    van_id            uuid NOT NULL REFERENCES vans(id) ON DELETE CASCADE,
+    driver_id         uuid REFERENCES users(id) ON DELETE SET NULL,
+    helper_ids        uuid[] DEFAULT '{}'::uuid[],
+    total_eta         integer,
+    total_people      integer,
+    school_order      uuid[] DEFAULT '{}'::uuid[],
+    address_order     uuid[] DEFAULT '{}'::uuid[],
+    created_at        timestamptz DEFAULT now(),
+    current_leg_index integer NOT NULL DEFAULT 0,
+    CONSTRAINT unique_route_van UNIQUE (route_id, van_id)
+);
+
+CREATE TABLE route_stops (
+    id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    route_van_id         uuid NOT NULL REFERENCES route_vans(id) ON DELETE CASCADE,
+    student_id           uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    responsible_staff_id uuid REFERENCES users(id) ON DELETE SET NULL,
+    created_at           timestamptz DEFAULT now(),
+    stop_order           integer
+);
+
+CREATE TABLE student_attendance (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id     uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    route_id       uuid,
+    van_id         uuid,
+    checked_in     boolean DEFAULT false,
+    checked_in_at  timestamptz,
+    checked_in_by  uuid REFERENCES users(id),
+    checked_out    boolean DEFAULT false,
+    checked_out_at timestamptz,
+    checked_out_by uuid REFERENCES users(id),
+    date           date NOT NULL DEFAULT CURRENT_DATE,
+    is_absent      boolean DEFAULT false,
+    absent_at      timestamptz,
+    absent_by      uuid REFERENCES users(id)
+);
+
+-- Obs: no dump original, route_vans.route_id NAO tinha FK para routes.
+-- Adicionada aqui porque o modelo indica essa relacao. Se existirem dados
+-- antigos orfaos, remova esta linha antes de importar os dados.
+ALTER TABLE route_vans
+    ADD CONSTRAINT route_vans_route_id_fkey
+    FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE;
+
+-- ---------------------------------------------------------------------
+-- INDICES
+-- ---------------------------------------------------------------------
+CREATE INDEX idx_route_stops_route_van_id ON route_stops (route_van_id);
+CREATE INDEX idx_route_vans_route_id      ON route_vans (route_id);
+CREATE INDEX idx_routes_date_type         ON routes (date, type);

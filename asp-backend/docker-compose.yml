@@ -1,0 +1,42 @@
+name: asp-backend
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: asp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: asp
+      POSTGRES_PASSWORD: asp123
+      POSTGRES_DB: asp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asp -d asp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    container_name: asp-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/asp
+      DB_USER: asp
+      DB_PASSWORD: asp123
+      # Key with assign the login tokens (32 characters) -- change in production
+      JWT_SECRET: dev-chave-secreta-troque-em-producao-0123456789
+      # First user Admin (created only if not exists) -- change in production
+      ADMIN_EMAIL: admin@asp.local
+      ADMIN_PASSWORD: admin123
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

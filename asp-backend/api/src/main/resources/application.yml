@@ -1,0 +1,17 @@
+server:
+  port: 8080
+  address: 0.0.0.0
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/asp}
+    username: ${DB_USER:asp}
+    password: ${DB_PASSWORD:asp123}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-chave-secreta-troque-em-producao-0123456789}
+    expiry-hours: 12
+  admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}

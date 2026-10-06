@@ -26,3 +26,6 @@ amplifytools.xcconfig
 #amplify-do-not-edit-end
 staffapp/aspappstaff-bdc020aa5aad.json
 staffapp/server/firebase/service-account.json
+
+# asp-backend
+asp-backend/api/target/
