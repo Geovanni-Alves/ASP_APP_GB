@@ -1,154 +1,100 @@
-import { createContext, useState, useEffect, useContext } from "react";
-import supabase from "../lib/supabase";
+import {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+} from "react";
+import api from "../lib/api";
 import { useAuthContext } from "./AuthContext";
 import CompleteProfile from "../components/CompleteProfile/CompleteProfile";
 
 const UsersContext = createContext({});
 
+// Role values can be stored with different casing ("Staff", "STAFF", "parent", "PARENT"...),
+// so we always compare them in lower case.
+const userTypeOf = (user) => (user?.userType || "").toLowerCase();
+
 const UsersContextProvider = ({ children }) => {
-  const [authUser, setAuthUser] = useState(null);
+  const { session } = useAuthContext();
+
+  // With our own API there is ONE table for login + profile ("users").
+  // The login (email + password) and the profile (name, phone...) live in the same row,
+  // so "authUser" and "dbUser" now come from the same place.
+  const authUser = session?.user ?? null;
+  const userEmail = authUser?.email ?? null;
+
   const [dbUser, setDbUser] = useState(null);
-  const [userEmail, setUserEmail] = useState(null);
   const [currentUserData, setCurrentUserData] = useState(null);
   const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showCompleteProfile, setShowCompleteProfile] = useState(false); // Track if profile completion is needed
-  const { session } = useAuthContext();
   const [staff, setStaff] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (session) {
-      setAuthUser(session.user);
-      setUserEmail(session.user.email);
-    }
-  }, [session]);
-
-  const listUser = async () => {
+  // GET /users/me -> full profile of the logged-in user
+  const loadCurrentUser = useCallback(async () => {
     try {
-      let { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("sub", authUser?.id);
-
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
-        // Fallback to email-based search (for invited parents or legacy users)
-        const fallback = await supabase
-          .from("users")
-          .select("*")
-          .eq("email", authUser?.email);
-
-        if (fallback.error) throw fallback.error;
-
-        data = fallback.data;
-      }
-
-      if (data && data.length > 0) {
-        const user = data[0];
-        setDbUser(user);
-
-        if (user.userType === "parent") {
-          setShowCompleteProfile(false); // Don't show CompleteProfile
-          setLoading(false);
-          return;
-        }
-      } else {
-        // No user found at all
-        setShowCompleteProfile(true);
-      }
+      const { data } = await api.get("/users/me");
+      setDbUser(data);
+      setCurrentUserData(data);
+      return data;
     } catch (error) {
       console.error("Error fetching user:", error.message);
-    } finally {
-      setLoading(false);
+      return null;
     }
-  };
+  }, []);
 
-  const createUser = async (profileData) => {
+  // GET /users -> all users (staff and admins only)
+  const loadUsers = useCallback(async () => {
     try {
-      const userType =
-        authUser.email === "geo-estevam@hotmail.com" ? "SuperAdmin" : "Staff";
-
-      const { data, error } = await supabase
-        .from("users")
-        .insert({
-          email: authUser.email,
-          sub: authUser.id,
-          name: profileData.name,
-          phoneNumber: profileData.phoneNumber,
-          address: profileData.address || null,
-          userType,
-          firstLogin: false, // Profile is now complete
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      setDbUser(data);
-      setShowCompleteProfile(false); // Hide profile completion screen
-      console.log("New user created:", data);
-    } catch (error) {
-      console.error("Error creating user:", error.message);
-    }
-  };
-
-  useEffect(() => {
-    if (authUser) {
-      listUser(); // Fetch or check user when authUser is set
-    }
-  }, [authUser]);
-
-  const getCurrentUserData = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("users")
-        .select()
-        .eq("id", dbUser.id)
-        .single();
-      if (error) {
-        throw error;
-      }
-      setCurrentUserData(data);
-    } catch (error) {
-      console.error("Error fetching user data:", error.message);
-    }
-  };
-
-  useEffect(() => {
-    if (dbUser) {
-      getCurrentUserData();
-    }
-  }, [dbUser]);
-
-  const getUsersData = async () => {
-    try {
-      const { data, error } = await supabase.from("users").select("*");
-      if (error) {
-        throw error;
-      }
+      const { data } = await api.get("/users");
       setUsers(data);
+      setStaff(data.filter((user) => userTypeOf(user) === "staff"));
     } catch (error) {
       console.error("Error fetching users:", error.message);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+
+    const init = async () => {
+      const me = await loadCurrentUser();
+      setLoading(false);
+      // Parents are blocked from this portal, so there is no point loading the user list.
+      if (userTypeOf(me) !== "parent") {
+        loadUsers();
+      }
+    };
+    init();
+  }, [session, loadCurrentUser, loadUsers]);
+
+  // Called by the CompleteProfile screen: saves name/phone on the user's own row
+  // and clears the "firstLogin" flag (PATCH /users/me).
+  const completeProfile = async (profileData) => {
+    try {
+      const { data } = await api.patch("/users/me", {
+        ...profileData,
+        firstLogin: false,
+      });
+      setDbUser(data);
+      setCurrentUserData(data);
+    } catch (error) {
+      console.error("Error saving profile:", error.message);
+      alert("Could not save your profile. Please try again.");
+    }
   };
-
-  useEffect(() => {
-    getUsersData();
-  }, [authUser]);
-
-  useEffect(() => {
-    if (!users?.length) return;
-
-    const filtered = users.filter((user) => user.userType === "Staff");
-    setStaff(filtered);
-  }, [users]);
 
   const RefreshCurrentUserData = async () => {
-    await getCurrentUserData();
+    await loadCurrentUser();
   };
+
+  const RefreshUsers = async () => {
+    await loadUsers();
+  };
+
+  // The profile screen is shown while the account is flagged as "firstLogin"
+  // (the flag is set when an admin creates/invites the user, and cleared by completeProfile).
+  const needsProfile = dbUser?.firstLogin === true;
 
   return (
     <UsersContext.Provider
@@ -161,11 +107,12 @@ const UsersContextProvider = ({ children }) => {
         userEmail,
         currentUserData,
         RefreshCurrentUserData,
+        RefreshUsers,
       }}
     >
       {loading ? (
         <div>Loading...</div>
-      ) : dbUser?.userType === "parent" ? (
+      ) : userTypeOf(dbUser) === "parent" ? (
         <div style={{ padding: 30, textAlign: "center", color: "#444" }}>
           <h2>Access Restricted</h2>
           <p>
@@ -174,8 +121,11 @@ const UsersContextProvider = ({ children }) => {
             child’s activity.
           </p>
         </div>
-      ) : showCompleteProfile ? (
-        <CompleteProfile email={authUser.email} onCreateUser={createUser} />
+      ) : needsProfile ? (
+        <CompleteProfile
+          email={authUser.email}
+          onCreateUser={completeProfile}
+        />
       ) : (
         children
       )}

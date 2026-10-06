@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import GbIcon from "../../Images/gb-logo.png";
-import api from "../../lib/api";
+import supabase from "../../lib/supabase";
 //import Profile from "../Images/avatar-image.png";
 import Dashboard from "../../Images/dashboard.png";
 import People from "../../Images/people.png";
@@ -71,22 +71,23 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
 
   useEffect(() => {
     const fetchSettings = async () => {
-      try {
-        // GET /settings?key=in:pickup_start_address,after_school_name
-        const { data } = await api.get("/settings", {
-          params: { key: "in:pickup_start_address,after_school_name" },
-        });
+      const { data, error } = await supabase
+        .from("settings")
+        .select("key, value")
+        .in("key", ["pickup_start_address", "after_school_name"]);
 
-        const schoolName = data.find((s) => s.key === "after_school_name")?.value;
-        const schoolAddress = data.find(
-          (s) => s.key === "pickup_start_address"
-        )?.value;
-
-        if (schoolName) setAspSchoolName(schoolName);
-        if (schoolAddress) setAspSchoolAddress(schoolAddress);
-      } catch (error) {
+      if (error) {
         console.error("Error fetching settings:", error);
+        return;
       }
+
+      const schoolName = data.find((s) => s.key === "after_school_name")?.value;
+      const schoolAddress = data.find(
+        (s) => s.key === "pickup_start_address"
+      )?.value;
+
+      if (schoolName) setAspSchoolName(schoolName);
+      if (schoolAddress) setAspSchoolAddress(schoolAddress);
     };
 
     fetchSettings();

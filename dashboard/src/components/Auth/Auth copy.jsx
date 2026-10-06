@@ -1,8 +1,8 @@
 import React, { useState } from "react";
+import supabase from "../../lib/supabase";
 import "./Auth.css";
 
-// "onLogin" is provided by AuthContext: it calls POST /auth/login and stores the session.
-const Auth = ({ onLogin }) => {
+const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -11,15 +11,15 @@ const Auth = ({ onLogin }) => {
     e.preventDefault();
     setError("");
     try {
-      const user = await onLogin(email, password);
-      console.log("Logged in:", user);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      console.log("Logged in:", data);
     } catch (error) {
-      if (!error.response) {
-        // No response at all: the API is down or the address in .env is wrong
-        setError("Cannot reach the server. Please try again later.");
-      } else {
-        setError("Login failed. Please check your credentials.");
-      }
+      setError("Login failed. Please check your credentials.");
       console.error("Error during login:", error);
     }
   };

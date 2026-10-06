@@ -1,75 +1,35 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import supabase from "../lib/supabase";
+import api from "../lib/api";
 
 const KidsContext = createContext({});
 
 const KidsContextProvider = ({ children }) => {
   const [kids, setKids] = useState([]);
 
-  // Fetch kids data from Supabase
+  // Fetch kids data from our API.
+  // GET /students/full returns every student with its school, contacts (student_family),
+  // schedule and current drop-off address already nested inside, in ONE request.
   const fetchKidsData = async () => {
     try {
-      const { data: fetchedKids, error: kidsError } = await supabase
-        .from("students")
-        .select(
-          `
-        *,
-        schools(*),  
-        drop_off_route(*),
-         student_family:student_family (
-          contact:contacts (*)
-        ),
-        students_schedule(*)
-      `
-        )
-        .order("name", { ascending: true });
+      const { data: fetchedKids } = await api.get("/students/full");
 
-      if (kidsError) {
-        throw kidsError;
-      }
+      // The API returns the schedule as a list; the dashboard expects a single object
+      // (or null when the student has no schedule).
+      const kidsWithFlattenedSchedule = fetchedKids.map((kid) => ({
+        ...kid,
+        students_schedule:
+          kid.students_schedule && kid.students_schedule.length > 0
+            ? kid.students_schedule[0]
+            : null,
+      }));
 
-      // Process each kid and flatten students_schedule to avoid accessing it as an array
-      const kidsWithFlattenedSchedule = fetchedKids.map((kid) => {
-        if (kid.students_schedule && kid.students_schedule.length > 0) {
-          kid.students_schedule = kid.students_schedule[0]; // Assign the first schedule object directly to the student
-        } else {
-          kid.students_schedule = null; // Set it to null if there is no schedule
-        }
-
-        return kid; // Return the updated kid object
-      });
-
-      // Fetch current drop-off addresses for each student manually
-      const kidsWithAddresses = await Promise.all(
-        kidsWithFlattenedSchedule.map(async (kid) => {
-          // Check if the student has a currentDropOffAddressId
-          if (kid.currentDropOffAddress) {
-            const { data: currentDropOffAddress, error: addressError } =
-              await supabase
-                .from("students_address")
-                .select("*")
-                .eq("id", kid.currentDropOffAddress)
-                .single(); // Fetch the specific address
-
-            if (addressError) {
-              console.error("Error fetching address:", addressError);
-            } else {
-              // Add the fetched drop-off address to the student object
-              kid.dropOffAddress = currentDropOffAddress;
-            }
-          }
-
-          return kid; // Return the kid with the drop-off address attached (if available)
-        })
-      );
-
-      setKids(kidsWithAddresses);
+      setKids(kidsWithFlattenedSchedule);
     } catch (error) {
       console.error("Error fetching kids data:", error);
     }
   };
 
-  // Update kid information in Supabase
+  // Update kid information through the API
   const updateKidOnDb = async (id, updates) => {
     try {
       const updatedFields = updates.reduce((obj, item) => {
@@ -77,15 +37,8 @@ const KidsContextProvider = ({ children }) => {
         return obj;
       }, {});
 
-      // Update the kid record in Supabase
-      const { data, error } = await supabase
-        .from("students")
-        .update(updatedFields)
-        .eq("id", id);
-
-      if (error) {
-        throw error;
-      }
+      // PATCH /students/{id} changes only the fields we send
+      const { data } = await api.patch(`/students/${id}`, updatedFields);
 
       console.log("Kid updated successfully!", data);
     } catch (error) {
