@@ -35,8 +35,13 @@ services:
       # First admin user (created only if it does not exist yet). Change it in production!
       ADMIN_EMAIL: admin@asp.local
       ADMIN_PASSWORD: admin123
+      # Where uploaded photos/videos are stored (kept in the "files" volume below)
+      FILES_DIR: /data/files
+    volumes:
+      - files:/data/files
     ports:
       - "8080:8080"
 
 volumes:
   pgdata:
+  files:

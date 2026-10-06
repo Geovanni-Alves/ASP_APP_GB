@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import GbIcon from "../../Images/gb-logo.png";
+import AspIcon from "../../Images/asp-logo.png";
 import api from "../../lib/api";
 //import Profile from "../Images/avatar-image.png";
 import Dashboard from "../../Images/dashboard.png";
@@ -77,9 +77,11 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
           params: { key: "in:pickup_start_address,after_school_name" },
         });
 
-        const schoolName = data.find((s) => s.key === "after_school_name")?.value;
+        const schoolName = data.find(
+          (s) => s.key === "after_school_name",
+        )?.value;
         const schoolAddress = data.find(
-          (s) => s.key === "pickup_start_address"
+          (s) => s.key === "pickup_start_address",
         )?.value;
 
         if (schoolName) setAspSchoolName(schoolName);
@@ -130,7 +132,7 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
           closeMenu === false ? "logoContainer" : "logoContainer active"
         }
       >
-        <img src={GbIcon} alt="icon" className="logo" />
+        <img src={AspIcon} alt="icon" className="logo" />
         {!closeMenu && (
           <>
             <span className="title">{aspSchoolName}</span>

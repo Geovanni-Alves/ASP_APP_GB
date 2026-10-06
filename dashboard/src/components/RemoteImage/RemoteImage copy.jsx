@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getSignedUrl } from "../../lib/files"; // Our API (replaces Supabase storage)
+import supabase from "../../lib/supabase"; // Your Supabase instance
 
 // In-memory cache
 const imageCache = {};
@@ -69,11 +69,21 @@ const RemoteImage = ({
         setImage("");
 
         try {
-          // Ask the API for a temporary signed link (valid for 2 hours; cached here for 1 hour)
-          const url = await getSignedUrl(bucketName, path, 2 * 60 * 60);
-          setImage(url);
-          imageCache[path] = { url, timestamp: Date.now() };
-          if (onImageLoaded) onImageLoaded(url);
+          const { data, error } = await supabase.storage
+            .from(bucketName)
+            .createSignedUrl(path, 60 * 60);
+
+          if (error) {
+            throw new Error("Error fetching image");
+          }
+          if (data?.signedUrl) {
+            const url = data.signedUrl;
+            setImage(url);
+            imageCache[path] = { url, timestamp: Date.now() };
+            if (onImageLoaded) onImageLoaded(url);
+          } else {
+            throw new Error("Image not found");
+          }
         } catch (error) {
           console.log(error);
         } finally {

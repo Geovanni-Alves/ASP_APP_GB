@@ -29,6 +29,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/health", "/auth/login", "/error").permitAll()
+                // Signed file links (<img> tags cannot send a token); the signature is checked in FilesController.
+                .requestMatchers(HttpMethod.GET, "/files/*/*").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .addFilterBefore(new JwtAuthFilter(jwt), UsernamePasswordAuthenticationFilter.class);

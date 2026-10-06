@@ -7,6 +7,11 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/asp}
     username: ${DB_USER:asp}
     password: ${DB_PASSWORD:asp123}
+  servlet:
+    multipart:
+      # Photos and short videos. The default limit (1MB) is too small.
+      max-file-size: 100MB
+      max-request-size: 100MB
 
 app:
   jwt:
@@ -15,3 +20,8 @@ app:
   admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
+  files:
+    # Folder where uploads are stored (a Docker volume in docker-compose.yml)
+    dir: ${FILES_DIR:./data/files}
+    # Secret used to sign file links. Defaults to the JWT secret; set FILES_SECRET in production.
+    secret: ${FILES_SECRET:${app.jwt.secret}}
