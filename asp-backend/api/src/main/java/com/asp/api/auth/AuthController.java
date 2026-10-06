@@ -34,20 +34,20 @@ public class AuthController {
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody LoginRequest req) {
         if (req == null || req.email() == null || req.password() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email e password sao obrigatorios");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email and password are required");
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
             "select id, name, email, \"userType\", password_hash from users where lower(email) = lower(?)",
             req.email().trim());
 
-        // Mesma mensagem para "usuario nao existe" e "senha errada" (nao revela qual foi).
+        // Same response for "user not found" and "wrong password" (does not reveal which one it was).
         if (rows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email ou senha invalidos");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
         Map<String, Object> u = rows.get(0);
         String hash = (String) u.get("password_hash");
         if (hash == null || !encoder.matches(req.password(), hash)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email ou senha invalidos");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
         UUID id = (UUID) u.get("id");
@@ -66,7 +66,7 @@ public class AuthController {
         List<Map<String, Object>> rows = jdbc.queryForList(
             "select id, name, email, \"userType\" from users where id = ?", id);
         if (rows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario nao existe mais");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User no longer exists");
         }
         return publicUser(rows.get(0));
     }

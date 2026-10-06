@@ -35,7 +35,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     List.of(new SimpleGrantedAuthority("ROLE_" + (role == null ? "NONE" : role))));
                 SecurityContextHolder.getContext().setAuthentication(auth);
             } catch (JwtException | IllegalArgumentException e) {
-                // token invalido ou expirado: segue sem autenticacao (resultara em 401)
+                // invalid or expired token: continue unauthenticated (the request will end up as 401)
             }
         }
         chain.doFilter(request, response);

@@ -14,7 +14,7 @@ public class HealthController {
         this.jdbc = jdbc;
     }
 
-    // Teste: a API esta no ar e consegue falar com o banco?
+    // Smoke test: is the API up and able to reach the database?
     @GetMapping("/health")
     public Map<String, Object> health() {
         Integer tables = jdbc.queryForObject(

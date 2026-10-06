@@ -8,10 +8,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 /**
- * Roda ao iniciar a API:
- *  1) garante que a tabela users tenha a coluna password_hash;
- *  2) cria o primeiro administrador (ADMIN_EMAIL / ADMIN_PASSWORD) se ele ainda nao existir.
- * Mais tarde isso sera substituido por migrations (Flyway).
+ * Runs when the API starts:
+ *  1) makes sure the users table has the password_hash column;
+ *  2) creates the first admin (ADMIN_EMAIL / ADMIN_PASSWORD) if it does not exist yet.
+ * This will be replaced by proper migrations (Flyway) later.
  */
 @Component
 public class AdminSeeder implements ApplicationRunner {
@@ -40,7 +40,7 @@ public class AdminSeeder implements ApplicationRunner {
         Integer exists = jdbc.queryForObject(
             "select count(*) from users where lower(email) = lower(?)", Integer.class, adminEmail.trim());
         if (exists != null && exists > 0) {
-            return; // nunca sobrescreve um usuario existente
+            return; // never overwrite an existing user
         }
         jdbc.update(
             "insert into users (name, email, \"userType\", password_hash, invited, \"firstLogin\") values (?, ?, ?, ?, true, false)",

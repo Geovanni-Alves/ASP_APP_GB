@@ -30,9 +30,9 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/asp
       DB_USER: asp
       DB_PASSWORD: asp123
-      # Key with assign the login tokens (32 characters) -- change in production
-      JWT_SECRET: dev-chave-secreta-troque-em-producao-0123456789
-      # First user Admin (created only if not exists) -- change in production
+      # Secret used to sign login tokens (minimum 32 characters). Change it in production!
+      JWT_SECRET: dev-secret-change-in-production-0123456789
+      # First admin user (created only if it does not exist yet). Change it in production!
       ADMIN_EMAIL: admin@asp.local
       ADMIN_PASSWORD: admin123
     ports:

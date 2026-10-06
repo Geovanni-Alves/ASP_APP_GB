@@ -40,8 +40,8 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // CORS: permite o dashboard (Vite) chamar a API do navegador, so em desenvolvimento.
-    // Apps de celular nao precisam de CORS. Na nuvem, troque pelo endereco real do dashboard.
+    // CORS: lets the dashboard (Vite) call the API from the browser, development only.
+    // Mobile apps do not need CORS. In the cloud, replace with the real dashboard origin.
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();

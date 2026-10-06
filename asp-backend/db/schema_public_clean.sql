@@ -1,13 +1,14 @@
 -- =====================================================================
--- Schema "public" limpo (ASP - After School Program)
--- Extraido do dump do Supabase. Funciona em PostgreSQL comum (13+).
--- REMOVIDO: schemas auth/storage, roles (anon, authenticated, ...),
---           GRANT, OWNER TO, RLS e POLICY.
--- A seguranca/permissoes passam a ser feitas na API.
+-- Clean "public" schema (ASP - After School Program)
+-- Extracted from the Supabase dump. Works on plain PostgreSQL (13+).
+-- REMOVED: auth/storage schemas, roles (anon, authenticated, ...),
+--          GRANT, OWNER TO, RLS and POLICY.
+-- Authorization is now handled in the API.
+-- NOTE: already applied to the local database. Do not run it again on a non-empty database.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- TIPOS (ENUMs)
+-- TYPES (ENUMs)
 -- ---------------------------------------------------------------------
 CREATE TYPE feed_type AS ENUM (
     'ATTENDANCE', 'PHOTO', 'PROMOTION', 'ACTIVITY', 'VIDEO', 'INCIDENT'
@@ -30,7 +31,7 @@ CREATE TYPE waypoint_status AS ENUM (
 );
 
 -- ---------------------------------------------------------------------
--- TABELAS
+-- TABLES
 -- ---------------------------------------------------------------------
 CREATE TABLE users (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -98,7 +99,7 @@ CREATE TABLE contacts (
     type               text
 );
 
--- Modelo antigo de rotas (legado)
+-- Legacy route model
 CREATE TABLE drop_off_route (
     id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     date                 text,
@@ -235,7 +236,7 @@ CREATE TABLE week_day_routes (
     "studentDropOffAddress" text
 );
 
--- Modelo novo de rotas
+-- New route model
 CREATE TABLE routes (
     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     date       date NOT NULL,
@@ -293,15 +294,15 @@ CREATE TABLE student_attendance (
     absent_by      uuid REFERENCES users(id)
 );
 
--- Obs: no dump original, route_vans.route_id NAO tinha FK para routes.
--- Adicionada aqui porque o modelo indica essa relacao. Se existirem dados
--- antigos orfaos, remova esta linha antes de importar os dados.
+-- Note: in the original dump, route_vans.route_id had NO foreign key to routes.
+-- Added here because the model clearly relies on that relation. If you ever
+-- import old orphaned data, remove this statement before importing.
 ALTER TABLE route_vans
     ADD CONSTRAINT route_vans_route_id_fkey
     FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE CASCADE;
 
 -- ---------------------------------------------------------------------
--- INDICES
+-- INDEXES
 -- ---------------------------------------------------------------------
 CREATE INDEX idx_route_stops_route_van_id ON route_stops (route_van_id);
 CREATE INDEX idx_route_vans_route_id      ON route_vans (route_id);
