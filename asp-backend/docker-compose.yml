@@ -19,6 +19,15 @@ services:
       timeout: 5s
       retries: 10
 
+  # Fake mailbox for development: every email the API sends shows up at http://localhost:8025
+  mailpit:
+    image: axllent/mailpit
+    container_name: asp-mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025" # web page
+      - "1025:1025" # SMTP
+
   api:
     build: ./api
     container_name: asp-api
@@ -37,6 +46,10 @@ services:
       ADMIN_PASSWORD: admin123
       # Where uploaded photos/videos are stored (kept in the "files" volume below)
       FILES_DIR: /data/files
+      # Emails: Mailpit in development
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      MAIL_FROM: no-reply@asp.local
     volumes:
       - files:/data/files
     ports:

@@ -7,6 +7,21 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/asp}
     username: ${DB_USER:asp}
     password: ${DB_PASSWORD:asp123}
+  mail:
+    # SMTP server. In development: Mailpit (see docker-compose.yml). In production: your email provider.
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:false}
+          starttls:
+            enable: ${SMTP_STARTTLS:false}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
   servlet:
     multipart:
       # Photos and short videos. The default limit (1MB) is too small.
@@ -17,6 +32,9 @@ app:
   jwt:
     secret: ${JWT_SECRET:dev-secret-change-in-production-0123456789}
     expiry-hours: 12
+  mail:
+    from: ${MAIL_FROM:no-reply@asp.local}
+    app-name: ${APP_NAME:ASP Parent App}
   admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
@@ -31,5 +49,8 @@ app:
     # GEOCODER_URL: the public one is shared, has fair-use limits, and would receive the addresses
     # typed by your staff.
     url: ${GEOCODER_URL:https://photon.komoot.io}
-    # Limits results to a bounding box: minLon,minLat,maxLon,maxLat (British Columbia). Empty = no limit.
-    bbox: "${GEOCODER_BBOX:-139.06,48.30,-114.03,60.00}"
+    # Restricts results to a bounding box: minLon,minLat,maxLon,maxLat. Empty = search the whole world.
+    bbox: "${GEOCODER_BBOX:}"
+    # Ranks results close to this point first. It does NOT exclude other places. Empty = no preference.
+    bias-lat: "${GEOCODER_BIAS_LAT:49.2827}"
+    bias-lon: "${GEOCODER_BIAS_LON:-123.1207}"

@@ -352,12 +352,36 @@ function Students({ closeMenu }) {
     fetchAllStudentData();
   }, [selectedStudent]);
 
-  // TODO(part 3): the invite flow (an email with a code) is being rebuilt on our own API.
-  // Until then the button only explains that it is not available.
-  const handleInviteContact = async () => {
-    alert(
-      "Sending invites is not available yet: it is being migrated to the new system.",
-    );
+  // Sends (or re-sends) the invite email with a one-time code. The API does all the work.
+  const handleInviteContact = async (contactId, contact) => {
+    if (!contact.email) {
+      alert("This contact does not have an email.");
+      return;
+    }
+
+    try {
+      const { data } = await api.post(`/contacts/${contactId}/invite`);
+
+      if (data.status === "already_registered") {
+        alert(
+          `${contact.email} already has an account. The child is linked to it, so no invite is needed.`,
+        );
+      } else {
+        alert(
+          `Invite sent to ${contact.email}. The code is valid for ${data.validDays} days.`,
+        );
+      }
+      fetchContacts(selectedStudent.id); // refresh the Invite / Signed columns
+    } catch (error) {
+      console.error("Invite failed:", error);
+      if (error.response?.status === 502) {
+        alert("The invite could not be emailed. Please try again in a moment.");
+      } else if (error.response?.status === 400) {
+        alert("This contact does not have a valid email address.");
+      } else {
+        alert("An unexpected error occurred while sending the invite.");
+      }
+    }
   };
 
   // The API deletes the address and, if it was the default, makes another one the default.
@@ -426,19 +450,37 @@ function Students({ closeMenu }) {
   // it finds or creates the parent's user account, saves the contact and links it to the student.
   const handleSaveContact = async (formData) => {
     try {
+      let newContact = null;
+
       if (editingContact) {
         await api.put(
           `/students/${selectedStudent.id}/contacts/${editingContact.id}`,
           formData,
         );
       } else {
-        await api.post(`/students/${selectedStudent.id}/contacts`, formData);
+        const { data } = await api.post(
+          `/students/${selectedStudent.id}/contacts`,
+          formData,
+        );
+        newContact = data;
       }
 
       // Refresh state
       await fetchContacts(selectedStudent.id);
       setEditingContact(null);
       setIsContactModalVisible(false);
+
+      // A new contact that was never invited: offer to send the invite now
+      if (
+        newContact?.email &&
+        !newContact.invited &&
+        !newContact.signed &&
+        window.confirm(
+          `Do you want to invite ${newContact.email} to register now?`,
+        )
+      ) {
+        await handleInviteContact(newContact.id, newContact);
+      }
     } catch (error) {
       console.error("Error saving contact:", error);
       alert("An error occurred while saving the contact.");
