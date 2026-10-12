@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import supabase from "../../lib/supabase";
+import api from "../../lib/api";
 import { Card, Button, Modal } from "antd";
 import AddSchool from "../../components/AddSchool/AddSchool";
 import { usePicturesContext } from "../../contexts/PicturesContext";
@@ -33,11 +33,13 @@ function StudentForm({ onStudentAdded }) {
 
   // Fetch schools
   const fetchSchools = async () => {
-    const { data, error } = await supabase.from("schools").select("id, name");
-    if (error) {
-      console.error("Error fetching schools:", error);
-    } else {
+    try {
+      const { data } = await api.get("/schools", {
+        params: { select: "id,name", order: "name" },
+      });
       setSchoolList(data);
+    } catch (error) {
+      console.error("Error fetching schools:", error);
     }
   };
 
@@ -52,29 +54,25 @@ function StudentForm({ onStudentAdded }) {
     }
 
     try {
-      const { data: student, error: studentError } = await supabase
-        .from("students")
-        .insert([
-          {
-            name,
-            schoolId,
-            birthDate: birthDate || null,
-            photo: photo
-              ? await savePhotoInBucket(photo, "profilePhotos")
-              : null,
-          },
-        ])
-        .select("id")
-        .single();
+      // 1) Upload the photo first (if any): the server returns the stored file name
+      const photoPath = photo
+        ? await savePhotoInBucket(photo, "profilePhotos")
+        : null;
 
-      if (studentError) throw studentError;
+      // 2) Create the student; the API answers with the new row (including its id)
+      const { data: student } = await api.post("/students", {
+        name,
+        schoolId,
+        birthDate: birthDate || null,
+        photo: photoPath,
+        status: "Active",
+      });
 
-      await supabase.from("students_schedule").insert([
-        {
-          studentId: student.id,
-          ...attendanceDays,
-        },
-      ]);
+      // 3) Create the weekly schedule of that student
+      await api.post("/students_schedule", {
+        studentId: student.id,
+        ...attendanceDays,
+      });
 
       alert("Student saved successfully!");
       onStudentAdded();
@@ -158,7 +156,7 @@ function StudentForm({ onStudentAdded }) {
                     onChange={() => toggleDay(day)}
                   />
                 </div>
-              )
+              ),
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Modal, Input, Button } from "antd";
-import GoogleMapsAutocomplete from "../../components/GoogleMapsAutocomplete/GoogleMapsAutocomplete";
+import AddressAutocomplete from "../../components/AddressAutocomplete/AddressAutocomplete";
 
 const AddressModal = ({ isVisible, onClose, onSave, addressToEdit }) => {
   const [addressData, setAddressData] = useState({
@@ -39,7 +39,7 @@ const AddressModal = ({ isVisible, onClose, onSave, addressToEdit }) => {
           lng: null,
         });
 
-        // Reset Google input
+        // Reset the address search box
         if (autoCompleteRef.current?.resetAutocompleteInput) {
           autoCompleteRef.current.resetAutocompleteInput();
         }
@@ -58,7 +58,8 @@ const AddressModal = ({ isVisible, onClose, onSave, addressToEdit }) => {
         ?.long_name || "";
 
     const updated = {
-      addressLine1: place.formatted_address,
+      // Only the street line goes in "Address Line 1" (city, province, zip and country have their own fields)
+      addressLine1: place.street_address || place.formatted_address,
       lat: place.geometry.location.lat(),
       lng: place.geometry.location.lng(),
       city: getComponent(["locality", "sublocality"]),
@@ -90,7 +91,7 @@ const AddressModal = ({ isVisible, onClose, onSave, addressToEdit }) => {
       okText="Save"
       okButtonProps={{ disabled: !isFormComplete }}
     >
-      <GoogleMapsAutocomplete
+      <AddressAutocomplete
         onPlaceSelect={handlePlaceSelect}
         ref={autoCompleteRef}
       />

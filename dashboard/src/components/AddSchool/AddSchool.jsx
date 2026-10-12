@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import supabase from "../../lib/supabase";
-import GoogleMapsAutocomplete from "../GoogleMapsAutocomplete/GoogleMapsAutocomplete";
+import api from "../../lib/api";
+import AddressAutocomplete from "../AddressAutocomplete/AddressAutocomplete";
 import { Button, Input } from "antd";
 
 function AddSchool({ onSchoolAdded, closeModal }) {
@@ -11,6 +11,7 @@ function AddSchool({ onSchoolAdded, closeModal }) {
   const [error, setError] = useState("");
 
   const handleAddressSelect = (selectedPlace) => {
+    console.log("selectedPlace", selectedPlace.formatted_address);
     setAddress(selectedPlace.formatted_address);
     setLat(selectedPlace.geometry.location.lat());
     setLng(selectedPlace.geometry.location.lng());
@@ -23,16 +24,7 @@ function AddSchool({ onSchoolAdded, closeModal }) {
     }
 
     try {
-      const { error: insertError } = await supabase.from("schools").insert([
-        {
-          name: schoolName,
-          address,
-          lat,
-          lng,
-        },
-      ]);
-
-      if (insertError) throw insertError;
+      await api.post("/schools", { name: schoolName, address, lat, lng });
 
       onSchoolAdded();
       closeModal(); // Ensure modal closes after successful addition
@@ -55,7 +47,7 @@ function AddSchool({ onSchoolAdded, closeModal }) {
       <div className="form-item">
         <label>Address:</label>
         <div className="autocomplete-container">
-          <GoogleMapsAutocomplete onPlaceSelect={handleAddressSelect} />
+          <AddressAutocomplete onPlaceSelect={handleAddressSelect} />
         </div>
       </div>
 

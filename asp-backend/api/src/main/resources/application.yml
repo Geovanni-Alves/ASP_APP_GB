@@ -25,3 +25,11 @@ app:
     dir: ${FILES_DIR:./data/files}
     # Secret used to sign file links. Defaults to the JWT secret; set FILES_SECRET in production.
     secret: ${FILES_SECRET:${app.jwt.secret}}
+  geocoder:
+    # Address search (autocomplete). Photon is an open-source geocoder built on OpenStreetMap data.
+    # The public server is fine for development. For production run your own instance and set
+    # GEOCODER_URL: the public one is shared, has fair-use limits, and would receive the addresses
+    # typed by your staff.
+    url: ${GEOCODER_URL:https://photon.komoot.io}
+    # Limits results to a bounding box: minLon,minLat,maxLon,maxLat (British Columbia). Empty = no limit.
+    bbox: "${GEOCODER_BBOX:-139.06,48.30,-114.03,60.00}"

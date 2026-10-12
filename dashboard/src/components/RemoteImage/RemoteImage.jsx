@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import React, { useEffect, useState } from "react";
 import { getSignedUrl } from "../../lib/files"; // Our API (replaces Supabase storage)
 
@@ -92,8 +93,8 @@ const RemoteImage = ({
     typeof rawH === "number"
       ? rawH
       : rawH != null
-      ? Number.parseFloat(String(rawH).replace("px", ""))
-      : NaN;
+        ? Number.parseFloat(String(rawH).replace("px", ""))
+        : NaN;
   const fontSize = Number.isFinite(heightNum) ? heightNum / 2 : 20;
 
   const FullScreenOverlay = () => (
@@ -147,7 +148,9 @@ const RemoteImage = ({
 
   return (
     <div style={{ ...style, ...styles.loaderContainer }}>
-      {fullscreenOnClick && showFullScreen && <FullScreenOverlay />}
+      {fullscreenOnClick &&
+        showFullScreen &&
+        createPortal(<FullScreenOverlay />, document.body)}
       {loading ? (
         <div style={styles.spinner}></div>
       ) : image ? (

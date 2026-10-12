@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import supabase from "../../lib/supabase";
+// Sending invites (the email with the code) is still pending: see TODO(part 3) below.
+import api from "../../lib/api";
 import { Modal, Button, Card } from "antd";
 import "./Students.css";
 import StudentForm from "./StudentForm";
@@ -68,7 +69,10 @@ function Students({ closeMenu }) {
   const [selectedSchool, setSelectedSchool] = useState(null);
   const [allSchools, setAllSchools] = useState([]);
   const [scheduleChanged, setScheduleChanged] = useState(false);
+  const [scheduleId, setScheduleId] = useState(null); // id of this student's row in students_schedule
   const [statusChanged, setStatusChanged] = useState(false);
+  const [savedDays, setSavedDays] = useState(null); // schedule as it is saved in the database
+  const [loadedStudentId, setLoadedStudentId] = useState(null); // which student the form is showing
 
   const [attendanceDays, setAttendanceDays] = useState({
     Monday: false,
@@ -79,6 +83,44 @@ function Students({ closeMenu }) {
   });
 
   const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+
+  // ---- Unsaved changes detection -------------------------------------------------
+  // The form as it is now, compared with the student as it is saved. Empty values count as "".
+  const currentForm = {
+    name: updatedName || "",
+    birthDate: updatedAge || "",
+    allergies: allergies || "",
+    medicine: medicine || "",
+    notes: notes || "",
+    doctor: doctor || "",
+    status: status || "",
+    schoolId: selectedSchool?.id || "",
+    dismissalTime: dismissalTime || "",
+    schoolGrade: schoolGrade || "",
+    schoolGradeDivision: schoolGradeDivision || "",
+    schoolTeacherName: schoolTeacherName || "",
+  };
+  const savedForm = selectedStudent && {
+    name: selectedStudent.name || "",
+    birthDate: selectedStudent.birthDate || "",
+    allergies: selectedStudent.allergies || "",
+    medicine: selectedStudent.medicine || "",
+    notes: selectedStudent.notes || "",
+    doctor: selectedStudent.doctor || "",
+    status: selectedStudent.status || "Active",
+    schoolId: selectedStudent.schools?.id || "",
+    dismissalTime: selectedStudent.dismissalTime?.slice(0, 5) || "",
+    schoolGrade: selectedStudent.schoolGrade || "",
+    schoolGradeDivision: selectedStudent.schoolGradeDivision || "",
+    schoolTeacherName: selectedStudent.schoolTeacherName || "",
+  };
+  const scheduleDirty =
+    !!savedDays && JSON.stringify(attendanceDays) !== JSON.stringify(savedDays);
+  const hasChanges =
+    !!selectedStudent &&
+    loadedStudentId === selectedStudent.id && // ignore the moment the form is still loading
+    (scheduleDirty ||
+      JSON.stringify(currentForm) !== JSON.stringify(savedForm));
 
   const formatTimeTo12Hour = (time) => {
     if (!time) return "-";
@@ -97,77 +139,35 @@ function Students({ closeMenu }) {
     });
   };
 
+  // Creates or updates an address. The API does everything in ONE transaction:
+  // it also fixes the "default" flags and the student's current drop-off address.
   const handleSaveAddress = async (addressData) => {
     try {
-      const payload = {
-        ...addressData,
-        studentId: selectedStudent.id,
-      };
-
-      const { data: existingAddresses, error: fetchError } = await supabase
-        .from("students_address")
-        .select("id, isDefault")
-        .eq("studentId", selectedStudent.id);
-
-      if (fetchError) throw fetchError;
-
-      let isFirst = existingAddresses.length === 0;
+      // Ask about "default" only when it can matter: there are other addresses
+      // and the address being edited is not already the default.
+      const othersExist = addresses.length > 0;
+      const alreadyDefault = !!editingAddress?.isDefault;
       let makeDefault = false;
-
-      if (isFirst) {
-        payload.isDefault = true;
-      } else {
-        const wantsDefault = window.confirm(
-          "Do you want to make this address the default?"
+      if (othersExist && !alreadyDefault) {
+        makeDefault = window.confirm(
+          "Do you want to make this address the default?",
         );
-        makeDefault = wantsDefault;
-        payload.isDefault = wantsDefault;
       }
 
-      // INSERT or UPDATE
-      let newAddressId = null;
       if (editingAddress) {
-        const { data, error } = await supabase
-          .from("students_address")
-          .update(payload)
-          .eq("id", editingAddress.id)
-          .select("id");
-
-        if (error) throw error;
-        newAddressId = data?.[0]?.id;
+        await api.put(
+          `/students/${selectedStudent.id}/addresses/${editingAddress.id}`,
+          { ...addressData, makeDefault },
+        );
       } else {
-        const { data, error } = await supabase
-          .from("students_address")
-          .insert([payload])
-          .select("id");
-
-        if (error) throw error;
-        newAddressId = data?.[0]?.id;
+        await api.post(`/students/${selectedStudent.id}/addresses`, {
+          ...addressData,
+          makeDefault,
+        });
       }
 
-      // If this address should be default:
-      if (payload.isDefault && newAddressId) {
-        // Step 1: unset other defaults
-        await supabase
-          .from("students_address")
-          .update({ isDefault: false })
-          .eq("studentId", selectedStudent.id)
-          .neq("id", newAddressId);
-
-        // Step 2: update student
-        await supabase
-          .from("students")
-          .update({ currentDropOffAddress: newAddressId })
-          .eq("id", selectedStudent.id);
-      }
-
-      // Refresh state
-      const { data: refreshed } = await supabase
-        .from("students_address")
-        .select("*")
-        .eq("studentId", selectedStudent.id);
-
-      setAddresses(refreshed || []);
+      await fetchAddresses(selectedStudent.id);
+      await fetchKidsData(); // the student list shows each default address
       setEditingAddress(null);
       setIsAddressModalVisible(false);
     } catch (error) {
@@ -184,17 +184,16 @@ function Students({ closeMenu }) {
 
   const handleUpload = async (file) => {
     try {
-      console.log("Uploading image to S3...");
-      const filename = `kid-photo-${selectedStudent.id}-${Date.now()}`;
-      console.log(filename);
-      await savePhotoInBucket(filename, file);
-      const updates = [{ fieldName: "photo", value: filename }];
-      await updateKidOnDb(selectedStudent.id, updates);
+      // The server chooses the file name and returns it as "path"
+      const path = await savePhotoInBucket(file, "profilePhotos");
+      if (!path) throw new Error("Upload failed");
 
+      // Save that name in the student row
+      await updateKidOnDb(selectedStudent.id, [
+        { fieldName: "photo", value: path },
+      ]);
+      await fetchKidsData();
       console.log("Image uploaded successfully.");
-      const imageURL = await Storage.get(filename);
-      console.log("Image URL:", imageURL);
-      setUploadedImageUrl(imageURL); // Update state with uploaded image URL
     } catch (error) {
       console.error("Error uploading image:", error);
     }
@@ -222,26 +221,23 @@ function Students({ closeMenu }) {
   // console.log("displayedKids", displayedKids);
 
   const handleStudentClick = (student) => {
+    setLoadedStudentId(null); // the form is reloaded for this student
     setSelectedStudent(student);
     setMode("details");
   };
 
   const fetchContacts = async (studentId) => {
     try {
-      const { data: all, error: allErr } = await supabase
-        .from("contacts")
-        .select("*");
-      if (allErr) throw allErr;
+      // All contacts (used by the "link an existing contact" list in the modal)
+      const { data: all } = await api.get("/contacts");
       setAllContacts(all);
 
-      const { data: familyRows, error } = await supabase
-        .from("student_family")
-        .select("contact:contacts (*)")
-        .eq("student_id", studentId);
-
-      if (error) throw error;
-      const linkedContacts = familyRows.map((row) => row.contact);
-      setContacts(linkedContacts);
+      // The link table says which contacts belong to this student
+      const { data: familyRows } = await api.get("/student_family", {
+        params: { student_id: studentId },
+      });
+      const linkedIds = new Set(familyRows.map((row) => row.contact_id));
+      setContacts(all.filter((contact) => linkedIds.has(contact.id)));
     } catch (err) {
       console.error("Error fetching contacts:", err);
       setAllContacts([]);
@@ -249,36 +245,52 @@ function Students({ closeMenu }) {
     }
   };
 
-  console.log("contacts", contacts);
-  const fetchAddresses = async (studentId) => {
-    const { data, error } = await supabase
-      .from("students_address")
-      .select("*")
-      .eq("studentId", studentId);
-    if (!error) setAddresses(data || []);
+  // console.log("contacts", contacts);
+  // Some callers pass no id, so we default to the selected student
+  const fetchAddresses = async (studentId = selectedStudent?.id) => {
+    if (!studentId) return;
+    try {
+      const { data } = await api.get("/students_address", {
+        params: { studentId },
+      });
+      // The default (favorite) address always comes first
+      const sorted = [...(data || [])].sort(
+        (a, b) => Number(!!b.isDefault) - Number(!!a.isDefault),
+      );
+      setAddresses(sorted);
+    } catch (error) {
+      console.error("Error fetching addresses:", error);
+    }
   };
 
   const fetchSchedule = async (studentId) => {
-    const { data, error } = await supabase
-      .from("students_schedule")
-      .select("monday, tuesday, wednesday, thursday, friday")
-      .eq("studentId", studentId)
-      .single();
-
-    if (!error && data) {
-      setAttendanceDays({
-        Monday: data.monday,
-        Tuesday: data.tuesday,
-        Wednesday: data.wednesday,
-        Thursday: data.thursday,
-        Friday: data.friday,
+    try {
+      const { data } = await api.get("/students_schedule", {
+        params: { studentId, limit: 1 },
       });
+      const row = data[0]; // a student has at most one schedule row
+      setScheduleId(row ? row.id : null);
+      const days = {
+        Monday: !!row?.monday,
+        Tuesday: !!row?.tuesday,
+        Wednesday: !!row?.wednesday,
+        Thursday: !!row?.thursday,
+        Friday: !!row?.friday,
+      };
+      setAttendanceDays(days);
+      setSavedDays(days);
+    } catch (error) {
+      console.error("Error fetching schedule:", error);
     }
   };
 
   const fetchSchools = async () => {
-    const { data, error } = await supabase.from("schools").select("*");
-    if (!error) setAllSchools(data);
+    try {
+      const { data } = await api.get("/schools");
+      setAllSchools(data);
+    } catch (error) {
+      console.error("Error fetching schools:", error);
+    }
   };
 
   useEffect(() => {
@@ -313,6 +325,12 @@ function Students({ closeMenu }) {
       setSchoolTeacherName(selectedStudent.schoolTeacherName || "");
       setSelectedSchool(selectedStudent.schools);
       setUpdatedPhoto(selectedStudent.photo);
+      // Restore the saved pickup mode (an empty value counts as Drop-Off service)
+      setDropOffMode(
+        selectedStudent.useDropOffService === false
+          ? "parentPickup"
+          : "dropOff",
+      );
 
       if (selectedStudent.schoolExitPhotos) {
         try {
@@ -327,265 +345,94 @@ function Students({ closeMenu }) {
       } else {
         setSchoolExitPhotos([]);
       }
+
+      setLoadedStudentId(selectedStudent.id); // the form now shows this student
     };
 
     fetchAllStudentData();
   }, [selectedStudent]);
 
-  const handleInviteContact = async (contactId, contact) => {
-    try {
-      if (!contact.email) {
-        alert("This contact does not have an email.");
-        return;
-      }
-
-      // 1. Send invite to backend
-      const response = await fetch("http://localhost:3001/api/invite-contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: contact.email,
-          firstName: contact.firstName,
-          lastName: contact.lastName,
-        }),
-      });
-
-      const result = await response.json();
-      console.log("result of post", result);
-
-      if (!response.ok) {
-        if (
-          result?.error &&
-          result.error.toLowerCase().includes("already been registered")
-        ) {
-          alert(
-            `The email "${contact.email}" is already in use.\nPlease edit the contact with a different email before trying again.`
-          );
-        } else {
-          alert("Failed to send invite: " + result.error);
-        }
-        return;
-      }
-
-      // 2. Update Supabase status
-      await supabase
-        .from("contacts")
-        .update({ invited: true, signed: false })
-        .eq("id", contactId);
-
-      alert("Invite sent successfully!");
-      fetchContacts(selectedStudent.id);
-    } catch (err) {
-      console.error("Invite failed:", err.message);
-      alert("An unexpected error occurred while sending the invite.");
-    }
+  // TODO(part 3): the invite flow (an email with a code) is being rebuilt on our own API.
+  // Until then the button only explains that it is not available.
+  const handleInviteContact = async () => {
+    alert(
+      "Sending invites is not available yet: it is being migrated to the new system.",
+    );
   };
 
+  // The API deletes the address and, if it was the default, makes another one the default.
   const handleDeleteAddress = async (idToDelete) => {
-    const confirm = window.confirm(
-      "Are you sure you want to delete this address?"
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this address?",
     );
-    if (!confirm) return;
+    if (!confirmed) return;
 
     try {
-      const addressToDelete = addresses.find((addr) => addr.id === idToDelete);
-
-      // Delete the address
-      const { error: deleteError } = await supabase
-        .from("students_address")
-        .delete()
-        .eq("id", idToDelete);
-
-      if (deleteError) throw deleteError;
-
-      // If the deleted address was the default
-      if (addressToDelete?.isDefault) {
-        // Fetch updated addresses
-        const { data: remainingAddresses, error: fetchError } = await supabase
-          .from("students_address")
-          .select("*")
-          .eq("studentId", selectedStudent.id);
-
-        if (fetchError) throw fetchError;
-
-        if (remainingAddresses.length > 0) {
-          // Set the first one as default
-          const newDefault = remainingAddresses[0];
-
-          await supabase
-            .from("students_address")
-            .update({ isDefault: true })
-            .eq("id", newDefault.id);
-
-          await supabase
-            .from("students")
-            .update({ currentDropOffAddress: newDefault.id })
-            .eq("id", selectedStudent.id);
-        } else {
-          // No addresses left — clear the student's currentDropOffAddress
-          await supabase
-            .from("students")
-            .update({ currentDropOffAddress: null })
-            .eq("id", selectedStudent.id);
-        }
-      }
-
-      // Refresh address list
-      fetchAddresses();
+      await api.delete(
+        `/students/${selectedStudent.id}/addresses/${idToDelete}`,
+      );
+      await fetchAddresses(selectedStudent.id);
+      await fetchKidsData();
     } catch (error) {
       console.error("Error deleting address:", error);
       alert("Failed to delete address.");
     }
   };
 
-  const handleDeleteContact = async (contactId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this contact?"
-    );
-    if (!confirmed) return;
-
-    const { error } = await supabase
-      .from("contacts")
-      .delete()
-      .eq("id", contactId);
-
-    if (error) {
-      console.error("Error deleting contact:", error);
-      alert("Failed to delete contact.");
-    } else {
-      alert("Contact deleted.");
-      fetchContacts(selectedStudent.id); // refresh contact list
+  // Saves the pickup mode right away: Drop-Off service = true, Parental pickup = false
+  const saveDropOffMode = async (useDropOffService) => {
+    try {
+      await api.patch(`/students/${selectedStudent.id}`, { useDropOffService });
+      await fetchKidsData();
+    } catch (error) {
+      console.error("Error saving the pickup mode:", error);
+      alert("Failed to save the pickup mode.");
+      throw error; // the caller keeps the old choice on screen
     }
   };
 
-  const handleSaveContact = async (formData) => {
-    const {
-      email,
-      firstName,
-      lastName,
-      phone,
-      type,
-      canPickup,
-      code,
-      is_primary_contact,
-    } = formData;
+  // Star icon: make this address the default one
+  const handleSetDefaultAddress = async (addressId) => {
+    try {
+      await api.put(
+        `/students/${selectedStudent.id}/addresses/${addressId}/default`,
+      );
+      await fetchAddresses(selectedStudent.id);
+      await fetchKidsData();
+    } catch (error) {
+      console.error("Error setting the default address:", error);
+      alert("Failed to set the default address.");
+    }
+  };
 
-    const isEditing = !!editingContact;
-    let userId;
-    let contactId;
+  const handleDeleteContact = async (contactId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this contact?",
+    );
+    if (!confirmed) return;
 
     try {
-      const { data: existingUser } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", email)
-        .single();
+      // Removes the contact from this student (the contact is deleted only if no sibling uses it)
+      await api.delete(`/students/${selectedStudent.id}/contacts/${contactId}`);
+      alert("Contact deleted.");
+      fetchContacts(selectedStudent.id); // refresh contact list
+    } catch (error) {
+      console.error("Error deleting contact:", error);
+      alert("Failed to delete contact.");
+    }
+  };
 
-      if (existingUser) {
-        userId = existingUser.id;
-        await supabase
-          .from("users")
-          .update({
-            name: `${firstName} ${lastName}`,
-            phoneNumber: phone,
-          })
-          .eq("id", userId);
-      } else {
-        const { data: newUser, error: userError } = await supabase
-          .from("users")
-          .insert([
-            {
-              name: `${firstName} ${lastName}`,
-              email,
-              phoneNumber: phone,
-              userType: "parent",
-              firstLogin: true,
-              updated_at: new Date().toISOString(),
-            },
-          ])
-          .select()
-          .single();
-
-        if (userError) throw userError;
-
-        userId = newUser.id;
-      }
-
-      const contactRecord = {
-        firstName,
-        lastName,
-        email,
-        phone,
-        type,
-        canPickup,
-        code,
-        invited: formData.invited ?? false,
-        signed: formData.signed ?? false,
-        user_id: userId,
-        is_primary_contact,
-      };
-
-      if (isEditing) {
-        const { error } = await supabase
-          .from("contacts")
-          .update(contactRecord)
-          .eq("id", editingContact.id);
-
-        if (error) throw error;
-        contactId = editingContact.id;
-      } else {
-        const { data, error } = await supabase
-          .from("contacts")
-          .insert([contactRecord])
-          .select()
-          .single();
-
-        if (error) throw error;
-        contactId = data?.id;
-      }
-
-      const { error: linkError } = await supabase
-        .from("student_family")
-        .upsert([{ student_id: selectedStudent.id, contact_id: contactId }]);
-      if (linkError) throw linkError;
-
-      if (!isEditing && email && !formData.invited) {
-        const confirmInvite = window.confirm(
-          `Do you want to invite ${email} to register now?`
+  // Creates or edits a contact of this student. The API does everything in ONE transaction:
+  // it finds or creates the parent's user account, saves the contact and links it to the student.
+  const handleSaveContact = async (formData) => {
+    try {
+      if (editingContact) {
+        await api.put(
+          `/students/${selectedStudent.id}/contacts/${editingContact.id}`,
+          formData,
         );
-
-        if (confirmInvite) {
-          const response = await fetch(
-            "http://localhost:3001/api/invite-contact",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                email,
-                firstName,
-                lastName,
-              }),
-            }
-          );
-
-          const result = await response.json();
-
-          console.log(result);
-
-          if (!response.ok) {
-            if (
-              result.error &&
-              result.error.toLowerCase().includes("already been registered")
-            ) {
-              alert(
-                `The email ${email} is already registered.\nPlease enter a different email or skip the invite.`
-              );
-            } else {
-              console.error("Invite failed:", result.error);
-              alert("Failed to send invite.");
-            }
-          }
-        }
+      } else {
+        await api.post(`/students/${selectedStudent.id}/contacts`, formData);
       }
 
       // Refresh state
@@ -593,16 +440,16 @@ function Students({ closeMenu }) {
       setEditingContact(null);
       setIsContactModalVisible(false);
     } catch (error) {
-      console.error("Error saving contact:", error.message);
+      console.error("Error saving contact:", error);
       alert("An error occurred while saving the contact.");
     }
   };
 
-  const handleDeleteClick = (student) => {
-    setSelectedStudent(student);
-    console.log("handle delete");
-    setMode("delete");
-  };
+  // const handleDeleteClick = (student) => {
+  //   setSelectedStudent(student);
+  //   console.log("handle delete");
+  //   setMode("delete");
+  // };
 
   const handleDeleteStudent = async () => {
     if (!selectedStudent) {
@@ -611,12 +458,7 @@ function Students({ closeMenu }) {
 
     try {
       const nameDeleted = selectedStudent.name;
-      const { data, error } = await supabase
-        .from("students")
-        .delete()
-        .eq("id", selectedStudent.id);
-
-      if (error) throw error;
+      await api.delete(`/students/${selectedStudent.id}`);
 
       setSelectedStudent(null);
       await fetchKidsData();
@@ -624,6 +466,14 @@ function Students({ closeMenu }) {
       alert(`Kid - ${nameDeleted}, successful deleted! `);
     } catch (error) {
       console.error("Error deleting student:", error);
+      if (error.response?.status === 409) {
+        // The database refuses to delete a student that other tables still point to
+        alert(
+          "This student still has related records (schedule, addresses, attendance, posts...). Set the status to Inactive instead of deleting.",
+        );
+      } else {
+        alert("Failed to delete the student.");
+      }
     }
   };
 
@@ -635,13 +485,16 @@ function Students({ closeMenu }) {
     const nameUpdated = selectedStudent.name;
 
     try {
+      // Empty inputs are sent as null: the database cannot turn "" into a date or a number.
+      // NOTE: "dropOffAddress" is no longer sent. It is not a column of "students" (it is the
+      // address object attached to each student by GET /students/full); the real column is
+      // "currentDropOffAddress", managed by the address handlers.
       const updates = {
         name: updatedName,
-        birthDate: updatedAge,
-        photo: updatedPhoto,
-        dropOffAddress: updatedDropOffAddress,
-        lat: updatedLat,
-        lng: updatedLng,
+        birthDate: updatedAge || null,
+        photo: updatedPhoto || null,
+        lat: updatedLat === "" ? null : updatedLat,
+        lng: updatedLng === "" ? null : updatedLng,
         notes,
         allergies,
         medicine,
@@ -652,22 +505,33 @@ function Students({ closeMenu }) {
         schoolGradeDivision,
         schoolTeacherName,
         dismissalTime: dismissalTime || null,
+        useDropOffService: dropOffMode === "dropOff",
       };
 
-      console.log("Updating student with:", updates);
+      // console.log("Updating student with:", updates);
 
-      const { data, error } = await supabase
-        .from("students")
-        .update(updates)
-        .eq("id", selectedStudent.id);
+      await api.patch(`/students/${selectedStudent.id}`, updates);
 
-      if (error) {
-        console.error("Supabase update error:", error);
-        alert(`Failed to update student.\n${error.message}`);
-        return;
+      // The weekly schedule is saved together with the rest of the form
+      if (scheduleDirty) {
+        const days = {
+          monday: attendanceDays.Monday,
+          tuesday: attendanceDays.Tuesday,
+          wednesday: attendanceDays.Wednesday,
+          thursday: attendanceDays.Thursday,
+          friday: attendanceDays.Friday,
+        };
+        if (scheduleId) {
+          await api.patch(`/students_schedule/${scheduleId}`, days);
+        } else {
+          await api.post("/students_schedule", {
+            studentId: selectedStudent.id,
+            ...days,
+          });
+        }
       }
 
-      console.log("Update result:", data);
+      await fetchKidsData(); // refresh the list with the saved values
       alert(`Kid - ${nameUpdated}, updated successfully!`);
 
       setSelectedStudent(null);
@@ -682,6 +546,11 @@ function Students({ closeMenu }) {
       setUpdatedPhoto("");
     } catch (error) {
       console.error("Error updating student:", error);
+      alert(
+        `Failed to update student.\n${
+          error.response?.data?.error || error.message
+        }`,
+      );
     }
   };
 
@@ -707,16 +576,22 @@ function Students({ closeMenu }) {
 
   const handleBackToList = (e) => {
     e.preventDefault();
+    if (
+      hasChanges &&
+      !window.confirm("You have unsaved changes. Leave without saving?")
+    ) {
+      return;
+    }
     setSelectedStudent(null);
     setMode("list");
   };
 
-  const handleUpdateAddressSelect = (selectedPlace) => {
-    //console.log("selectd Place", selectedPlace);
-    setUpdatedDropOffAddress(selectedPlace.formatted_address);
-    setUpdatedLat(selectedPlace.geometry.location.lat());
-    setUpdatedLng(selectedPlace.geometry.location.lng());
-  };
+  // (unused: the search box that called this was removed from the details screen)
+  // const handleUpdateAddressSelect = (selectedPlace) => {
+  //   setUpdatedDropOffAddress(selectedPlace.formatted_address);
+  //   setUpdatedLat(selectedPlace.geometry.location.lat());
+  //   setUpdatedLng(selectedPlace.geometry.location.lng());
+  // };
 
   return (
     <div>
@@ -848,678 +723,641 @@ function Students({ closeMenu }) {
                   </div>
                   <h2 className="student-name-title">{updatedName}</h2>
                 </div>
-                <div className="profile-columns">
-                  <Card
-                    title="Personal Info"
-                    className="form-item"
-                    style={{ flex: 1, marginBottom: 1 }}
-                  >
-                    <label>Name:</label>
-                    <input
-                      type="text"
-                      value={updatedName}
-                      onChange={(e) => setUpdatedName(e.target.value)}
-                    />
+                <div className="profile-body">
+                  <div className="profile-columns">
+                    <Card
+                      title="Personal Info"
+                      className="form-item"
+                      style={{ flex: 1, marginBottom: 1 }}
+                    >
+                      <label>Name:</label>
+                      <input
+                        type="text"
+                        value={updatedName}
+                        onChange={(e) => setUpdatedName(e.target.value)}
+                      />
 
-                    <label>Birthday:</label>
-                    <input
-                      type="date"
-                      value={updatedAge}
-                      onChange={(e) => setUpdatedAge(e.target.value)}
-                    />
+                      <label>Birthday:</label>
+                      <input
+                        type="date"
+                        value={updatedAge}
+                        onChange={(e) => setUpdatedAge(e.target.value)}
+                      />
 
-                    <label>Allergies:</label>
-                    <input
-                      value={allergies}
-                      onChange={(e) => setAllergies(e.target.value)}
-                    />
+                      <label>Allergies:</label>
+                      <input
+                        value={allergies}
+                        onChange={(e) => setAllergies(e.target.value)}
+                      />
 
-                    <label>Medications:</label>
-                    <input
-                      value={medicine}
-                      onChange={(e) => setMedicine(e.target.value)}
-                    />
+                      <label>Medications:</label>
+                      <input
+                        value={medicine}
+                        onChange={(e) => setMedicine(e.target.value)}
+                      />
 
-                    <label>Notes:</label>
-                    <input
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    />
+                      <label>Notes:</label>
+                      <input
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                      />
 
-                    <label>Doctor:</label>
-                    <input
-                      type="text"
-                      value={doctor}
-                      onChange={(e) => setDoctor(e.target.value)}
-                    />
-                  </Card>
-                  <Card
-                    title="School Details"
-                    className="form-item"
-                    style={{ flex: 1, marginBottom: 1 }}
-                  >
-                    {!isEditingSchool ? (
-                      <>
-                        <div style={{ marginBottom: 10 }}>
-                          <strong>School:</strong>
-                          <p>
-                            {selectedStudent.schools?.name || "Not Assigned"}
-                          </p>
-                          <p style={{ fontSize: "12px", color: "#777" }}>
-                            {selectedStudent.schools?.address || ""}
-                          </p>
-                        </div>
-
-                        <p>
-                          <strong>Dismissal Time:</strong>{" "}
-                          {dismissalTime
-                            ? formatTimeTo12Hour(dismissalTime)
-                            : "-"}
-                        </p>
-                        <p>
-                          <strong>Grade:</strong> {schoolGrade || "-"}
-                        </p>
-                        <p>
-                          <strong>Division:</strong>{" "}
-                          {schoolGradeDivision || "-"}
-                        </p>
-                        <p>
-                          <strong>Teacher:</strong> {schoolTeacherName || "-"}
-                        </p>
-
-                        <Button
-                          type="link"
-                          onClick={() => setIsEditingSchool(true)}
-                        >
-                          Edit School details
-                        </Button>
-                        {schoolExitPhotos?.length > 0 && (
-                          <div
-                            className="school-photos"
-                            style={{ marginTop: "15px" }}
-                          >
-                            <p
-                              style={{ fontSize: "14px", marginBottom: "10px" }}
-                            >
-                              📷 School Exit Photos
-                              <br />
-                              <em style={{ fontSize: "12px", color: "#777" }}>
-                                To change or add exit photos, please use the
-                                Staff App.
-                              </em>
+                      <label>Doctor:</label>
+                      <input
+                        type="text"
+                        value={doctor}
+                        onChange={(e) => setDoctor(e.target.value)}
+                      />
+                    </Card>
+                    <Card
+                      title="School Details"
+                      className="form-item"
+                      style={{ flex: 1, marginBottom: 1 }}
+                    >
+                      {!isEditingSchool ? (
+                        <>
+                          <div style={{ marginBottom: 10 }}>
+                            <strong>School:</strong>
+                            <p>
+                              {selectedStudent.schools?.name || "Not Assigned"}
                             </p>
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: "10px",
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              {schoolExitPhotos.map((photo, index) =>
-                                photo?.path ? (
-                                  <RemoteImage
-                                    key={index}
-                                    path={photo.path}
-                                    bucketName="schoolexitphotos"
-                                    className="school-exit-photo"
-                                    fullscreenOnClick
-                                  />
-                                ) : null
-                              )}
-                            </div>
+                            <p style={{ fontSize: "12px", color: "#777" }}>
+                              {selectedStudent.schools?.address || ""}
+                            </p>
                           </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <label>School</label>
-                        <select
-                          value={selectedSchool?.id || ""}
-                          onChange={(e) =>
-                            setSelectedSchool(
-                              allSchools.find((s) => s.id === e.target.value) ||
-                                null
-                            )
-                          }
-                        >
-                          <option value="">Select School</option>
-                          {allSchools.map((school) => (
-                            <option key={school.id} value={school.id}>
-                              {school.name}
-                            </option>
-                          ))}
-                        </select>
 
-                        <label>
-                          Dismissal Time{" "}
-                          <span style={{ fontSize: "12px", color: "#888" }}>
-                            (Usually 3:00 PM)
-                          </span>
-                        </label>
-                        <input
-                          type="time"
-                          value={dismissalTime}
-                          onChange={(e) => setDismissalTime(e.target.value)}
-                          min="13:00"
-                          max="18:00"
-                          step="300"
-                        />
+                          <p>
+                            <strong>Dismissal Time:</strong>{" "}
+                            {dismissalTime
+                              ? formatTimeTo12Hour(dismissalTime)
+                              : "-"}
+                          </p>
+                          <p>
+                            <strong>Grade:</strong> {schoolGrade || "-"}
+                          </p>
+                          <p>
+                            <strong>Division:</strong>{" "}
+                            {schoolGradeDivision || "-"}
+                          </p>
+                          <p>
+                            <strong>Teacher:</strong> {schoolTeacherName || "-"}
+                          </p>
 
-                        <label>Grade</label>
-                        <input
-                          type="text"
-                          value={schoolGrade}
-                          onChange={(e) => setSchoolGrade(e.target.value)}
-                        />
-
-                        <label>Division</label>
-                        <input
-                          type="text"
-                          value={schoolGradeDivision}
-                          onChange={(e) =>
-                            setSchoolGradeDivision(e.target.value)
-                          }
-                        />
-
-                        <label>Teacher</label>
-                        <input
-                          type="text"
-                          value={schoolTeacherName}
-                          onChange={(e) => setSchoolTeacherName(e.target.value)}
-                        />
-
-                        <div style={{ marginTop: 10 }}>
                           <Button
-                            type="primary"
-                            onClick={() => setIsEditingSchool(false)}
-                            style={{ marginRight: 10 }}
+                            type="link"
+                            onClick={() => setIsEditingSchool(true)}
                           >
-                            Done
+                            Edit School details
                           </Button>
-                          <Button onClick={() => setIsEditingSchool(false)}>
-                            Cancel
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </Card>
-                </div>
-                <Card
-                  title="Address Info"
-                  className="form-item"
-                  style={{ flex: 1, marginBottom: 15 }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 10,
-                    }}
-                  >
-                    {/* Left side - Pickup Mode and Add Address Button */}
-
-                    <div
-                      style={{
-                        border: "1px solid #ccc",
-                        borderRadius: "8px",
-                        padding: "15px",
-                        maxWidth: "220px",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <h4 style={{ marginTop: 0, marginBottom: "15px" }}>
-                        After Class Dismissal
-                      </h4>
-
-                      <label
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "10px",
-                          cursor: "pointer",
-                          fontSize: 13,
-                        }}
-                      >
-                        <span>Parental pickup</span>
-                        <input
-                          type="radio"
-                          name="dropOffMode"
-                          value="parentPickup"
-                          checked={dropOffMode === "parentPickup"}
-                          onChange={() => {
-                            (async () => {
-                              if (dropOffMode === "dropOff") {
-                                const nonDefaultAddresses = addresses.filter(
-                                  (a) => !a.isDefault
-                                );
-
-                                if (nonDefaultAddresses.length > 0) {
-                                  const confirmed = window.confirm(
-                                    "Are you sure you want to switch to Parental Pickup? All addresses except the default will be removed. (This can not be undone!)"
-                                  );
-                                  if (!confirmed) return;
-
-                                  const idsToDelete = nonDefaultAddresses.map(
-                                    (a) => a.id
-                                  );
-                                  await supabase
-                                    .from("students_address")
-                                    .delete()
-                                    .in("id", idsToDelete);
-
-                                  await fetchAddresses();
-                                }
-
-                                setDropOffMode("parentPickup");
-                              } else {
-                                setDropOffMode("parentPickup");
-                              }
-                            })();
-                          }}
-                        />
-                      </label>
-
-                      <label
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: "10px",
-                          cursor: "pointer",
-                          fontSize: 13,
-                        }}
-                      >
-                        <span>Drop-Off service</span>
-                        <input
-                          type="radio"
-                          name="dropOffMode"
-                          value="dropOff"
-                          checked={dropOffMode === "dropOff"}
-                          onChange={() => setDropOffMode("dropOff")}
-                        />
-                      </label>
-                    </div>
-
-                    {/* Right side - Address List */}
-                    <div
-                      style={{
-                        flex: 1,
-                        border: "1px solid #ccc",
-                        borderRadius: "8px",
-                      }}
-                    >
-                      <h4 style={{ marginTop: 0, marginBottom: "15px" }}>
-                        {dropOffMode === "dropOff"
-                          ? "Drop-Off Address List"
-                          : "Address List"}
-                      </h4>
-                      <Button
-                        type="primary"
-                        style={{ marginTop: 15 }}
-                        onClick={() => {
-                          setEditingAddress(null);
-                          setIsAddressModalVisible(true);
-                        }}
-                        disabled={
-                          (dropOffMode === "parentPickup" &&
-                            addresses.length >= 1) ||
-                          (dropOffMode === "dropOff" && addresses.length >= 3)
-                        }
-                      >
-                        + Add New Address
-                      </Button>
-
-                      {dropOffMode === "dropOff" && addresses.length >= 3 && (
-                        <p style={{ color: "red", fontSize: 12 }}>
-                          Maximum of 3 addresses allowed.
-                        </p>
-                      )}
-
-                      {addresses.length > 0 ? (
-                        <ul style={{ paddingLeft: 10, listStyle: "none" }}>
-                          {addresses.map((addr) => (
-                            <li
-                              key={addr.id}
-                              style={{
-                                marginBottom: 12,
-                                padding: 10,
-                                border: "1px solid #ccc",
-                                borderRadius: 8,
-                                backgroundColor: addr.isDefault
-                                  ? "#e6f7ff"
-                                  : "#fff",
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "flex-start",
-                              }}
+                          {schoolExitPhotos?.length > 0 && (
+                            <div
+                              className="school-photos"
+                              style={{ marginTop: "15px" }}
                             >
-                              <div style={{ flex: 1 }}>
-                                <strong>
-                                  {addr.houseName || "Unnamed Address"}
-                                </strong>
+                              <p
+                                style={{
+                                  fontSize: "14px",
+                                  marginBottom: "10px",
+                                }}
+                              >
+                                📷 School Exit Photos
                                 <br />
-                                {addr.addressLine1}, {addr.city},{" "}
-                                {addr.province}
-                                <br />
-                                {dropOffMode === "dropOff" &&
-                                  addr.isDefault && (
-                                    <span
-                                      style={{ fontSize: 12, color: "#888" }}
-                                    >
-                                      ✅ Default Address
-                                    </span>
-                                  )}
-                              </div>
-
+                                <em style={{ fontSize: "12px", color: "#777" }}>
+                                  To change or add exit photos, please use the
+                                  Staff App.
+                                </em>
+                              </p>
                               <div
                                 style={{
                                   display: "flex",
-                                  alignItems: "center",
-                                  gap: 12,
-                                  paddingLeft: 10,
+                                  gap: "10px",
+                                  flexWrap: "wrap",
                                 }}
                               >
-                                {/* Default star icon */}
-                                {dropOffMode === "dropOff" &&
-                                  !addr.isDefault && (
-                                    <FontAwesomeIcon
-                                      icon={faStar}
-                                      title="Set as Default"
-                                      style={{
-                                        color: addr.isDefault ? "gold" : "#ccc",
-                                        fontSize: 18,
-                                        cursor: addr.isDefault
-                                          ? "default"
-                                          : "pointer",
-                                      }}
-                                      onClick={() => {
-                                        if (addr.isDefault) return;
-                                        const updates = addresses.map((a) => ({
-                                          id: a.id,
-                                          isDefault: a.id === addr.id,
-                                        }));
-                                        console.log(updates);
-                                        supabase
-                                          .from("students_address")
-                                          .upsert(updates)
-                                          .then(({ error }) => {
-                                            if (!error) fetchAddresses();
-                                          });
-                                      }}
+                                {schoolExitPhotos.map((photo, index) =>
+                                  photo?.path ? (
+                                    <RemoteImage
+                                      key={index}
+                                      path={photo.path}
+                                      bucketName="schoolexitphotos"
+                                      className="school-exit-photo"
+                                      fullscreenOnClick
                                     />
-                                  )}
-
-                                {/* Edit icon */}
-                                <FontAwesomeIcon
-                                  icon={faPenToSquare}
-                                  title="Edit Address"
-                                  style={{
-                                    color: "#555",
-                                    cursor: "pointer",
-                                    fontSize: 16,
-                                  }}
-                                  onClick={() => {
-                                    setEditingAddress(addr);
-                                    setIsAddressModalVisible(true);
-                                  }}
-                                />
-
-                                {/* Trash icon */}
-                                <FontAwesomeIcon
-                                  icon={faTrash}
-                                  title="Delete Address"
-                                  style={{
-                                    color: "#d00",
-                                    cursor: "pointer",
-                                    fontSize: 16,
-                                  }}
-                                  onClick={() => handleDeleteAddress(addr.id)}
-                                />
+                                  ) : null,
+                                )}
                               </div>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p style={{ color: "#999" }}>
-                          No addresses found.
-                          {dropOffMode === "dropOff" && (
-                            <>
-                              {" "}
-                              (For drop-off, you must add at least one address.)
-                            </>
+                            </div>
                           )}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </Card>
+                        </>
+                      ) : (
+                        <>
+                          <label>School</label>
+                          <select
+                            value={selectedSchool?.id || ""}
+                            onChange={(e) =>
+                              setSelectedSchool(
+                                allSchools.find(
+                                  (s) => s.id === e.target.value,
+                                ) || null,
+                              )
+                            }
+                          >
+                            <option value="">Select School</option>
+                            {allSchools.map((school) => (
+                              <option key={school.id} value={school.id}>
+                                {school.name}
+                              </option>
+                            ))}
+                          </select>
 
-                <Card
-                  title="Attendance & Status"
-                  className="form-item"
-                  style={{ flex: 1, marginBottom: 15 }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      justifyContent: "space-between",
-                      gap: 15,
-                    }}
-                  >
-                    {/* Status Selector */}
-                    <div style={{ minWidth: 140 }}>
-                      <label>Status:</label>
-                      <select
-                        value={status}
-                        onChange={(e) => {
-                          setStatus(e.target.value);
-                          setStatusChanged(true);
-                        }}
-                        style={{ width: "100%", padding: 5, marginTop: 5 }}
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                      </select>
-                    </div>
-
-                    {/* Attendance Days */}
-                    <div className="attendance-compact">
-                      {[
-                        "Monday",
-                        "Tuesday",
-                        "Wednesday",
-                        "Thursday",
-                        "Friday",
-                      ].map((day) => (
-                        <div className="day-checkbox" key={day}>
-                          <label className="day-label-small">
-                            {day.slice(0, 3)}
+                          <label>
+                            Dismissal Time{" "}
+                            <span style={{ fontSize: "12px", color: "#888" }}>
+                              (Usually 3:00 PM)
+                            </span>
                           </label>
                           <input
-                            type="checkbox"
-                            checked={attendanceDays[day]}
-                            onChange={() => handleAttendanceToggle(day)}
+                            type="time"
+                            value={dismissalTime}
+                            onChange={(e) => setDismissalTime(e.target.value)}
+                            min="13:00"
+                            max="18:00"
+                            step="300"
                           />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Save Button */}
-                  {(scheduleChanged || statusChanged) && (
+                          <label>Grade</label>
+                          <input
+                            type="text"
+                            value={schoolGrade}
+                            onChange={(e) => setSchoolGrade(e.target.value)}
+                          />
+
+                          <label>Division</label>
+                          <input
+                            type="text"
+                            value={schoolGradeDivision}
+                            onChange={(e) =>
+                              setSchoolGradeDivision(e.target.value)
+                            }
+                          />
+
+                          <label>Teacher</label>
+                          <input
+                            type="text"
+                            value={schoolTeacherName}
+                            onChange={(e) =>
+                              setSchoolTeacherName(e.target.value)
+                            }
+                          />
+
+                          <div style={{ marginTop: 10 }}>
+                            <Button
+                              type="primary"
+                              onClick={() => setIsEditingSchool(false)}
+                              style={{ marginRight: 10 }}
+                            >
+                              Done
+                            </Button>
+                            <Button onClick={() => setIsEditingSchool(false)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </Card>
+                  </div>
+                  <Card
+                    title="Address Info"
+                    className="form-item"
+                    style={{ flex: 1, marginBottom: 15 }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                      }}
+                    >
+                      {/* Left side - Pickup Mode and Add Address Button */}
+
+                      <div
+                        style={{
+                          border: "1px solid #ccc",
+                          borderRadius: "8px",
+                          padding: "15px",
+                          maxWidth: "220px",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <h4 style={{ marginTop: 0, marginBottom: "15px" }}>
+                          After Class Dismissal
+                        </h4>
+
+                        <label
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: "10px",
+                            cursor: "pointer",
+                            fontSize: 13,
+                          }}
+                        >
+                          <span>Parental pickup</span>
+                          <input
+                            type="radio"
+                            name="dropOffMode"
+                            value="parentPickup"
+                            checked={dropOffMode === "parentPickup"}
+                            onChange={async () => {
+                              if (dropOffMode === "parentPickup") return;
+
+                              const nonDefaultAddresses = addresses.filter(
+                                (a) => !a.isDefault,
+                              );
+                              if (nonDefaultAddresses.length > 0) {
+                                const confirmed = window.confirm(
+                                  "Are you sure you want to switch to Parental Pickup? All addresses except the default will be removed. (This can not be undone!)",
+                                );
+                                if (!confirmed) return;
+
+                                await api.delete("/students_address", {
+                                  params: {
+                                    id: `in:${nonDefaultAddresses
+                                      .map((a) => a.id)
+                                      .join(",")}`,
+                                  },
+                                });
+                                await fetchAddresses();
+                              }
+
+                              try {
+                                await saveDropOffMode(false);
+                                setDropOffMode("parentPickup");
+                              } catch (error) {
+                                // the message was already shown
+                              }
+                            }}
+                          />
+                        </label>
+
+                        <label
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: "10px",
+                            cursor: "pointer",
+                            fontSize: 13,
+                          }}
+                        >
+                          <span>Drop-Off service</span>
+                          <input
+                            type="radio"
+                            name="dropOffMode"
+                            value="dropOff"
+                            checked={dropOffMode === "dropOff"}
+                            onChange={async () => {
+                              try {
+                                await saveDropOffMode(true);
+                                setDropOffMode("dropOff");
+                              } catch (error) {
+                                // the message was already shown
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Right side - Address List */}
+                      <div
+                        style={{
+                          flex: 1,
+                          border: "1px solid #ccc",
+                          borderRadius: "8px",
+                        }}
+                      >
+                        <h4 style={{ marginTop: 0, marginBottom: "15px" }}>
+                          {dropOffMode === "dropOff"
+                            ? "Drop-Off Address List"
+                            : "Address List"}
+                        </h4>
+                        <Button
+                          type="primary"
+                          style={{ marginTop: 15 }}
+                          onClick={() => {
+                            setEditingAddress(null);
+                            setIsAddressModalVisible(true);
+                          }}
+                          disabled={
+                            (dropOffMode === "parentPickup" &&
+                              addresses.length >= 1) ||
+                            (dropOffMode === "dropOff" && addresses.length >= 3)
+                          }
+                        >
+                          + Add New Address
+                        </Button>
+
+                        {dropOffMode === "dropOff" && addresses.length >= 3 && (
+                          <p style={{ color: "red", fontSize: 12 }}>
+                            Maximum of 3 addresses allowed.
+                          </p>
+                        )}
+
+                        {addresses.length > 0 ? (
+                          <ul style={{ paddingLeft: 10, listStyle: "none" }}>
+                            {addresses.map((addr) => (
+                              <li
+                                key={addr.id}
+                                style={{
+                                  marginBottom: 12,
+                                  padding: 10,
+                                  border: "1px solid #ccc",
+                                  borderRadius: 8,
+                                  backgroundColor: addr.isDefault
+                                    ? "#e6f7ff"
+                                    : "#fff",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "flex-start",
+                                }}
+                              >
+                                <div style={{ flex: 1 }}>
+                                  <strong>
+                                    {addr.houseName || "Unnamed Address"}
+                                  </strong>
+                                  <br />
+                                  {addr.addressLine1}, {addr.city},{" "}
+                                  {addr.province}
+                                  <br />
+                                  {dropOffMode === "dropOff" &&
+                                    addr.isDefault && (
+                                      <span
+                                        style={{ fontSize: 12, color: "#888" }}
+                                      >
+                                        ✅ Default Address
+                                      </span>
+                                    )}
+                                </div>
+
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                    paddingLeft: 10,
+                                  }}
+                                >
+                                  {/* Default star icon */}
+                                  {dropOffMode === "dropOff" &&
+                                    !addr.isDefault && (
+                                      <FontAwesomeIcon
+                                        icon={faStar}
+                                        title="Set as Default"
+                                        style={{
+                                          color: addr.isDefault
+                                            ? "gold"
+                                            : "#ccc",
+                                          fontSize: 18,
+                                          cursor: addr.isDefault
+                                            ? "default"
+                                            : "pointer",
+                                        }}
+                                        onClick={() => {
+                                          if (addr.isDefault) return;
+                                          handleSetDefaultAddress(addr.id);
+                                        }}
+                                      />
+                                    )}
+
+                                  {/* Edit icon */}
+                                  <FontAwesomeIcon
+                                    icon={faPenToSquare}
+                                    title="Edit Address"
+                                    style={{
+                                      color: "#555",
+                                      cursor: "pointer",
+                                      fontSize: 16,
+                                    }}
+                                    onClick={() => {
+                                      setEditingAddress(addr);
+                                      setIsAddressModalVisible(true);
+                                    }}
+                                  />
+
+                                  {/* Trash icon */}
+                                  <FontAwesomeIcon
+                                    icon={faTrash}
+                                    title="Delete Address"
+                                    style={{
+                                      color: "#d00",
+                                      cursor: "pointer",
+                                      fontSize: 16,
+                                    }}
+                                    onClick={() => handleDeleteAddress(addr.id)}
+                                  />
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p style={{ color: "#999" }}>
+                            No addresses found.
+                            {dropOffMode === "dropOff" && (
+                              <>
+                                {" "}
+                                (For drop-off, you must add at least one
+                                address.)
+                              </>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card
+                    title="Attendance & Status"
+                    className="form-item"
+                    style={{ flex: 1, marginBottom: 15 }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "space-between",
+                        gap: 15,
+                      }}
+                    >
+                      {/* Status Selector */}
+                      <div style={{ minWidth: 140 }}>
+                        <label>Status:</label>
+                        <select
+                          value={status}
+                          onChange={(e) => {
+                            setStatus(e.target.value);
+                            setStatusChanged(true);
+                          }}
+                          style={{ width: "100%", padding: 5, marginTop: 5 }}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      </div>
+
+                      {/* Attendance Days */}
+                      <div className="attendance-compact">
+                        {[
+                          "Monday",
+                          "Tuesday",
+                          "Wednesday",
+                          "Thursday",
+                          "Friday",
+                        ].map((day) => (
+                          <div className="day-checkbox" key={day}>
+                            <label className="day-label-small">
+                              {day.slice(0, 3)}
+                            </label>
+                            <input
+                              type="checkbox"
+                              checked={attendanceDays[day]}
+                              onChange={() => handleAttendanceToggle(day)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+
+                  <Card title="Parents/Family" style={{ marginBottom: 20 }}>
+                    <div
+                      className="contacts-header"
+                      style={{
+                        display: "flex",
+                        fontWeight: "bold",
+                        padding: "8px 12px",
+                        borderBottom: "1px solid #ccc",
+                      }}
+                    >
+                      <div style={{ flex: 2 }}>Name</div>
+                      <div style={{ flex: 2 }}>Email</div>
+                      <div style={{ flex: 2 }}>Phone</div>
+                      <div style={{ flex: 1 }}>Type</div>
+                      <div style={{ flex: 1 }}>Can Pickup</div>
+                      <div style={{ flex: 1 }}>Signed</div>
+                      <div style={{ flex: 1 }}>Primary</div>
+                      {/* <div style={{ flex: 1 }}>Code</div> */}
+                      <div style={{ flex: 2 }}>Actions</div>
+                    </div>
+
+                    {contacts.map((contact) => (
+                      <div
+                        key={contact.id}
+                        style={{
+                          display: "flex",
+                          padding: "10px 12px",
+                          borderBottom: "1px solid #eee",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div style={{ flex: 2 }}>
+                          {contact.firstName} {contact.lastName}
+                          {contact.is_primary_contact && (
+                            <span
+                              style={{
+                                marginLeft: 6,
+                                fontSize: 16,
+                                color: "#1677ff",
+                              }}
+                            >
+                              🛡
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ flex: 2 }}>{contact.email}</div>
+                        <div style={{ flex: 2 }}>{contact.phone}</div>
+                        <div style={{ flex: 1 }}>{contact.type}</div>
+                        <div style={{ flex: 1 }}>
+                          {contact.canPickup ? "Yes" : "No"}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          {contact.signed ? "Yes" : "No"}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          {contact.is_primary_contact ? "Yes" : ""}
+                        </div>
+                        {/* <div style={{ flex: 1 }}>{contact.code}</div> */}
+                        <div style={{ flex: 2, display: "flex", gap: 8 }}>
+                          {!contact.signed && (
+                            <Button
+                              size="small"
+                              onClick={() =>
+                                handleInviteContact(contact.id, contact)
+                              }
+                            >
+                              {contact.invited ? "Resend Invite" : "Invite"}
+                            </Button>
+                          )}
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              setEditingContact(contact);
+                              setIsContactModalVisible(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            danger
+                            size="small"
+                            onClick={() => handleDeleteContact(contact.id)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+
                     <Button
                       type="primary"
                       style={{ marginTop: 12 }}
-                      onClick={async () => {
-                        let success = true;
-
-                        if (scheduleChanged) {
-                          const { error } = await supabase
-                            .from("students_schedule")
-                            .update({
-                              monday: attendanceDays.Monday,
-                              tuesday: attendanceDays.Tuesday,
-                              wednesday: attendanceDays.Wednesday,
-                              thursday: attendanceDays.Thursday,
-                              friday: attendanceDays.Friday,
-                            })
-                            .eq("studentId", selectedStudent.id);
-
-                          if (error) {
-                            console.error("Error saving schedule:", error);
-                            success = false;
-                          } else {
-                            setScheduleChanged(false);
-                          }
-                        }
-
-                        if (statusChanged) {
-                          const { error } = await supabase
-                            .from("students")
-                            .update({ status })
-                            .eq("id", selectedStudent.id);
-
-                          if (error) {
-                            console.error("Error saving status:", error);
-                            success = false;
-                          } else {
-                            setStatusChanged(false);
-                          }
-                        }
-
-                        if (success) alert("Changes saved!");
-                        else alert("Some changes failed to save.");
+                      onClick={() => {
+                        setEditingContact(null);
+                        setIsContactModalVisible(true);
                       }}
                     >
-                      Save Changes
+                      + Add Parent/Family
                     </Button>
-                  )}
-                </Card>
+                  </Card>
 
-                <Card title="Parents/Family" style={{ marginBottom: 20 }}>
-                  <div
-                    className="contacts-header"
-                    style={{
-                      display: "flex",
-                      fontWeight: "bold",
-                      padding: "8px 12px",
-                      borderBottom: "1px solid #ccc",
-                    }}
-                  >
-                    <div style={{ flex: 2 }}>Name</div>
-                    <div style={{ flex: 2 }}>Email</div>
-                    <div style={{ flex: 2 }}>Phone</div>
-                    <div style={{ flex: 1 }}>Type</div>
-                    <div style={{ flex: 1 }}>Can Pickup</div>
-                    <div style={{ flex: 1 }}>Signed</div>
-                    <div style={{ flex: 1 }}>Primary</div>
-                    {/* <div style={{ flex: 1 }}>Code</div> */}
-                    <div style={{ flex: 2 }}>Actions</div>
-                  </div>
-
-                  {contacts.map((contact) => (
-                    <div
-                      key={contact.id}
-                      style={{
-                        display: "flex",
-                        padding: "10px 12px",
-                        borderBottom: "1px solid #eee",
-                        alignItems: "center",
-                      }}
+                  <Card title="Danger Zone" style={{ border: "1px solid red" }}>
+                    <p style={{ color: "red", fontWeight: "bold" }}>
+                      Warning: Deleting this student is permanent and cannot be
+                      undone.
+                    </p>
+                    <Button
+                      danger
+                      onClick={() => setIsDeleteModalVisible(true)}
+                      style={{ marginTop: 10 }}
                     >
-                      <div style={{ flex: 2 }}>
-                        {contact.firstName} {contact.lastName}
-                        {contact.is_primary_contact && (
-                          <span
-                            style={{
-                              marginLeft: 6,
-                              fontSize: 16,
-                              color: "#1677ff",
-                            }}
-                          >
-                            🛡
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ flex: 2 }}>{contact.email}</div>
-                      <div style={{ flex: 2 }}>{contact.phone}</div>
-                      <div style={{ flex: 1 }}>{contact.type}</div>
-                      <div style={{ flex: 1 }}>
-                        {contact.canPickup ? "Yes" : "No"}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        {contact.signed ? "Yes" : "No"}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        {contact.is_primary_contact ? "Yes" : ""}
-                      </div>
-                      {/* <div style={{ flex: 1 }}>{contact.code}</div> */}
-                      <div style={{ flex: 2, display: "flex", gap: 8 }}>
-                        {!contact.signed && (
-                          <Button
-                            size="small"
-                            onClick={() =>
-                              handleInviteContact(contact.id, contact)
-                            }
-                          >
-                            {contact.invited ? "Resend Invite" : "Invite"}
-                          </Button>
-                        )}
-                        <Button
-                          size="small"
-                          onClick={() => {
-                            setEditingContact(contact);
-                            setIsContactModalVisible(true);
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          danger
-                          size="small"
-                          onClick={() => handleDeleteContact(contact.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-
+                      Delete Student
+                    </Button>
+                  </Card>
+                </div>
+                <div className="profile-footer">
+                  {hasChanges && (
+                    <span className="unsaved-hint">
+                      You have unsaved changes
+                    </span>
+                  )}
+                  <Button onClick={handleBackToList}>Back to List</Button>
                   <Button
                     type="primary"
-                    style={{ marginTop: 12 }}
-                    onClick={() => {
-                      setEditingContact(null);
-                      setIsContactModalVisible(true);
-                    }}
+                    disabled={!hasChanges}
+                    onClick={handleUpdateStudent}
                   >
-                    + Add Parent/Family
-                  </Button>
-                </Card>
-
-                <Card title="Danger Zone" style={{ border: "1px solid red" }}>
-                  <p style={{ color: "red", fontWeight: "bold" }}>
-                    Warning: Deleting this student is permanent and cannot be
-                    undone.
-                  </p>
-                  <Button
-                    danger
-                    onClick={() => setIsDeleteModalVisible(true)}
-                    style={{ marginTop: 10 }}
-                  >
-                    Delete Student
-                  </Button>
-                </Card>
-
-                <div className="profile-actions">
-                  <button className="btn-student" onClick={handleUpdateStudent}>
                     Save Changes
-                  </button>
-                  <button className="btn-student" onClick={handleBackToList}>
-                    Back to List
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
