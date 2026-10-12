@@ -2,7 +2,12 @@ asp_app_gb – After‑School Pickup & Drop‑Off Management
 
 A full‑stack system for managing student transportation in an After‑School Program. It streamlines scheduling, van assignments, real‑time attendance, and automated PDF exports for routes and drop‑off times.
 
-⚠️ This project is still under development and not ready for production use. I'm actively working on it.
+> ⚠️ **Status: under active development — backend migration to Spring Boot**
+>
+> This app started on AWS Amplify, then moved to Supabase (PostgreSQL, Auth, Storage) with an Express API.
+> I'm now migrating the backend to **Spring Boot** with a local database, because [REASON].
+>
+> The setup instructions below still describe the previous Supabase version, so the app won't run as-is until the migration is finished.
 
 Table of Contents
 
