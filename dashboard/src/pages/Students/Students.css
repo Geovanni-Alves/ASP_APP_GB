@@ -107,7 +107,7 @@
 }
 
 .profile-header .photo-wrapper {
-  flex: 0 0 72px;
+  flex: 0 0 82px;
   width: 82px;
   height: 82px;
 }
@@ -449,8 +449,9 @@
 
 .profile-columns {
   display: flex;
-  justify-content: space-between;
-  gap: 40px;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
 }
 
 .profile-column {
@@ -485,4 +486,19 @@
   margin-right: auto; /* pushes the buttons to the right */
   font-size: 13px;
   color: #d46b08;
+}
+
+/* Archived students */
+.student-details-container.is-inactive {
+  opacity: 0.6;
+}
+
+.inactive-banner {
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background-color: #fff7e6;
+  border: 1px solid #ffd591;
+  color: #ad6800;
+  font-size: 14px;
 }

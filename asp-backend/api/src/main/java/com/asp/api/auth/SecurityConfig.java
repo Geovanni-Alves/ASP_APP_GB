@@ -21,7 +21,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtService jwt) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtService jwt, ActiveUsers activeUsers)
+        throws Exception {
         http
             .csrf(csrf -> csrf.disable())
             .cors(Customizer.withDefaults())
@@ -33,7 +34,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/files/*/*").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-            .addFilterBefore(new JwtAuthFilter(jwt), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(new JwtAuthFilter(jwt, activeUsers), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

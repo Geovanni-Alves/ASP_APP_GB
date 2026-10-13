@@ -1,5 +1,7 @@
 package com.asp.api.invites;
 
+import com.asp.api.auth.AppAccess;
+import com.asp.api.auth.AuthProblem;
 import com.asp.api.auth.JwtService;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -77,7 +79,43 @@ public class InviteService {
             jdbc.update("update contacts set user_id = ? where id = ?", userId, contactId);
         }
 
-        // A parent who already has a password (for example from a sibling) needs no code:
+        return sendInvite(userId, contactId, email, text(contact.get("firstName")),
+            MailService.Audience.PARENT, invitedBy);
+    }
+
+    // The same flow for a staff member (a user, not a contact). The email text is for the staff app.
+    @Transactional
+    public Map<String, Object> inviteStaff(UUID userId, UUID invitedBy) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "select name, email, active, \"userType\" from users where id = ?", userId);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+        Map<String, Object> user = rows.get(0);
+
+        String email = text(user.get("email"));
+        if (email.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This staff member has no email address");
+        }
+        if (Boolean.FALSE.equals(user.get("active"))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This staff member is inactive");
+        }
+
+        String name = text(user.get("name"));
+        String firstName = name.isEmpty() ? "" : name.split("\\s+")[0];
+        // An administrator activates the account in the dashboard (the email has a link);
+        // staff and drivers activate it in the staff app (they type the code)
+        String role = text(user.get("userType")).toLowerCase();
+        MailService.Audience audience = (role.equals("admin") || role.equals("superadmin"))
+            ? MailService.Audience.DASHBOARD
+            : MailService.Audience.STAFF;
+        return sendInvite(userId, null, email, firstName, audience, invitedBy);
+    }
+
+    // Creates the one-time code, stores its hash and emails it. contactId is null for staff.
+    private Map<String, Object> sendInvite(UUID userId, UUID contactId, String email, String firstName,
+                                           MailService.Audience audience, UUID invitedBy) {
+        // Someone who already has a password (for example a parent from a sibling) needs no code:
         // the child is already linked to the account, so it will show up after login.
         Boolean hasPassword = jdbc.queryForObject(
             "select password_hash is not null from users where id = ?", Boolean.class, userId);
@@ -95,10 +133,12 @@ public class InviteService {
                 + "values (?, ?, ?, now() + make_interval(days => ?), ?)",
             userId, contactId, hash(userId, code), VALID_DAYS, invitedBy);
 
-        mail.sendInvite(email, text(contact.get("firstName")), format(code), VALID_DAYS);
+        mail.sendInvite(email, firstName, format(code), VALID_DAYS, audience);
 
         jdbc.update("update users set invited = true where id = ?", userId);
-        jdbc.update("update contacts set invited = true, signed = false where id = ?", contactId);
+        if (contactId != null) {
+            jdbc.update("update contacts set invited = true, signed = false where id = ?", contactId);
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", "sent");
@@ -110,7 +150,7 @@ public class InviteService {
 
     // A wrong code must still count as an attempt, so a ResponseStatusException does NOT roll back.
     @Transactional(noRollbackFor = ResponseStatusException.class)
-    public Map<String, Object> accept(String email, String rawCode, String password) {
+    public Map<String, Object> accept(String email, String rawCode, String password, String app) {
         if (email == null || email.isBlank() || rawCode == null || rawCode.isBlank() || password == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email, code and password are required");
         }
@@ -121,11 +161,14 @@ public class InviteService {
 
         // Every failure below answers the same thing, so nothing reveals whether the email exists.
         List<Map<String, Object>> users = jdbc.queryForList(
-            "select id, name, email, \"userType\" from users where lower(email) = lower(?)", email.trim());
+            "select id, name, email, \"userType\", active from users where lower(email) = lower(?)", email.trim());
         if (users.isEmpty()) {
             throw invalid();
         }
         Map<String, Object> user = users.get(0);
+        if (Boolean.FALSE.equals(user.get("active"))) {
+            throw invalid();
+        }
         UUID userId = (UUID) user.get("id");
 
         List<Map<String, Object>> invites = jdbc.queryForList(
@@ -150,13 +193,27 @@ public class InviteService {
             throw invalid();
         }
 
-        // Correct code: save the password, close the invite, mark the contacts as registered
-        jdbc.update("update users set password_hash = ?, updated_at = now() where id = ?",
+        // The code is right, but this role may not use the app the person is in (for example staff on the
+        // dashboard). Nothing is used up: the person can accept the invite in the right app.
+        String role = text(user.get("userType"));
+        String appName = app == null ? "" : app.trim().toLowerCase();
+        if (!appName.isEmpty()) {
+            if (!AppAccess.isKnown(appName)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown app");
+            }
+            if (!AppAccess.canUse(appName, role)) {
+                throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed",
+                    "This account cannot use this app");
+            }
+        }
+
+        // Correct code: save the password, close the invite, mark the contacts as registered.
+        // The name and email were registered with the invite, so there is no "complete profile" step.
+        jdbc.update("update users set password_hash = ?, \"firstLogin\" = false, updated_at = now() where id = ?",
             encoder.encode(password), userId);
         jdbc.update("update invites set used_at = now() where id = ?", inviteId);
         jdbc.update("update contacts set signed = true where user_id = ?", userId);
 
-        String role = text(user.get("userType"));
         Map<String, Object> publicUser = new LinkedHashMap<>();
         publicUser.put("id", userId);
         publicUser.put("name", user.get("name"));

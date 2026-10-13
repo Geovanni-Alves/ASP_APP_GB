@@ -10,7 +10,9 @@ import org.springframework.stereotype.Component;
 /**
  * Runs when the API starts:
  *  1) makes sure the users table has the password_hash column;
- *  2) creates the first admin (ADMIN_EMAIL / ADMIN_PASSWORD) if it does not exist yet.
+ *  2) creates the first user (ADMIN_EMAIL / ADMIN_PASSWORD) as a SuperAdmin if it does not exist yet.
+ *     The SuperAdmin is the owner account: it manages other admins and is the only one that may erase
+ *     a student for good (see StudentsController).
  * This will be replaced by proper migrations (Flyway) later.
  */
 @Component
@@ -44,6 +46,6 @@ public class AdminSeeder implements ApplicationRunner {
         }
         jdbc.update(
             "insert into users (name, email, \"userType\", password_hash, invited, \"firstLogin\") values (?, ?, ?, ?, true, false)",
-            "Admin", adminEmail.trim(), "STAFF", encoder.encode(adminPassword));
+            "Admin", adminEmail.trim(), "SuperAdmin", encoder.encode(adminPassword));
     }
 }

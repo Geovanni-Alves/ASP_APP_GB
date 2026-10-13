@@ -19,7 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/auth")
 public class AuthController {
 
-    public record LoginRequest(String email, String password) {}
+    public record LoginRequest(String email, String password, String app) {}
 
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
@@ -37,7 +37,7 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email and password are required");
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "select id, name, email, \"userType\", password_hash from users where lower(email) = lower(?)",
+            "select id, name, email, \"userType\", password_hash, active from users where lower(email) = lower(?)",
             req.email().trim());
 
         // Same response for "user not found" and "wrong password" (does not reveal which one it was).
@@ -49,9 +49,26 @@ public class AuthController {
         if (hash == null || !encoder.matches(req.password(), hash)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
+        // The password was right, but this account was switched off by the staff
+        if (Boolean.FALSE.equals(u.get("active"))) {
+            throw new AuthProblem(HttpStatus.FORBIDDEN, "account_disabled", "This account has been disabled");
+        }
 
         UUID id = (UUID) u.get("id");
         String role = (String) u.get("userType");
+
+        // Each app says what it is ("dashboard", "staff", "parent"); the role must be allowed to use it
+        String app = req.app() == null ? "" : req.app().trim().toLowerCase();
+        if (!app.isEmpty()) {
+            if (!AppAccess.isKnown(app)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown app");
+            }
+            if (!AppAccess.canUse(app, role)) {
+                throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed",
+                    "This account cannot use this app");
+            }
+        }
+
         String token = jwt.generate(id, (String) u.get("email"), role);
 
         Map<String, Object> out = new LinkedHashMap<>();

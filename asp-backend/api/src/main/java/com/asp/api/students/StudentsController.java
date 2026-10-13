@@ -36,6 +36,8 @@ import org.springframework.web.server.ResponseStatusException;
  *   POST   /students/{studentId}/contacts                   add (or link an existing) parent/guardian
  *   PUT    /students/{studentId}/contacts/{contactId}       edit a contact
  *   DELETE /students/{studentId}/contacts/{contactId}       remove a contact from this student
+ *   PUT    /students/{studentId}/status                     archive (Inactive) or restore (Active) a student
+ *   DELETE /students/{studentId}                            delete the student for good (super admin only)
  *
  * Every write here runs in ONE transaction ("all or nothing"), because each one touches several
  * tables that must always agree (for example students_address and students, or users, contacts
@@ -60,7 +62,7 @@ public class StudentsController {
             (select to_jsonb(sc) from schools sc where sc.id = s."schoolId") as schools,
             (select to_jsonb(r) from drop_off_route r where r.id = s."dropOffRouteId") as drop_off_route,
             coalesce((
-              select jsonb_agg(jsonb_build_object('contact', to_jsonb(c)))
+              select jsonb_agg(jsonb_build_object('contact', to_jsonb(c), 'is_primary', sf.is_primary))
               from student_family sf
               join contacts c on c.id = sf.contact_id
               where sf.student_id = s.id
@@ -97,6 +99,7 @@ public class StudentsController {
     // Contact fields a client may send. Ignored on purpose (the server controls them):
     //   id, user_id, student_id -> generated or resolved by the server
     //   invited, signed         -> set by the invite flow, never by the dashboard form
+    //   is_primary_contact      -> handled separately: it is stored per student (student_family.is_primary)
     private static final Map<String, String> CONTACT_FIELDS = Map.of(
         "firstName", "text",
         "lastName", "text",
@@ -104,22 +107,23 @@ public class StudentsController {
         "phone", "text",
         "type", "text",
         "code", "text",
-        "canPickup", "boolean",
-        "is_primary_contact", "boolean");
+        "canPickup", "boolean");
 
     private static final Set<String> CONTACT_IGNORED_KEYS =
-        Set.of("id", "user_id", "student_id", "invited", "signed");
+        Set.of("id", "user_id", "student_id", "invited", "signed", "is_primary_contact");
 
     private final JdbcTemplate jdbc;
+    private final StudentDeletionService deletion;
 
-    public StudentsController(JdbcTemplate jdbc) {
+    public StudentsController(JdbcTemplate jdbc, StudentDeletionService deletion) {
         this.jdbc = jdbc;
+        this.deletion = deletion;
     }
 
     // GET /students/full -> all students with school, contacts, schedule and drop-off address
     @GetMapping("/full")
     public ResponseEntity<String> full(Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         String json = jdbc.queryForObject(FULL_SQL, String.class);
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(json);
     }
@@ -132,7 +136,7 @@ public class StudentsController {
     public Map<String, Object> addAddress(@PathVariable UUID studentId,
                                           @RequestBody Map<String, Object> body,
                                           Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireStudent(studentId);
 
         Integer existing = jdbc.queryForObject(
@@ -168,7 +172,7 @@ public class StudentsController {
                                              @PathVariable UUID addressId,
                                              @RequestBody Map<String, Object> body,
                                              Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireAddress(studentId, addressId);
 
         Map<String, Object> fields = addressFields(body);
@@ -194,7 +198,7 @@ public class StudentsController {
     public Map<String, Object> makeDefaultAddress(@PathVariable UUID studentId,
                                                   @PathVariable UUID addressId,
                                                   Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireAddress(studentId, addressId);
         setDefault(studentId, addressId);
         return fetchAddress(addressId);
@@ -207,7 +211,7 @@ public class StudentsController {
     public Map<String, Integer> deleteAddress(@PathVariable UUID studentId,
                                               @PathVariable UUID addressId,
                                               Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireAddress(studentId, addressId);
 
         Boolean wasDefault = jdbc.queryForObject(
@@ -238,9 +242,10 @@ public class StudentsController {
     public Map<String, Object> addContact(@PathVariable UUID studentId,
                                           @RequestBody Map<String, Object> body,
                                           Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireStudent(studentId);
 
+        boolean wantsPrimary = Boolean.TRUE.equals(body.get("is_primary_contact"));
         Map<String, Object> fields = contactFields(body);
         if (stringOf(fields.get("firstName")).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "firstName is required");
@@ -253,6 +258,7 @@ public class StudentsController {
                 "select id from contacts where lower(email) = lower(?) limit 1", UUID.class, email);
             if (!existing.isEmpty()) {
                 linkContact(studentId, existing.get(0));
+                ensurePrimary(studentId, existing.get(0), wantsPrimary);
                 return fetchContact(existing.get(0));
             }
         }
@@ -277,6 +283,7 @@ public class StudentsController {
             UUID.class, args.toArray());
 
         linkContact(studentId, contactId);
+        ensurePrimary(studentId, contactId, wantsPrimary);
         return fetchContact(contactId);
     }
 
@@ -287,9 +294,11 @@ public class StudentsController {
                                              @PathVariable UUID contactId,
                                              @RequestBody Map<String, Object> body,
                                              Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireContactLink(studentId, contactId);
 
+        // "true" promotes this contact; "false" is ignored (to change the primary contact, mark another one)
+        boolean wantsPrimary = Boolean.TRUE.equals(body.get("is_primary_contact"));
         Map<String, Object> fields = contactFields(body);
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
@@ -302,11 +311,16 @@ public class StudentsController {
             sets.add("user_id = ?");
             args.add(findOrCreateParentUser(email, fields));
         }
-        if (sets.isEmpty()) {
+        if (sets.isEmpty() && !wantsPrimary) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Nothing to update");
         }
-        args.add(contactId);
-        jdbc.update("update contacts set " + String.join(", ", sets) + " where id = ?", args.toArray());
+        if (!sets.isEmpty()) {
+            args.add(contactId);
+            jdbc.update("update contacts set " + String.join(", ", sets) + " where id = ?", args.toArray());
+        }
+        if (wantsPrimary) {
+            setPrimary(studentId, contactId);
+        }
         return fetchContact(contactId);
     }
 
@@ -318,10 +332,25 @@ public class StudentsController {
     public Map<String, Integer> removeContact(@PathVariable UUID studentId,
                                               @PathVariable UUID contactId,
                                               Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireContactLink(studentId, contactId);
 
+        Boolean wasPrimary = jdbc.queryForObject(
+            "select is_primary from student_family where student_id = ? and contact_id = ?",
+            Boolean.class, studentId, contactId);
+
         jdbc.update("delete from student_family where student_id = ? and contact_id = ?", studentId, contactId);
+
+        // The student must always have a primary contact (as long as it has contacts)
+        if (Boolean.TRUE.equals(wasPrimary)) {
+            List<UUID> others = jdbc.queryForList(
+                "select contact_id from student_family where student_id = ? order by contact_id limit 1",
+                UUID.class, studentId);
+            if (!others.isEmpty()) {
+                setPrimary(studentId, others.get(0));
+            }
+        }
+        syncPrimaryFlag(contactId);
         Integer stillLinked = jdbc.queryForObject(
             "select count(*) from student_family where contact_id = ?", Integer.class, contactId);
 
@@ -333,6 +362,49 @@ public class StudentsController {
         return Map.of("unlinked", 1, "contactDeleted", contactDeleted);
     }
 
+    // PUT /students/{studentId}/status   body: { "status": "Active" | "Inactive" }
+    // Archiving (Inactive) is BLOCKED while the student is tied to a van or to an open route.
+    // The answer is 409 { error, reasons: [...] } so the dashboard can show exactly why.
+    @PutMapping("/{studentId}/status")
+    public ResponseEntity<Map<String, Object>> changeStatus(@PathVariable UUID studentId,
+                                                            @RequestBody Map<String, Object> body,
+                                                            Authentication auth) {
+        Roles.requireManager(auth);
+        requireStudent(studentId);
+
+        String requested = body.get("status") == null ? "" : body.get("status").toString().trim();
+        if (!requested.equalsIgnoreCase("Active") && !requested.equalsIgnoreCase("Inactive")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "status must be Active or Inactive");
+        }
+        String status = requested.equalsIgnoreCase("Inactive") ? "Inactive" : "Active";
+
+        if (status.equals("Inactive")) {
+            List<String> reasons = inactivationBlockers(studentId);
+            if (!reasons.isEmpty()) {
+                Map<String, Object> error = new LinkedHashMap<>();
+                error.put("error", "This student cannot be deactivated yet.");
+                error.put("reasons", reasons);
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+            }
+        }
+
+        jdbc.update("update students set status = ? where id = ?", status, studentId);
+        Map<String, Object> ok = new LinkedHashMap<>();
+        ok.put("status", status);
+        return ResponseEntity.ok(ok);
+    }
+
+    // DELETE /students/{studentId}: PERMANENT. Removes the student and everything that belongs to it
+    // (schedule, addresses, feed posts, photos, messages...). See StudentDeletionService.
+    // Policy: children are archived (status "Inactive"), never deleted from the app. Erasing a child is a
+    // rare, deliberate action done by the developer on request, so only a SUPER ADMIN may call this
+    // (and only for Inactive students). The dashboard has no button for it.
+    @DeleteMapping("/{studentId}")
+    public Map<String, Object> deleteStudent(@PathVariable UUID studentId, Authentication auth) {
+        Roles.requireSuperAdmin(auth);
+        return deletion.delete(studentId);
+    }
+
     // ------------------------------------------------------------- helpers
 
     // One address is the default; every other address of the student is not.
@@ -340,6 +412,36 @@ public class StudentsController {
     private void setDefault(UUID studentId, UUID addressId) {
         jdbc.update("update students_address set \"isDefault\" = (id = ?) where \"studentId\" = ?", addressId, studentId);
         jdbc.update("update students set \"currentDropOffAddress\" = ? where id = ?", addressId, studentId);
+    }
+
+    // Why a student cannot be archived right now (an empty list means it can)
+    private List<String> inactivationBlockers(UUID studentId) {
+        List<String> reasons = new ArrayList<>();
+
+        // Assigned to a van
+        List<String> vans = jdbc.queryForList(
+            "select coalesce(v.name, 'a van') from students s join vans v on v.id = s.\"vanId\" where s.id = ?",
+            String.class, studentId);
+        for (String van : vans) {
+            reasons.add("Assigned to " + van + ". Remove the student from the van first.");
+        }
+
+        // Stops of routes that are not finished (today or in the future)
+        List<Map<String, Object>> routes = jdbc.queryForList(
+            "select r.date, r.type, r.status, v.name as van "
+                + "from route_stops rs "
+                + "join route_vans rv on rv.id = rs.route_van_id "
+                + "join routes r on r.id = rv.route_id "
+                + "left join vans v on v.id = rv.van_id "
+                + "where rs.student_id = ? and r.status <> 'finished' and r.date >= current_date "
+                + "order by r.date",
+            studentId);
+        for (Map<String, Object> route : routes) {
+            String van = route.get("van") == null ? "" : ", van " + route.get("van");
+            reasons.add("In an open " + route.get("type") + " route on " + route.get("date")
+                + " (" + route.get("status") + van + ").");
+        }
+        return reasons;
     }
 
     private Map<String, Object> addressFields(Map<String, Object> body) {
@@ -431,6 +533,35 @@ public class StudentsController {
             "insert into users (name, email, \"phoneNumber\", \"userType\", \"firstLogin\", updated_at) "
                 + "values (?, ?, ?, 'parent', true, now()) returning id",
             UUID.class, name, email, phone.isEmpty() ? null : phone);
+    }
+
+    // Exactly one contact of the student is the primary one.
+    private void setPrimary(UUID studentId, UUID contactId) {
+        jdbc.update("update student_family set is_primary = (contact_id = ?) where student_id = ?",
+            contactId, studentId);
+        jdbc.update(
+            "update contacts c set is_primary_contact = exists "
+                + "(select 1 from student_family sf where sf.contact_id = c.id and sf.is_primary) "
+                + "where c.id in (select contact_id from student_family where student_id = ?)",
+            studentId);
+    }
+
+    // The first contact of a student is always the primary one; later ones only when requested.
+    private void ensurePrimary(UUID studentId, UUID contactId, boolean requested) {
+        Integer primaries = jdbc.queryForObject(
+            "select count(*) from student_family where student_id = ? and is_primary", Integer.class, studentId);
+        if (requested || primaries == null || primaries == 0) {
+            setPrimary(studentId, contactId);
+        }
+    }
+
+    // contacts.is_primary_contact is the OLD flag that other apps may still read. We keep it in step:
+    // it means "primary for at least one student".
+    private void syncPrimaryFlag(UUID contactId) {
+        jdbc.update(
+            "update contacts c set is_primary_contact = exists "
+                + "(select 1 from student_family sf where sf.contact_id = c.id and sf.is_primary) where c.id = ?",
+            contactId);
     }
 
     private void linkContact(UUID studentId, UUID contactId) {

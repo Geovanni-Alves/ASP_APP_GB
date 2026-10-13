@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 // Sending invites (the email with the code) is still pending: see TODO(part 3) below.
 import api from "../../lib/api";
-import { Modal, Button, Card } from "antd";
+import { Modal, Button, Card, Segmented, Tag } from "antd";
 import "./Students.css";
 import StudentForm from "./StudentForm";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -57,6 +57,7 @@ function Students({ closeMenu }) {
   const [addresses, setAddresses] = useState([]);
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("Active"); // "Active" | "Inactive" | "All"
 
   const [schoolExitPhotos, setSchoolExitPhotos] = useState([
     { index: 0, path: "" },
@@ -209,11 +210,18 @@ function Students({ closeMenu }) {
   //   handleUpload(selectedPhoto);
   // };
 
+  const isInactive = (kid) => kid.status === "Inactive";
+  const activeCount = kids.filter((kid) => !isInactive(kid)).length;
+  const inactiveCount = kids.length - activeCount;
+
   const filteredKids = kids.filter((kid) => {
-    return (
+    const matchesName =
       nameFilter === "" ||
-      kid.name?.toLowerCase().includes(nameFilter.toLowerCase())
-    );
+      kid.name?.toLowerCase().includes(nameFilter.toLowerCase());
+    const matchesStatus =
+      statusFilter === "All" ||
+      (statusFilter === "Inactive" ? isInactive(kid) : !isInactive(kid));
+    return matchesName && matchesStatus;
   });
 
   // const displayedKids = filteredKids.slice(startIndex, endIndex);
@@ -236,8 +244,23 @@ function Students({ closeMenu }) {
       const { data: familyRows } = await api.get("/student_family", {
         params: { student_id: studentId },
       });
-      const linkedIds = new Set(familyRows.map((row) => row.contact_id));
-      setContacts(all.filter((contact) => linkedIds.has(contact.id)));
+      // Each family row says whether that contact is the primary one FOR THIS STUDENT
+      const rowByContact = new Map(
+        familyRows.map((row) => [row.contact_id, row]),
+      );
+      setContacts(
+        all
+          .filter((contact) => rowByContact.has(contact.id))
+          .map((contact) => ({
+            ...contact,
+            is_primary_contact: !!rowByContact.get(contact.id).is_primary,
+          }))
+          // the primary contact comes first
+          .sort(
+            (a, b) =>
+              Number(b.is_primary_contact) - Number(a.is_primary_contact),
+          ),
+      );
     } catch (err) {
       console.error("Error fetching contacts:", err);
       setAllContacts([]);
@@ -308,18 +331,18 @@ function Students({ closeMenu }) {
       // Set all other fields from selectedStudent
       setUpdatedName(selectedStudent.name);
       setUpdatedDropOffAddress(selectedStudent.dropOffAddress);
-      setUpdatedAge(selectedStudent.birthDate);
+      setUpdatedAge(selectedStudent.birthDate || "");
       // setUpdatedParent1Email(selectedStudent.parent1Email);
       // setUpdatedParent2Email(selectedStudent.parent2Email);
-      setUpdatedLat(selectedStudent.lat);
-      setUpdatedLng(selectedStudent.lng);
+      setUpdatedLat(selectedStudent.lat ?? "");
+      setUpdatedLng(selectedStudent.lng ?? "");
       setNotes(selectedStudent.notes || "");
       setAllergies(selectedStudent.allergies || "");
       setMedicine(selectedStudent.medicine || "");
       setDoctor(selectedStudent.doctor || "");
       setStatus(selectedStudent.status || "Active");
       setSchoolName(selectedStudent.schoolName || "");
-      setDismissalTime(selectedStudent.dismissalTime?.slice(0, 5));
+      setDismissalTime(selectedStudent.dismissalTime?.slice(0, 5) || "");
       setSchoolGrade(selectedStudent.schoolGrade || "");
       setSchoolGradeDivision(selectedStudent.schoolGradeDivision || "");
       setSchoolTeacherName(selectedStudent.schoolTeacherName || "");
@@ -481,9 +504,11 @@ function Students({ closeMenu }) {
       ) {
         await handleInviteContact(newContact.id, newContact);
       }
+      return true;
     } catch (error) {
       console.error("Error saving contact:", error);
       alert("An error occurred while saving the contact.");
+      return false;
     }
   };
 
@@ -524,6 +549,18 @@ function Students({ closeMenu }) {
       return;
     }
 
+    // Archiving a student asks for a confirmation (the API may still refuse, see below)
+    const statusChangedNow = status !== (selectedStudent.status || "Active");
+    if (statusChangedNow && status === "Inactive") {
+      const confirmed = window.confirm(
+        `Deactivate ${selectedStudent.name}?\n\n` +
+          "- They will disappear from the student lists, routes and notifications.\n" +
+          "- Attendance, photos and history are kept.\n" +
+          "- You can reactivate them at any time.",
+      );
+      if (!confirmed) return;
+    }
+
     const nameUpdated = selectedStudent.name;
 
     try {
@@ -531,6 +568,11 @@ function Students({ closeMenu }) {
       // NOTE: "dropOffAddress" is no longer sent. It is not a column of "students" (it is the
       // address object attached to each student by GET /students/full); the real column is
       // "currentDropOffAddress", managed by the address handlers.
+      // The status has its own rules (open routes, vans), so it has its own endpoint
+      if (statusChangedNow) {
+        await api.put(`/students/${selectedStudent.id}/status`, { status });
+      }
+
       const updates = {
         name: updatedName,
         birthDate: updatedAge || null,
@@ -541,7 +583,6 @@ function Students({ closeMenu }) {
         allergies,
         medicine,
         doctor,
-        status,
         schoolId: selectedSchool?.id || selectedStudent.schoolId,
         schoolGrade,
         schoolGradeDivision,
@@ -588,11 +629,13 @@ function Students({ closeMenu }) {
       setUpdatedPhoto("");
     } catch (error) {
       console.error("Error updating student:", error);
-      alert(
-        `Failed to update student.\n${
-          error.response?.data?.error || error.message
-        }`,
-      );
+      const data = error.response?.data;
+      if (error.response?.status === 409 && data?.reasons) {
+        alert(`${data.error}\n\n- ${data.reasons.join("\n- ")}`);
+        setStatus(selectedStudent.status || "Active"); // put the select back to the saved value
+      } else {
+        alert(`Failed to update student.\n${data?.error || error.message}`);
+      }
     }
   };
 
@@ -654,6 +697,18 @@ function Students({ closeMenu }) {
                     value={nameFilter}
                     onChange={(e) => setNameFilter(e.target.value)}
                   />
+                  <Segmented
+                    value={statusFilter}
+                    onChange={setStatusFilter}
+                    options={[
+                      { label: `Active (${activeCount})`, value: "Active" },
+                      {
+                        label: `Inactive (${inactiveCount})`,
+                        value: "Inactive",
+                      },
+                      { label: `All (${kids.length})`, value: "All" },
+                    ]}
+                  />
                   {/* <input
                     type="text"
                     placeholder="Filter by Address"
@@ -669,7 +724,12 @@ function Students({ closeMenu }) {
                 </div>
                 <div className="student-list">
                   {filteredKids.map((kid) => (
-                    <div className="student-details-container" key={kid.id}>
+                    <div
+                      className={`student-details-container ${
+                        isInactive(kid) ? "is-inactive" : ""
+                      }`}
+                      key={kid.id}
+                    >
                       <RemoteImage
                         path={kid.photo}
                         name={kid.name}
@@ -677,7 +737,12 @@ function Students({ closeMenu }) {
                         className="student-photo"
                       />
                       <div className="student-details">
-                        <div className="student-name">{kid.name}</div>
+                        <div className="student-name">
+                          {kid.name}
+                          {isInactive(kid) && (
+                            <Tag style={{ marginLeft: 8 }}>Inactive</Tag>
+                          )}
+                        </div>
                         <div className="student-address">
                           {kid.dropOffAddress?.addressLine1}
                           {kid.dropOffAddress?.city}
@@ -766,6 +831,12 @@ function Students({ closeMenu }) {
                   <h2 className="student-name-title">{updatedName}</h2>
                 </div>
                 <div className="profile-body">
+                  {selectedStudent.status === "Inactive" && (
+                    <div className="inactive-banner">
+                      This student is inactive: hidden from the lists, routes
+                      and notifications. Set the status to Active to restore.
+                    </div>
+                  )}
                   <div className="profile-columns">
                     <Card
                       title="Personal Info"
@@ -1372,7 +1443,7 @@ function Students({ closeMenu }) {
                     </Button>
                   </Card>
 
-                  <Card title="Danger Zone" style={{ border: "1px solid red" }}>
+                  {/* <Card title="Danger Zone" style={{ border: "1px solid red" }}>
                     <p style={{ color: "red", fontWeight: "bold" }}>
                       Warning: Deleting this student is permanent and cannot be
                       undone.
@@ -1384,7 +1455,7 @@ function Students({ closeMenu }) {
                     >
                       Delete Student
                     </Button>
-                  </Card>
+                  </Card> */}
                 </div>
                 <div className="profile-footer">
                   {hasChanges && (
@@ -1425,7 +1496,7 @@ function Students({ closeMenu }) {
             addressToEdit={editingAddress}
           />
 
-          <Modal
+          {/* <Modal
             open={isDeleteModalVisible}
             title="Are you absolutely sure?"
             onCancel={() => setIsDeleteModalVisible(false)}
@@ -1441,7 +1512,7 @@ function Students({ closeMenu }) {
               This action cannot be undone. This will permanently delete the
               student record.
             </p>
-          </Modal>
+          </Modal> */}
 
           {/* Modal for adding student */}
           <Modal

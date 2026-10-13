@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,9 +17,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwt;
+    private final ActiveUsers activeUsers;
 
-    public JwtAuthFilter(JwtService jwt) {
+    public JwtAuthFilter(JwtService jwt, ActiveUsers activeUsers) {
         this.jwt = jwt;
+        this.activeUsers = activeUsers;
     }
 
     @Override
@@ -30,10 +33,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 Claims claims = jwt.parse(header.substring(7));
                 String role = claims.get("role", String.class);
-                var auth = new UsernamePasswordAuthenticationToken(
-                    claims.getSubject(), null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + (role == null ? "NONE" : role))));
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                // A deactivated or deleted user is treated as not logged in, even with a valid token
+                if (activeUsers.isActive(UUID.fromString(claims.getSubject()))) {
+                    var auth = new UsernamePasswordAuthenticationToken(
+                        claims.getSubject(), null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + (role == null ? "NONE" : role))));
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                }
             } catch (JwtException | IllegalArgumentException e) {
                 // invalid or expired token: continue unauthenticated (the request will end up as 401)
             }

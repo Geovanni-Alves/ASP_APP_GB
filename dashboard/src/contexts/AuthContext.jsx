@@ -14,9 +14,27 @@ const AuthContextProvider = ({ children }) => {
     setSession(null);
   }, []);
 
-  // Called by the login form
+  // Called by the login form. "app" tells the API which app is signing in: only administrators
+  // may use the dashboard (staff and drivers use the staff app).
   const login = async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+    const { data } = await api.post("/auth/login", {
+      email,
+      password,
+      app: "dashboard",
+    });
+    setToken(data.token);
+    setSession({ access_token: data.token, user: data.user });
+    return data.user;
+  };
+
+  // Called by the "I have an invite" form: sets the password and logs the person in
+  const acceptInvite = async (email, code, password) => {
+    const { data } = await api.post("/auth/accept-invite", {
+      email,
+      code,
+      password,
+      app: "dashboard",
+    });
     setToken(data.token);
     setSession({ access_token: data.token, user: data.user });
     return data.user;
@@ -51,6 +69,7 @@ const AuthContextProvider = ({ children }) => {
       value={{
         session,
         login,
+        acceptInvite,
         logout,
       }}
     >
@@ -59,7 +78,7 @@ const AuthContextProvider = ({ children }) => {
       ) : session ? (
         children // Render children if authenticated
       ) : (
-        <Auth onLogin={login} /> // Render the login form if not authenticated
+        <Auth onLogin={login} onAcceptInvite={acceptInvite} /> // Render the login form if not authenticated
       )}
     </AuthContext.Provider>
   );

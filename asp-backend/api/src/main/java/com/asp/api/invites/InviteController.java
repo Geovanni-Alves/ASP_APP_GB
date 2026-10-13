@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class InviteController {
 
-    public record AcceptRequest(String email, String code, String password) {}
+    public record AcceptRequest(String email, String code, String password, String app) {}
 
     private final InviteService invites;
 
@@ -24,14 +24,14 @@ public class InviteController {
     // -> { status: "sent", validDays: 7 }  or  { status: "already_registered" }
     @PostMapping("/contacts/{contactId}/invite")
     public Map<String, Object> invite(@PathVariable UUID contactId, Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         return invites.invite(contactId, UUID.fromString(auth.getName()));
     }
 
     // POST /auth/accept-invite  (public: the parent has no account yet)
-    // Body: { email, code, password } -> { token, user }, the same shape as the login
+    // Body: { email, code, password, app? } -> { token, user }, the same shape as the login
     @PostMapping("/auth/accept-invite")
     public Map<String, Object> accept(@RequestBody AcceptRequest request) {
-        return invites.accept(request.email(), request.code(), request.password());
+        return invites.accept(request.email(), request.code(), request.password(), request.app());
     }
 }

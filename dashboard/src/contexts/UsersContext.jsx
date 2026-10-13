@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useState,
-  useEffect,
-  useContext,
-  useCallback,
-} from "react";
+import { createContext, useState, useEffect, useContext, useCallback } from "react";
 import api from "../lib/api";
 import { useAuthContext } from "./AuthContext";
 import CompleteProfile from "../components/CompleteProfile/CompleteProfile";
@@ -15,8 +9,13 @@ const UsersContext = createContext({});
 // so we always compare them in lower case.
 const userTypeOf = (user) => (user?.userType || "").toLowerCase();
 
+// Only administrators use the dashboard (the ASP manager and the super admin).
+// Staff and drivers use the staff app, parents use the parent app.
+const PORTAL_TYPES = ["admin", "superadmin"];
+const canUsePortal = (user) => PORTAL_TYPES.includes(userTypeOf(user));
+
 const UsersContextProvider = ({ children }) => {
-  const { session } = useAuthContext();
+  const { session, logout } = useAuthContext();
 
   // With our own API there is ONE table for login + profile ("users").
   // The login (email + password) and the profile (name, phone...) live in the same row,
@@ -48,7 +47,11 @@ const UsersContextProvider = ({ children }) => {
     try {
       const { data } = await api.get("/users");
       setUsers(data);
-      setStaff(data.filter((user) => userTypeOf(user) === "staff"));
+      setStaff(
+        data.filter(
+          (user) => userTypeOf(user) === "staff" && user.active !== false,
+        ),
+      );
     } catch (error) {
       console.error("Error fetching users:", error.message);
     }
@@ -60,8 +63,8 @@ const UsersContextProvider = ({ children }) => {
     const init = async () => {
       const me = await loadCurrentUser();
       setLoading(false);
-      // Parents are blocked from this portal, so there is no point loading the user list.
-      if (userTypeOf(me) !== "parent") {
+      // Only administrators may use this portal (the API refuses everybody else anyway).
+      if (canUsePortal(me)) {
         loadUsers();
       }
     };
@@ -112,20 +115,19 @@ const UsersContextProvider = ({ children }) => {
     >
       {loading ? (
         <div>Loading...</div>
-      ) : userTypeOf(dbUser) === "parent" ? (
+      ) : dbUser && !canUsePortal(dbUser) ? (
         <div style={{ padding: 30, textAlign: "center", color: "#444" }}>
           <h2>Access Restricted</h2>
           <p>
-            This web portal is for staff use only. <br />
-            Please use the Parent App to manage your profile and view your
-            child’s activity.
+            This web portal is for administrators only. <br />
+            {userTypeOf(dbUser) === "parent"
+              ? "Please use the Parent App to manage your profile and view your child’s activity."
+              : "Please use the Staff App."}
           </p>
+          <button onClick={logout}>Sign out</button>
         </div>
       ) : needsProfile ? (
-        <CompleteProfile
-          email={authUser.email}
-          onCreateUser={completeProfile}
-        />
+        <CompleteProfile email={authUser.email} onCreateUser={completeProfile} />
       ) : (
         children
       )}

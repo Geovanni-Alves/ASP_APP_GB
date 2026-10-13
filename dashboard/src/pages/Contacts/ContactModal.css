@@ -1,60 +1,90 @@
-/* Modal container */
+/* The class "contact-modal" is on the inner div only (it used to be on the antd Modal too,
+   which turned the whole dialog into a flex column). Inputs and the Select keep antd's own
+   look: styling the .ant-select wrapper with padding and a border made a "box inside a box". */
 .contact-modal {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 16px;
+  padding-top: 4px;
 }
 
-/* Label styling */
-.contact-modal label {
-  font-size: 1rem;
+.contact-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.contact-field > label {
+  font-size: 14px;
   font-weight: 600;
-  margin-bottom: 5px;
 }
 
-/* Input and select styling */
-.contact-modal input,
-.contact-modal select,
+/* Two fields side by side (first/last name, phone/type) */
+.contact-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
 .contact-modal .ant-select {
   width: 100%;
-  max-width: 350px;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  box-sizing: border-box;
 }
 
-.contact-modal select {
-  cursor: pointer;
-}
-
-/* Checkbox row */
-.contact-modal .checkbox-container {
+.contact-choice {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-/* Lighter label inside checkbox row */
-.contact-modal .checkbox-container label {
-  font-weight: normal;
+.contact-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+}
+
+/* "Use Existing Contact" results */
+.contact-results {
+  list-style: none;
   margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-/* Save button */
+.contact-result {
+  padding: 10px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.contact-result:hover {
+  background-color: #fff1f0;
+  border-color: #ed3337;
+}
+
+/* Save button (brand red) */
 .contact-modal .save-btn {
   width: 100%;
-  max-width: 350px;
-  padding: 10px;
-  border-radius: 4px;
-  border: none;
   background-color: #ed3337;
-  color: #fff;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.3s;
+  border-color: #ed3337;
 }
 
-.contact-modal .save-btn:hover {
-  background-color: #d12d30;
+.contact-modal .save-btn:hover:not(:disabled) {
+  background-color: #d12d30 !important;
+  border-color: #d12d30 !important;
+}
+
+@media (max-width: 520px) {
+  .contact-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Small explanatory text under the checkboxes */
+.contact-hint {
+  font-size: 13px;
+  color: #888;
 }

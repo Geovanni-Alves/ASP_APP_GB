@@ -22,9 +22,11 @@ public class UsersController {
     // Columns returned to clients. Deliberately NOT included:
     //   password_hash        -> must never leave the API
     //   "pushToken", "fcmToken" -> device tokens, not needed by the dashboard
-    private static final String COLUMNS =
+    //   "registered" says whether the person already has a password (without exposing it)
+    static final String COLUMNS =
         "id, sub, name, email, \"unitNumber\", address, lng, lat, "
-        + "\"phoneNumber\", \"userType\", photo, updated_at, \"firstLogin\", invited";
+        + "\"phoneNumber\", \"userType\", photo, updated_at, \"firstLogin\", invited, active, "
+        + "(password_hash is not null) as registered";
 
     // Profile fields a user may change about THEMSELVES, with their SQL kind.
     // "userType", "email", "invited" and the password are deliberately NOT here,
@@ -44,11 +46,15 @@ public class UsersController {
         this.jdbc = jdbc;
     }
 
-    // GET /users -> every user (staff and admins only)
+    // GET /users -> every user (administrators only).
+    // The owner account (SuperAdmin) is only listed for a SuperAdmin: the manager does not see it.
     @GetMapping
     public List<Map<String, Object>> list(Authentication auth) {
-        Roles.requireStaff(auth);
-        return jdbc.queryForList("select " + COLUMNS + " from users order by lower(name)");
+        Roles.requireManager(auth);
+        String hideOwner = Roles.isSuperAdmin(auth)
+            ? ""
+            : " where lower(coalesce(\"userType\", '')) <> 'superadmin'";
+        return jdbc.queryForList("select " + COLUMNS + " from users" + hideOwner + " order by lower(name)");
     }
 
     // GET /users/me -> the profile of the logged-in user (any role)

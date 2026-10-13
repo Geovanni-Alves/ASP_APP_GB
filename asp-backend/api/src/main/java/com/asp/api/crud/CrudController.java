@@ -43,6 +43,9 @@ import org.springframework.web.server.ResponseStatusException;
 public class CrudController {
 
     private static final Set<String> RESERVED = Set.of("order", "limit", "offset", "select");
+
+    // Rows of these tables are never deleted through the generic endpoints (students are archived instead)
+    private static final Set<String> NEVER_DELETED = Set.of("students");
     private static final int DEFAULT_LIMIT = 1000;
     private static final int MAX_LIMIT = 5000;
 
@@ -64,7 +67,7 @@ public class CrudController {
     public ResponseEntity<String> list(@PathVariable String resource,
                                        @RequestParam Map<String, String> params,
                                        Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         Map<String, TableMetaService.Column> cols = columnsOf(resource);
         Where where = buildWhere(cols, params);
 
@@ -84,7 +87,7 @@ public class CrudController {
     public ResponseEntity<String> getOne(@PathVariable String resource,
                                          @PathVariable String id,
                                          Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         Map<String, TableMetaService.Column> cols = columnsOf(resource);
         String pk = requirePrimaryKey(resource);
 
@@ -106,7 +109,7 @@ public class CrudController {
     public ResponseEntity<String> create(@PathVariable String resource,
                                          @RequestBody Object body,
                                          Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         Map<String, TableMetaService.Column> cols = columnsOf(resource);
 
         if (body instanceof List<?> items) {
@@ -127,7 +130,12 @@ public class CrudController {
                                          @PathVariable String id,
                                          @RequestBody Map<String, Object> body,
                                          Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
+        if (resource.equals("students") && body.containsKey("status")) {
+            // the status has rules (open routes, vans): see PUT /students/{id}/status
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Use PUT /students/{id}/status to change the status of a student");
+        }
         Map<String, TableMetaService.Column> cols = columnsOf(resource);
         String pk = requirePrimaryKey(resource);
 
@@ -167,7 +175,8 @@ public class CrudController {
     public ResponseEntity<String> deleteById(@PathVariable String resource,
                                              @PathVariable String id,
                                              Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
+        rejectProtectedDelete(resource);
         Map<String, TableMetaService.Column> cols = columnsOf(resource);
         String pk = requirePrimaryKey(resource);
 
@@ -184,7 +193,8 @@ public class CrudController {
     public ResponseEntity<String> deleteWhere(@PathVariable String resource,
                                               @RequestParam Map<String, String> params,
                                               Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
+        rejectProtectedDelete(resource);
         Map<String, TableMetaService.Column> cols = columnsOf(resource);
         Where where = buildWhere(cols, params);
 
@@ -243,6 +253,13 @@ public class CrudController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Table not found in the database: " + resource);
         }
         return cols;
+    }
+
+    private void rejectProtectedDelete(String resource) {
+        if (NEVER_DELETED.contains(resource)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Students are never deleted from the app. Set the status to Inactive instead.");
+        }
     }
 
     private String requirePrimaryKey(String resource) {

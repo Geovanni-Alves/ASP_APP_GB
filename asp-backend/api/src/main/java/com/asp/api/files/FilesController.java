@@ -79,7 +79,7 @@ public class FilesController {
     public Map<String, String> upload(@PathVariable String bucket,
                                       @RequestParam("file") MultipartFile file,
                                       Authentication auth) throws IOException {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireBucket(bucket);
         if (file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Empty file");
@@ -102,7 +102,7 @@ public class FilesController {
                                          @RequestParam String path,
                                          @RequestParam(defaultValue = "3600") long expires,
                                          Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireBucket(bucket);
         requireName(path);
         if (storage.load(bucket, path) == null) {
@@ -145,7 +145,7 @@ public class FilesController {
     public Map<String, Integer> delete(@PathVariable String bucket,
                                        @PathVariable String name,
                                        Authentication auth) throws IOException {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         requireBucket(bucket);
         requireName(name);
         return Map.of("deleted", storage.delete(bucket, name) ? 1 : 0);

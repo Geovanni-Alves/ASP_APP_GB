@@ -9,23 +9,50 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * Small helper for role checks. Roles come from the "userType" column and may be
  * stored with different casing ("Staff", "STAFF", "SuperAdmin"...), so we compare in lower case.
+ *
+ * Who is who:
+ *   superadmin  the owner/developer: everything, including the parent app and erasing a student
+ *   admin       the ASP manager: the dashboard, plus the staff app (can drive and post photos)
+ *   staff       the staff app only
+ *   driver      the staff app only; a driver is also a member of the staff
+ *   parent      the parent app only
+ * The login also checks which APP a role may use (see AppAccess).
  */
 public final class Roles {
 
-    private static final Set<String> STAFF_ROLES = Set.of("staff", "superadmin", "admin");
+    // Who may use the dashboard and the management endpoints of the API
+    private static final Set<String> MANAGER_ROLES = Set.of("admin", "superadmin");
 
     private Roles() {}
 
-    /** Throws 403 unless the authenticated user is staff or an admin. */
-    public static void requireStaff(Authentication auth) {
-        boolean isStaff = auth.getAuthorities().stream()
-            .map(GrantedAuthority::getAuthority)
-            .map(a -> a.startsWith("ROLE_") ? a.substring(5) : a)
-            .map(String::toLowerCase)
-            .anyMatch(STAFF_ROLES::contains);
+    private static String roleOf(GrantedAuthority authority) {
+        String a = authority.getAuthority();
+        return (a.startsWith("ROLE_") ? a.substring(5) : a).toLowerCase();
+    }
 
-        if (!isStaff) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Staff access required");
+    /** Throws 403 unless the authenticated user is an administrator (admin or superadmin). */
+    public static void requireManager(Authentication auth) {
+        boolean isManager = auth.getAuthorities().stream()
+            .map(Roles::roleOf)
+            .anyMatch(MANAGER_ROLES::contains);
+
+        if (!isManager) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Administrator access required");
+        }
+    }
+
+    /** True when the authenticated user is a super admin (the owner / developer account). */
+    public static boolean isSuperAdmin(Authentication auth) {
+        return auth.getAuthorities().stream()
+            .map(Roles::roleOf)
+            .anyMatch("superadmin"::equals);
+    }
+
+    /** Throws 403 unless the authenticated user is a super admin (used to erase a student for good). */
+    public static void requireSuperAdmin(Authentication auth) {
+        if (!isSuperAdmin(auth)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Students are never deleted from the app. Set the status to Inactive instead.");
         }
     }
 }

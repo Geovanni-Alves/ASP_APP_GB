@@ -25,7 +25,7 @@ public class GeocodeController {
     public List<Map<String, Object>> autocomplete(@RequestParam String q,
                                                   @RequestParam(defaultValue = "5") int limit,
                                                   Authentication auth) {
-        Roles.requireStaff(auth);
+        Roles.requireManager(auth);
         String query = q.trim();
         if (query.length() < 3) {
             return List.of(); // too short to be worth a search
