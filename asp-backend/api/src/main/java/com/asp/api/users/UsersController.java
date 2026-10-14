@@ -26,6 +26,7 @@ public class UsersController {
     static final String COLUMNS =
         "id, sub, name, email, \"unitNumber\", address, lng, lat, "
         + "\"phoneNumber\", \"userType\", photo, updated_at, \"firstLogin\", invited, active, "
+        + "\"inactiveReason\", \"inactiveNote\", \"inactiveSince\", "
         + "(password_hash is not null) as registered";
 
     // Profile fields a user may change about THEMSELVES, with their SQL kind.

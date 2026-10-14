@@ -6,6 +6,8 @@ import { Button, Modal, Input, Card, Segmented, Select, Tag, message } from "ant
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPenToSquare, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { useUsersContext } from "../../contexts/UsersContext";
+import DeactivateModal from "../../components/DeactivateModal/DeactivateModal";
+import { STAFF_REASONS } from "../../lib/inactiveReasons";
 
 // Everybody listed on this page (GET /users also returns parents, who are not staff)
 const STAFF_TYPES = ["staff", "driver", "admin", "superadmin"];
@@ -46,6 +48,8 @@ function StaffPage({ closeMenu }) {
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [isNewModalVisible, setIsNewModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [staffToDeactivate, setStaffToDeactivate] = useState(null);
+  const [deactivating, setDeactivating] = useState(false);
 
   /* ──────────────────────────────────
      NEW STAFF FORM
@@ -286,37 +290,50 @@ function StaffPage({ closeMenu }) {
   /* ──────────────────────────────────
      DEACTIVATE / REACTIVATE (staff are never deleted from the app)
   ────────────────────────────────── */
-  const setActive = async (staff, active) => {
-    if (
-      !active &&
-      !window.confirm(
-        `Deactivate ${staff.name || staff.email}?\n\n` +
-          "- They will no longer be able to sign in.\n" +
-          "- They will disappear from the lists.\n" +
-          "- Their history is kept, and you can reactivate them at any time.",
-      )
-    ) {
-      return;
+  const showBlockedMessage = (error, fallback) => {
+    console.error("Change status error:", error);
+    const data = error.response?.data;
+    if ([403, 409].includes(error.response?.status) && data?.error) {
+      // The API says why (open routes, your own account, an account only a super admin can manage...)
+      alert(
+        data.reasons?.length
+          ? `${data.error}\n\n- ${data.reasons.join("\n- ")}`
+          : data.error,
+      );
+    } else {
+      alert(fallback);
     }
+  };
 
+  // The reason comes from the dialog (DeactivateModal)
+  const confirmDeactivate = async ({ reason, note }) => {
+    setDeactivating(true);
     try {
-      await api.put(`/staff/${staff.id}/active`, { active });
-      message.success(active ? "Staff member reactivated." : "Staff member deactivated.");
+      await api.put(`/staff/${staffToDeactivate.id}/active`, {
+        active: false,
+        reason,
+        note,
+      });
+      message.success("Staff member deactivated.");
+      setStaffToDeactivate(null);
       await fetchStaff();
       setSelectedStaff(null);
     } catch (error) {
-      console.error("Change status error:", error);
-      const data = error.response?.data;
-      if ([403, 409].includes(error.response?.status) && data?.error) {
-        // The API says why (open routes, your own account, an account only a super admin can manage...)
-        alert(
-          data.reasons?.length
-            ? `${data.error}\n\n- ${data.reasons.join("\n- ")}`
-            : data.error,
-        );
-      } else {
-        alert("Failed to change the status.");
-      }
+      setStaffToDeactivate(null);
+      showBlockedMessage(error, "Failed to deactivate the staff member.");
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
+  const reactivate = async (staff) => {
+    try {
+      await api.put(`/staff/${staff.id}/active`, { active: true });
+      message.success("Staff member reactivated.");
+      await fetchStaff();
+      setSelectedStaff(null);
+    } catch (error) {
+      showBlockedMessage(error, "Failed to reactivate the staff member.");
     }
   };
 
@@ -428,6 +445,14 @@ function StaffPage({ closeMenu }) {
               <div className="staff-banner">
                 This staff member is inactive: they cannot sign in and are
                 hidden from the lists. Reactivate them below to restore access.
+                {selectedStaff.inactiveReason && (
+                  <div>
+                    <strong>Reason:</strong> {selectedStaff.inactiveReason}
+                    {selectedStaff.inactiveNote
+                      ? `: ${selectedStaff.inactiveNote}`
+                      : ""}
+                  </div>
+                )}
               </div>
             )}
 
@@ -499,11 +524,11 @@ function StaffPage({ closeMenu }) {
                   Status: <strong>{isActive(selectedStaff) ? "Active" : "Inactive"}</strong>
                 </div>
                 {isActive(selectedStaff) ? (
-                  <Button danger onClick={() => setActive(selectedStaff, false)}>
+                  <Button danger onClick={() => setStaffToDeactivate(selectedStaff)}>
                     Deactivate
                   </Button>
                 ) : (
-                  <Button type="primary" onClick={() => setActive(selectedStaff, true)}>
+                  <Button type="primary" onClick={() => reactivate(selectedStaff)}>
                     Reactivate
                   </Button>
                 )}
@@ -532,6 +557,16 @@ function StaffPage({ closeMenu }) {
           </div>
         </div>
       )}
+
+      <DeactivateModal
+        open={!!staffToDeactivate}
+        title={`Deactivate ${staffToDeactivate?.name || staffToDeactivate?.email || ""}?`}
+        intro="They will no longer be able to sign in and will disappear from the lists. Their history is kept, and you can reactivate them at any time."
+        reasons={STAFF_REASONS}
+        confirmLoading={deactivating}
+        onConfirm={confirmDeactivate}
+        onCancel={() => setStaffToDeactivate(null)}
+      />
 
       {/* ───────────── NEW STAFF MODAL ───────────── */}
       <Modal

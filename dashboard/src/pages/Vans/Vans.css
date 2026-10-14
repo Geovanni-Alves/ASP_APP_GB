@@ -1,17 +1,13 @@
+/* Every class on this page starts with "van" (the CSS of all pages is global: the old generic names
+   .menu-open, .menu-closed and .form-row could change other pages). */
+
 .vans-container {
-  /* position: relative;
-  width: 80%;
-  top: -20px;
-  background-color: #fff;
-  border-radius: 40px;
-  transition: left 0.3s ease;
-  max-height: 900px; */
   display: flex;
   flex-direction: column;
   position: fixed;
   top: 0;
   bottom: 0;
-  left: 5rem; /* or 15rem if menu is open */
+  left: 5rem;
   right: 0;
   padding: 30px 40px;
   background-color: #fff;
@@ -21,12 +17,30 @@
   transition: left 0.3s ease;
 }
 
-.menu-open {
+.vans-container.menu-open {
   left: 15rem;
 }
 
-.menu-closed {
+.vans-container.menu-closed {
   left: 5rem;
+}
+
+.vans-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.vans-header h2 {
+  margin: 0;
+}
+
+.vans-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .van-list {
@@ -36,15 +50,16 @@
   margin-top: 20px;
 }
 
-.list-vans-card {
+.van-card {
   flex: 1 1 250px;
   max-width: 250px;
-  justify-content: space-between;
   width: 260px;
-  /* background: #f9f9f9; */
   border-radius: 15px;
-  padding: 15px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.van-card.is-inactive {
+  opacity: 0.6;
 }
 
 .van-photo {
@@ -62,5 +77,37 @@
 
 .van-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 8px;
+}
+
+.van-empty {
+  width: 100%;
+  text-align: center;
+  color: #999;
+}
+
+/* ---- modal ---- */
+.van-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.van-form-row > label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.van-hint {
+  color: #888;
+}
+
+/* "Sold", "Out of service"... on a deactivated van */
+.van-reason {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #888;
 }

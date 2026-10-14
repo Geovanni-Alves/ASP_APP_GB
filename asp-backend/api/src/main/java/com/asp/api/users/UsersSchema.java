@@ -24,5 +24,9 @@ public class UsersSchema implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         jdbc.execute("alter table users add column if not exists active boolean not null default true");
+        // Why and since when a staff member was deactivated
+        jdbc.execute("alter table users add column if not exists \"inactiveReason\" text");
+        jdbc.execute("alter table users add column if not exists \"inactiveNote\" text");
+        jdbc.execute("alter table users add column if not exists \"inactiveSince\" timestamptz");
     }
 }

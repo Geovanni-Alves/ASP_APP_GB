@@ -4,6 +4,7 @@ import api from "../../lib/api";
 import { Modal, Button, Card, Segmented, Tag } from "antd";
 import "./Students.css";
 import StudentForm from "./StudentForm";
+import { STUDENT_REASONS } from "../../lib/inactiveReasons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPenToSquare,
@@ -18,6 +19,7 @@ import { usePicturesContext } from "../../contexts/PicturesContext";
 import RemoteImage from "../../components/RemoteImage/RemoteImage";
 import ContactModal from "../Contacts/ContactModal";
 import AddressModal from "../AddressModal/AddressModal";
+import DeactivateModal from "../../components/DeactivateModal/DeactivateModal";
 
 function Students({ closeMenu }) {
   const { kids, updateKidOnDb, fetchKidsData } = useKidsContext();
@@ -58,12 +60,16 @@ function Students({ closeMenu }) {
   const [isAddressModalVisible, setIsAddressModalVisible] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
   const [statusFilter, setStatusFilter] = useState("Active"); // "Active" | "Inactive" | "All"
+  const [isDeactivateModalVisible, setIsDeactivateModalVisible] =
+    useState(false);
 
   const [schoolExitPhotos, setSchoolExitPhotos] = useState([
     { index: 0, path: "" },
     { index: 1, path: "" },
     { index: 2, path: "" },
   ]);
+  const [inactiveReason, setInactiveReason] = useState("");
+  const [inactiveNote, setInactiveNote] = useState("");
   const [schoolTeacherName, setSchoolTeacherName] = useState("");
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [isEditingSchool, setIsEditingSchool] = useState(false);
@@ -341,6 +347,8 @@ function Students({ closeMenu }) {
       setMedicine(selectedStudent.medicine || "");
       setDoctor(selectedStudent.doctor || "");
       setStatus(selectedStudent.status || "Active");
+      setInactiveReason("");
+      setInactiveNote("");
       setSchoolName(selectedStudent.schoolName || "");
       setDismissalTime(selectedStudent.dismissalTime?.slice(0, 5) || "");
       setSchoolGrade(selectedStudent.schoolGrade || "");
@@ -544,35 +552,30 @@ function Students({ closeMenu }) {
     }
   };
 
-  const handleUpdateStudent = async () => {
+  const handleUpdateStudent = async (deactivation) => {
     if (!selectedStudent) {
       return;
     }
 
-    // Archiving a student asks for a confirmation (the API may still refuse, see below)
+    // Archiving (Inactive) arrives here with the reason from the dialog (see handleSaveClick)
     const statusChangedNow = status !== (selectedStudent.status || "Active");
-    if (statusChangedNow && status === "Inactive") {
-      const confirmed = window.confirm(
-        `Deactivate ${selectedStudent.name}?\n\n` +
-          "- They will disappear from the student lists, routes and notifications.\n" +
-          "- Attendance, photos and history are kept.\n" +
-          "- You can reactivate them at any time.",
-      );
-      if (!confirmed) return;
-    }
-
     const nameUpdated = selectedStudent.name;
 
     try {
+      // The status has its own rules (open routes), so it has its own endpoint.
+      // It is saved first: if the API refuses, nothing else is saved.
+      if (statusChangedNow) {
+        await api.put(`/students/${selectedStudent.id}/status`, {
+          status,
+          reason: deactivation?.reason,
+          note: deactivation?.note,
+        });
+      }
+
       // Empty inputs are sent as null: the database cannot turn "" into a date or a number.
       // NOTE: "dropOffAddress" is no longer sent. It is not a column of "students" (it is the
       // address object attached to each student by GET /students/full); the real column is
       // "currentDropOffAddress", managed by the address handlers.
-      // The status has its own rules (open routes, vans), so it has its own endpoint
-      if (statusChangedNow) {
-        await api.put(`/students/${selectedStudent.id}/status`, { status });
-      }
-
       const updates = {
         name: updatedName,
         birthDate: updatedAge || null,
@@ -671,6 +674,19 @@ function Students({ closeMenu }) {
     setMode("list");
   };
 
+  // Archiving a student asks WHY first (the dialog); anything else is saved right away
+  const handleSaveClick = () => {
+    const archiving =
+      status === "Inactive" &&
+      (selectedStudent.status || "Active") !== "Inactive";
+
+    if (archiving) {
+      setIsDeactivateModalVisible(true);
+    } else {
+      handleUpdateStudent();
+    }
+  };
+
   // (unused: the search box that called this was removed from the details screen)
   // const handleUpdateAddressSelect = (selectedPlace) => {
   //   setUpdatedDropOffAddress(selectedPlace.formatted_address);
@@ -740,7 +756,12 @@ function Students({ closeMenu }) {
                         <div className="student-name">
                           {kid.name}
                           {isInactive(kid) && (
-                            <Tag style={{ marginLeft: 8 }}>Inactive</Tag>
+                            <Tag
+                              style={{ marginLeft: 8 }}
+                              title={kid.inactiveReason || ""}
+                            >
+                              Inactive
+                            </Tag>
                           )}
                         </div>
                         <div className="student-address">
@@ -835,6 +856,15 @@ function Students({ closeMenu }) {
                     <div className="inactive-banner">
                       This student is inactive: hidden from the lists, routes
                       and notifications. Set the status to Active to restore.
+                      {selectedStudent.inactiveReason && (
+                        <div>
+                          <strong>Reason:</strong>{" "}
+                          {selectedStudent.inactiveReason}
+                          {selectedStudent.inactiveNote
+                            ? `: ${selectedStudent.inactiveNote}`
+                            : ""}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="profile-columns">
@@ -1467,7 +1497,7 @@ function Students({ closeMenu }) {
                   <Button
                     type="primary"
                     disabled={!hasChanges}
-                    onClick={handleUpdateStudent}
+                    onClick={handleSaveClick}
                   >
                     Save Changes
                   </Button>
@@ -1494,6 +1524,17 @@ function Students({ closeMenu }) {
             }}
             onSave={handleSaveAddress}
             addressToEdit={editingAddress}
+          />
+          <DeactivateModal
+            open={isDeactivateModalVisible}
+            title={`Deactivate ${selectedStudent?.name || ""}?`}
+            intro="They will disappear from the student lists, routes and notifications. Attendance, photos and history are kept, and you can reactivate them at any time."
+            reasons={STUDENT_REASONS}
+            onConfirm={async (details) => {
+              setIsDeactivateModalVisible(false);
+              await handleUpdateStudent(details);
+            }}
+            onCancel={() => setIsDeactivateModalVisible(false)}
           />
 
           {/* <Modal

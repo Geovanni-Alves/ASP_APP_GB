@@ -44,8 +44,12 @@ public class CrudController {
 
     private static final Set<String> RESERVED = Set.of("order", "limit", "offset", "select");
 
-    // Rows of these tables are never deleted through the generic endpoints (students are archived instead)
-    private static final Set<String> NEVER_DELETED = Set.of("students");
+    // Rows of these tables are never deleted through the generic endpoints (they are archived instead).
+    // Deleting a van would even erase its routes (route_vans has "on delete cascade").
+    private static final Set<String> NEVER_DELETED = Set.of("students", "vans");
+
+    // Fields that have their own endpoint with rules (open routes, vans...): the generic PATCH refuses them
+    private static final Map<String, String> RULE_FIELDS = Map.of("students", "status", "vans", "active");
     private static final int DEFAULT_LIMIT = 1000;
     private static final int MAX_LIMIT = 5000;
 
@@ -131,10 +135,10 @@ public class CrudController {
                                          @RequestBody Map<String, Object> body,
                                          Authentication auth) {
         Roles.requireManager(auth);
-        if (resource.equals("students") && body.containsKey("status")) {
-            // the status has rules (open routes, vans): see PUT /students/{id}/status
+        String ruleField = RULE_FIELDS.get(resource);
+        if (ruleField != null && body.containsKey(ruleField)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Use PUT /students/{id}/status to change the status of a student");
+                "Use PUT /" + resource + "/{id}/" + ruleField + " to change this field");
         }
         Map<String, TableMetaService.Column> cols = columnsOf(resource);
         String pk = requirePrimaryKey(resource);
@@ -258,7 +262,7 @@ public class CrudController {
     private void rejectProtectedDelete(String resource) {
         if (NEVER_DELETED.contains(resource)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                "Students are never deleted from the app. Set the status to Inactive instead.");
+                "Students and vans are never deleted from the app. Deactivate them instead.");
         }
     }
 

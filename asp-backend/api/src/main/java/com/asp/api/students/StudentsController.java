@@ -1,6 +1,7 @@
 package com.asp.api.students;
 
 import com.asp.api.auth.Roles;
+import com.asp.api.common.InactiveReasons;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -362,8 +363,8 @@ public class StudentsController {
         return Map.of("unlinked", 1, "contactDeleted", contactDeleted);
     }
 
-    // PUT /students/{studentId}/status   body: { "status": "Active" | "Inactive" }
-    // Archiving (Inactive) is BLOCKED while the student is tied to a van or to an open route.
+    // PUT /students/{studentId}/status   body: { "status": "Active" | "Inactive", "reason": "...", "note": "..." }
+    // Archiving (Inactive) needs a reason (see InactiveReasons) and is BLOCKED while the student is in an open route.
     // The answer is 409 { error, reasons: [...] } so the dashboard can show exactly why.
     @PutMapping("/{studentId}/status")
     public ResponseEntity<Map<String, Object>> changeStatus(@PathVariable UUID studentId,
@@ -378,7 +379,10 @@ public class StudentsController {
         }
         String status = requested.equalsIgnoreCase("Inactive") ? "Inactive" : "Active";
 
+        InactiveReasons.Reason why = null;
         if (status.equals("Inactive")) {
+            why = InactiveReasons.require(InactiveReasons.STUDENT, body);
+
             List<String> reasons = inactivationBlockers(studentId);
             if (!reasons.isEmpty()) {
                 Map<String, Object> error = new LinkedHashMap<>();
@@ -388,7 +392,13 @@ public class StudentsController {
             }
         }
 
-        jdbc.update("update students set status = ? where id = ?", status, studentId);
+        if (why != null) {
+            jdbc.update("update students set status = 'Inactive', \"inactiveReason\" = ?, \"inactiveNote\" = ?, "
+                + "\"inactiveSince\" = now() where id = ?", why.reason(), why.note(), studentId);
+        } else {
+            jdbc.update("update students set status = 'Active', \"inactiveReason\" = null, \"inactiveNote\" = null, "
+                + "\"inactiveSince\" = null where id = ?", studentId);
+        }
         Map<String, Object> ok = new LinkedHashMap<>();
         ok.put("status", status);
         return ResponseEntity.ok(ok);
@@ -417,14 +427,6 @@ public class StudentsController {
     // Why a student cannot be archived right now (an empty list means it can)
     private List<String> inactivationBlockers(UUID studentId) {
         List<String> reasons = new ArrayList<>();
-
-        // Assigned to a van
-        List<String> vans = jdbc.queryForList(
-            "select coalesce(v.name, 'a van') from students s join vans v on v.id = s.\"vanId\" where s.id = ?",
-            String.class, studentId);
-        for (String van : vans) {
-            reasons.add("Assigned to " + van + ". Remove the student from the van first.");
-        }
 
         // Stops of routes that are not finished (today or in the future)
         List<Map<String, Object>> routes = jdbc.queryForList(

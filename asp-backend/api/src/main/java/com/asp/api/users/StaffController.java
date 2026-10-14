@@ -2,6 +2,7 @@ package com.asp.api.users;
 
 import com.asp.api.auth.ActiveUsers;
 import com.asp.api.auth.Roles;
+import com.asp.api.common.InactiveReasons;
 import com.asp.api.invites.InviteService;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -153,7 +154,9 @@ public class StaffController {
         }
         boolean active = (Boolean) body.get("active");
 
+        InactiveReasons.Reason why = null;
         if (!active) {
+            why = InactiveReasons.require(InactiveReasons.STAFF, body);
             if (id.toString().equals(auth.getName())) {
                 return conflict("You cannot deactivate your own account.", null);
             }
@@ -163,7 +166,13 @@ public class StaffController {
             }
         }
 
-        jdbc.update("update users set active = ?, updated_at = now() where id = ?", active, id);
+        if (why != null) {
+            jdbc.update("update users set active = false, \"inactiveReason\" = ?, \"inactiveNote\" = ?, "
+                + "\"inactiveSince\" = now(), updated_at = now() where id = ?", why.reason(), why.note(), id);
+        } else {
+            jdbc.update("update users set active = true, \"inactiveReason\" = null, \"inactiveNote\" = null, "
+                + "\"inactiveSince\" = null, updated_at = now() where id = ?", id);
+        }
         activeUsers.forget(id); // a deactivated person loses access right away
 
         Map<String, Object> ok = new LinkedHashMap<>();
