@@ -2,20 +2,6 @@
    file used generic names (.filters, .form-item, .profile-actions, .menu-open...) that fought with
    the same names in Students.css and changed the look of the Students page. */
 
-.staff-container {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 5rem;
-  right: 0;
-  padding: 30px 40px;
-  background-color: #fff;
-  border-radius: 40px;
-  overflow-y: auto;
-  box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
-  transition: left 0.3s ease;
-}
-
 .staff-container.menu-open {
   left: 15rem;
 }
@@ -25,7 +11,7 @@
 }
 
 /* While the edit page is open only its body scrolls (header and footer stay) */
-.staff-container:has(> .staff-edit-page) {
+.app-page:has(> .staff-edit-page) {
   overflow: hidden;
 }
 

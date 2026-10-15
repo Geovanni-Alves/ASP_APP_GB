@@ -4,9 +4,10 @@ import api from "../../lib/api";
 //import Profile from "../Images/avatar-image.png";
 import Dashboard from "../../Images/dashboard.png";
 import People from "../../Images/people.png";
+import House from "../../Images/House.png";
 import School from "../../Images/school.png";
-import House from "../../Images/house.png";
-import GbBus from "../../Images/vanDashboard.png";
+import AspPickup from "../../Images/aspbus.png";
+import Van from "../../Images/vanDashboard.png";
 import Settings from "../../Images/settings.png";
 import ArrowIcon from "../../Images/drop-down-arrow.png";
 import { useLocation } from "react-router-dom";
@@ -229,15 +230,20 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
             </ul>
           )}
 
+          <li className={location.pathname === "/schools" ? "active" : ""}>
+            <img src={School} alt="schools" />
+            <a href="/schools">Schools</a>
+          </li>
+
           <li className={location.pathname === "/vans" ? "active" : ""}>
-            <img src={GbBus} alt="vehicles" />
+            <img src={Van} alt="vehicles" />
             <a href="/vans">Vehicles</a>
           </li>
           <li
             className={location.pathname === "/pickup" ? "active" : ""}
             onClick={() => handleSubmenuToggle("pickup")}
           >
-            <img src={School} alt="pickup" />
+            <img src={AspPickup} alt="pickup" />
             <p>Pickup</p>
             <img
               src={ArrowIcon}

@@ -10,6 +10,7 @@
 // import PickupPlanner from "./pages/PickupPlanner.jsx";
 
 import "../src/styles/main.scss";
+import "../src/styles/page.css";
 import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
@@ -28,6 +29,7 @@ import DashBoardHome from "./pages/Home/DashBoardHome.jsx";
 import KidsContext from "./contexts/KidsContext.jsx";
 import PicturesContext from "./contexts/PicturesContext.jsx";
 import PickupPlanner from "./components/PickupPlanner/PickupPlanner.jsx";
+import Schools from "./pages/Schools/Schools.jsx";
 
 function App() {
   const [closeMenu, setCloseMenu] = useState(false);
@@ -69,9 +71,14 @@ function App() {
                         element={<Staff closeMenu={closeMenu} />}
                       />
                       <Route
+                        path="/schools"
+                        element={<Schools closeMenu={closeMenu} />}
+                      />
+                      <Route
                         path="/vans"
                         element={<Vans closeMenu={closeMenu} />}
                       />
+
                       {/* <Route path="/vans/:vanId" element={<VanDetailPage />} /> */}
                       <Route
                         path="/pickupPlanner"

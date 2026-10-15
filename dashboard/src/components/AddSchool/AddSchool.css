@@ -1,0 +1,38 @@
+/* Every class here starts with "add-school" (the CSS of all pages is global). The old markup used
+   the generic ".form-item", which belongs to the Students page and changed the inputs here. */
+.add-school {
+  padding: 4px 6px 2px;
+}
+
+.add-school-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.add-school-field > label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.add-school-hint {
+  color: #888;
+}
+
+.add-school-error {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: #fff2f0;
+  border: 1px solid #ffccc7;
+  color: #cf1322;
+  font-size: 13px;
+}
+
+.add-school-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}

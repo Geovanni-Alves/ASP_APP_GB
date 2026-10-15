@@ -1,11 +1,11 @@
-// src/pages/StudentWeeklySchedule.jsx
+// src/pages/Students/StudentWeeklySchedule.jsx
 import React, { useMemo, useState } from "react";
-import { Card, Spin, Input, Select } from "antd";
+import { Spin, Input, Select } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 import { useKidsContext } from "../../contexts/KidsContext";
 import "./StudentWeeklySchedule.scss";
 
 const { Option } = Select;
-const { Search } = Input;
 
 const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 const schedKey = {
@@ -17,12 +17,18 @@ const schedKey = {
 };
 
 export default function StudentWeeklySchedule({ closeMenu }) {
-  const { kids: students } = useKidsContext();
+  const { kids } = useKidsContext();
+
+  // Archived students are not part of the weekly schedule
+  const students = useMemo(
+    () => kids.filter((kid) => kid.status !== "Inactive"),
+    [kids],
+  );
 
   /* filter states */
   const [sortBy, setSortBy] = useState("school"); // name | school
   const [search, setSearch] = useState(""); // text search
-  const [dayFilter, setDayFilter] = useState(0); // 0 = any, 1 … 5 exact count
+  const [dayFilter, setDayFilter] = useState(0); // 0 = any, 1 … 5 exact count
 
   /* build schedule lookup {id:{Mon:true…}} */
   const scheduleTemplate = useMemo(() => {
@@ -66,11 +72,16 @@ export default function StudentWeeklySchedule({ closeMenu }) {
   }, [students, sortBy, search, dayFilter, scheduleTemplate]);
 
   const totalShown = displayed.length;
+  // How many kids come on each weekday (of the kids shown)
+  const dayTotals = daysOfWeek.map(
+    (d) => displayed.filter((kid) => scheduleTemplate[kid.id][d]).length,
+  );
+  const menuClass = closeMenu ? "menu-closed" : "menu-open";
 
   /* ---------- loading ---------- */
-  if (!students.length) {
+  if (!kids.length) {
     return (
-      <div className="students-container">
+      <div className={`app-page ${menuClass}`}>
         <Spin tip="Loading schedule…" />
       </div>
     );
@@ -78,18 +89,14 @@ export default function StudentWeeklySchedule({ closeMenu }) {
 
   /* ---------- render ---------- */
   return (
-    <div
-      className={`students-container ${
-        closeMenu ? "menu-closed" : "menu-open"
-      }`}
-    >
-      <Card className="scheduleCard student-weekly-card">
-        <h1>Student Weekly Schedule</h1>
+    <div className={`app-page ${menuClass}`}>
+      <div className="app-page-header">
+        <h2 className="app-page-title">Student Weekly Schedule</h2>
 
-        {/* filters */}
-        <div className="schedule-filters">
-          <Search
+        <div className="app-page-controls">
+          <Input
             placeholder="Search student or school"
+            prefix={<SearchOutlined />}
             allowClear
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: 240 }}
@@ -112,34 +119,58 @@ export default function StudentWeeklySchedule({ closeMenu }) {
             <Option value={4}>4 days / wk</Option>
             <Option value={5}>5 days / wk</Option>
           </Select>
+
           <span className="total-count">Total Students: {totalShown}</span>
         </div>
+      </div>
 
-        <div className="tableWrapper">
-          <table className="schedule-table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>School</th>
+      <div className="tableWrapper">
+        <table className="schedule-table">
+          <thead>
+            <tr>
+              <th className="name-cell">Student</th>
+              <th className="school-cell">School</th>
+              {daysOfWeek.map((d) => (
+                <th key={d} className="day-cell">
+                  {d}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {displayed.map((kid) => (
+              <tr key={kid.id}>
+                <td className="name-cell">{kid.name}</td>
+                <td className="school-cell">{kid.schools?.name || "—"}</td>
                 {daysOfWeek.map((d) => (
-                  <th key={d}>{d}</th>
+                  <td key={d} className="day-cell">
+                    {scheduleTemplate[kid.id][d] ? (
+                      <span className="schedule-dot">✓</span>
+                    ) : (
+                      ""
+                    )}
+                  </td>
                 ))}
               </tr>
-            </thead>
-            <tbody>
-              {displayed.map((kid) => (
-                <tr key={kid.id}>
-                  <td>{kid.name}</td>
-                  <td>{kid.schools?.name || "—"}</td>
-                  {daysOfWeek.map((d) => (
-                    <td key={d}>{scheduleTemplate[kid.id][d] ? "✓" : ""}</td>
-                  ))}
-                </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={2} className="foot-label">
+                Kids per day
+              </td>
+              {dayTotals.map((total, index) => (
+                <td key={daysOfWeek[index]} className="day-cell">
+                  {total}
+                </td>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+            </tr>
+          </tfoot>
+        </table>
+        {displayed.length === 0 && (
+          <p className="schedule-empty">No students match.</p>
+        )}
+      </div>
     </div>
   );
 }

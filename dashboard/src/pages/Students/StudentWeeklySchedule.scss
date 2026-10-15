@@ -1,85 +1,98 @@
-/* ---------------------------------------------
-   Layout with sidebar spacing
---------------------------------------------- */
-.students-container {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  left: 5rem;
-  padding: 30px 40px;
-  background: #fff;
-  border-radius: 40px;
-  overflow-y: auto;
-  box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
-  transition: left 0.3s ease;
+/* The panel and the header come from the standard page (src/styles/page.css).
+   This file only styles the table. */
+
+.total-count {
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.students-container.menu-open {
-  left: 15rem; /* matches your other pages */
+/* The table sits in a rounded frame and scrolls inside it */
+.tableWrapper {
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  border: 1px solid #e8e8e8;
+  border-radius: 14px;
 }
 
-/* ---------------------------------------------
-   Card & filters
---------------------------------------------- */
-.student-weekly-card {
-  border-radius: 30px;
-  width: 60%;
-}
-
-.schedule-filters {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-/* ---------------------------------------------
-   Table tweaks (keeps your narrow weekday cols)
---------------------------------------------- */
 .schedule-table {
-  width: 80%;
-  border-collapse: collapse;
+  width: 100%;
+  border-collapse: separate; /* needed for the sticky header and the rounded frame */
+  border-spacing: 0;
 
   th,
   td {
-    border-bottom: 1px solid #eaeaea;
+    padding: 12px 14px;
   }
 
-  /* widths you already like */
-  th:not(:first-child),
-  td:not(:first-child) {
-    width: 36px;
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f7f8fa;
+    font-weight: 600;
+    text-align: left;
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  tbody td {
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  tbody tr:nth-child(even) {
+    background: #fafbfc;
+  }
+
+  tbody tr:hover {
+    background: #f0f7ff;
+  }
+
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  /* "Kids per day" stays visible at the bottom */
+  tfoot td {
+    position: sticky;
+    bottom: 0;
+    background: #f7f8fa;
+    font-weight: 600;
+    border-top: 1px solid #e8e8e8;
+  }
+  /* columns by class (not by position: the footer row has a cell that spans two columns) */
+  .name-cell {
+    width: 28%;
+  }
+
+  .school-cell {
+    width: 32%;
+  }
+
+  .day-cell {
+    width: 80px;
     text-align: center;
-    font-size: 0.8rem;
   }
 
-  th:first-child,
-  td:first-child {
-    width: 160px;
+  .foot-label {
     text-align: left;
-    padding-left: 8px;
-  }
-
-  th:nth-child(2),
-  td:nth-child(2) {
-    width: 180px;
-    text-align: left;
-    padding-left: 8px;
-  }
-
-  td {
-    font-size: 0.9rem;
   }
 }
 
-/* optional: scroll if you expect > 40 kids */
-.tableWrapper {
-  max-height: 70vh;
-  overflow: auto;
+.schedule-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #52c41a;
+  font-size: 13px;
+  font-weight: 700;
 }
 
-.total-count {
-  margin-left: auto;
-  font-weight: 600;
-  align-self: center;
+.schedule-empty {
+  text-align: center;
+  color: #999;
+  margin: 24px 0;
 }

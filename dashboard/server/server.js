@@ -2,7 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const { createClient } = require("@supabase/supabase-js");
+// const { createClient } = require("@supabase/supabase-js");
 require("dotenv").config();
 
 const app = express();
@@ -12,11 +12,11 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-// Supabase (service role only on the server)
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// // Supabase (service role only on the server)
+// const supabase = createClient(
+//   process.env.SUPABASE_URL,
+//   process.env.SUPABASE_SERVICE_ROLE_KEY
+// );
 
 // OSRM base URL (container / local)
 const OSRM_URL = process.env.OSRM_URL || "http://localhost:5000";
@@ -120,25 +120,25 @@ app.post("/api/table", async (req, res) => {
   }
 });
 
-// Invite contact (your existing route)
-app.post("/api/invite-contact", async (req, res) => {
-  const { email, firstName, lastName } = req.body;
+// // Invite contact (your existing route)
+// app.post("/api/invite-contact", async (req, res) => {
+//   const { email, firstName, lastName } = req.body;
 
-  if (!email) return res.status(400).json({ error: "Email is required" });
+//   if (!email) return res.status(400).json({ error: "Email is required" });
 
-  const { error, data } = await supabase.auth.admin.createUser({
-    email,
-    user_metadata: { first_name: firstName, last_name: lastName },
-  });
+//   const { error, data } = await supabase.auth.admin.createUser({
+//     email,
+//     user_metadata: { first_name: firstName, last_name: lastName },
+//   });
 
-  if (!error) {
-    await supabase.auth.admin.inviteUserByEmail(email);
-  }
+//   if (!error) {
+//     await supabase.auth.admin.inviteUserByEmail(email);
+//   }
 
-  if (error) return res.status(500).json({ error: error.message });
+//   if (error) return res.status(500).json({ error: error.message });
 
-  res.status(200).json({ success: true, data });
-});
+//   res.status(200).json({ success: true, data });
+// });
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

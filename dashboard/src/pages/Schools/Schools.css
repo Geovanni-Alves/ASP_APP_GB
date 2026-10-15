@@ -1,0 +1,121 @@
+/* Every class on this page starts with "schools" (the CSS of all pages is global). */
+
+.schools-container.menu-open {
+  left: 15rem;
+}
+
+.schools-container.menu-closed {
+  left: 5rem;
+}
+
+/* ---- the schools: cards in a grid ---- */
+.schools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 18px;
+}
+
+.schools-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background-color: #fff;
+  border: 1px solid #eef0f3;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.schools-card:hover {
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.schools-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.schools-badge {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background-color: #e6f4ff;
+  color: #1677ff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.schools-card-title {
+  min-width: 0;
+}
+
+.schools-name {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.schools-address {
+  margin-top: 4px;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.schools-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.schools-tags .ant-tag {
+  margin: 0;
+}
+
+/* the buttons always sit at the bottom of the card, so cards of one row line up */
+.schools-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.schools-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #999;
+}
+
+/* ---- modal ---- */
+.schools-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.schools-field > label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.schools-field input {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.schools-hint {
+  color: #888;
+}

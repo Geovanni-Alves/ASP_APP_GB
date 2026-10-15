@@ -2,7 +2,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
-import supabase from "../../lib/supabase.js";
+// import supabase from "../../lib/supabase.js";
+import api from "../../lib/api.js";
 import { message } from "antd";
 import { useKidsContext } from "../../contexts/KidsContext.jsx";
 import { useUsersContext } from "../../contexts/UsersContext.jsx";
@@ -59,7 +60,9 @@ export function usePickupPlanner({ closeMenu }) {
   // const isRouteInProgress = route.status === "in_progress";
   // const isRouteInPlanning = route.status === "planning" || route.status === "";
   const isRouteLocked =
-    route.status === "waiting_to_start" || route.status === "in_progress";
+    route.status === "waiting_to_start" ||
+    route.status === "in_progress" ||
+    route.status === "finished";
 
   // Keep the full roster snapshot separate from the UI pool
   const staffRosterRef = React.useRef([]);
@@ -79,69 +82,68 @@ export function usePickupPlanner({ closeMenu }) {
   useEffect(() => {
     const fetchSettings = async () => {
       setSettingsLoading(true);
-      const { data, error } = await supabase
-        .from("settings")
-        .select("key, value")
-        .in("key", [
-          "pickup_start_coords",
-          "after_school_name",
-          "pickup_start_address",
-        ]);
-      if (error) {
-        console.error("Error fetching settings:", error);
-        setSettingsLoading(false);
-        return;
-      }
-      const coordsValue = data.find(
-        (s) => s.key === "pickup_start_coords"
-      )?.value;
-      const schoolName = data.find((s) => s.key === "after_school_name")?.value;
-      const schoolAddress = data.find(
-        (s) => s.key === "pickup_start_address"
-      )?.value;
+      try {
+        const { data } = await api.get("/settings", {
+          params: {
+            key: "in:pickup_start_coords,after_school_name,pickup_start_address",
+          },
+        });
+        const coordsValue = data.find(
+          (s) => s.key === "pickup_start_coords",
+        )?.value;
+        const schoolName = data.find(
+          (s) => s.key === "after_school_name",
+        )?.value;
+        const schoolAddress = data.find(
+          (s) => s.key === "pickup_start_address",
+        )?.value;
 
-      if (coordsValue) {
-        try {
-          const parsed = JSON.parse(coordsValue);
-          if (parsed.lat && parsed.lng) {
-            setRoute((prev) => ({
-              ...prev,
-              startCoords: { lat: parsed.lat, lng: parsed.lng },
-            }));
+        if (coordsValue) {
+          try {
+            const parsed = JSON.parse(coordsValue);
+            if (parsed.lat && parsed.lng) {
+              setRoute((prev) => ({
+                ...prev,
+                startCoords: { lat: parsed.lat, lng: parsed.lng },
+              }));
+            }
+          } catch (err) {
+            console.error("Invalid JSON for pickup_start_coords:", coordsValue);
           }
-        } catch (err) {
-          console.error("Invalid JSON for pickup_start_coords:", coordsValue);
         }
+        if (schoolName)
+          setRoute((prev) => ({
+            ...prev,
+            aspSchoolName: schoolName,
+            aspSchoolAddress: schoolAddress,
+          }));
+      } catch (error) {
+        console.error("Error fetching settings:", error);
       }
-      if (schoolName)
-        setRoute((prev) => ({
-          ...prev,
-          aspSchoolName: schoolName,
-          aspSchoolAddress: schoolAddress,
-        }));
       setSettingsLoading(false);
     };
     fetchSettings();
   }, []);
 
-  // fetch the vans data from db
+  // fetch the vans data from the API
   useEffect(() => {
     (async () => {
       setVansLoading(true);
-      const { data, error } = await supabase
-        .from("vans")
-        .select("*")
-        .order("name");
-      if (!error) {
-        setLocalVans(data || []);
+      try {
+        const { data } = await api.get("/vans", { params: { order: "name" } });
+        // A deactivated van cannot be used in a new route
+        const activeVans = (data || []).filter((v) => v.active !== false);
+        setLocalVans(activeVans);
         setRoute((prev) => ({
           ...prev,
-          vans: (data || []).map((v) => ({
+          vans: activeVans.map((v) => ({
             ...v,
             driver: v.driver ?? null,
             helpers: v.helpers ?? [],
           })),
         }));
+      } catch (error) {
+        console.error("Error fetching vans:", error);
       }
       setVansLoading(false);
     })();
@@ -150,42 +152,37 @@ export function usePickupPlanner({ closeMenu }) {
   // staff
   const fetchStaff = async () => {
     setStaffLoading(true);
-    const { data, error } = await supabase
-      .from("users")
-      .select("id, name")
-      .in("userType", ["STAFF", "SUPER_ADMIN"])
-      .order("name");
-    if (!error) {
+    try {
+      // The API decides who can work in a route (active staff, drivers and admins)
+      const { data } = await api.get("/planner/roster");
       setStaff(data || []);
       staffRosterRef.current = data || [];
+    } catch (error) {
+      console.error("Error fetching staff:", error);
     }
     setStaffLoading(false);
   };
+
   useEffect(() => {
     fetchStaff();
   }, []);
 
-  useEffect(() => {
-    const fetchRouteDates = async () => {
-      const { data, error } = await supabase
-        .from("routes")
-        .select("date, status")
-        .eq("type", "pickup");
-
-      if (error) {
-        console.error("❌ Failed to fetch routes:", error);
-        return;
-      }
-
+  const fetchRouteDates = async () => {
+    try {
+      const { data } = await api.get("/routes", {
+        params: { type: "pickup", select: "date,status" },
+      });
       const mapped = {};
       data.forEach((r) => {
         mapped[dayjs(r.date).format("YYYY-MM-DD")] = r.status;
       });
-      // console.log(mapped);
-
       setRouteDates(mapped);
-    };
+    } catch (error) {
+      console.error("❌ Failed to fetch routes:", error);
+    }
+  };
 
+  useEffect(() => {
     fetchRouteDates();
   }, []);
 
@@ -197,14 +194,17 @@ export function usePickupPlanner({ closeMenu }) {
       setRestoringRoute(true);
       const dateStr = route.date.format("YYYY-MM-DD");
 
-      const { data: routeData, error: routeError } = await supabase
-        .from("routes")
-        .select("*")
-        .eq("type", "pickup")
-        .eq("date", dateStr)
-        .maybeSingle();
-      if (routeError) {
-        console.error("❌ Error fetching route:", routeError);
+      let routeData = null;
+      let vansData = [];
+      let stopsData = [];
+      try {
+        // ONE request: the route, its vans and its stops (with student, school and responsible)
+        const { data } = await api.get(`/planner/pickup/${dateStr}`);
+        routeData = data.route; // null when nothing was saved for that day
+        vansData = data.vans || [];
+        stopsData = data.stops || [];
+      } catch (error) {
+        console.error("❌ Error fetching route:", error);
         setRestoringRoute(false);
         return;
       }
@@ -239,31 +239,6 @@ export function usePickupPlanner({ closeMenu }) {
           vans: freshVans,
         }));
         setIsDirty(false);
-        setRestoringRoute(false);
-        return;
-      }
-
-      const { data: vansData, error: vansError } = await supabase
-        .from("route_vans")
-        .select("*")
-        .eq("route_id", routeData.id);
-      if (vansError) {
-        console.error("❌ Error fetching route vans:", vansError);
-        setRestoringRoute(false);
-        return;
-      }
-
-      const { data: stopsData, error: stopsError } = await supabase
-        .from("route_stops")
-        .select(
-          `*, students (*, schools (*)), users!responsible_staff_id (id, name)`
-        )
-        .in(
-          "route_van_id",
-          (vansData || []).map((v) => v.id)
-        );
-      if (stopsError) {
-        console.error("❌ Error fetching route stops:", stopsError);
         setRestoringRoute(false);
         return;
       }
@@ -317,7 +292,7 @@ export function usePickupPlanner({ closeMenu }) {
         if (vanData.school_order) orderMap[vanId] = vanData.school_order;
 
         const stops = (stopsData || []).filter(
-          (s) => s.route_van_id === routeVanId
+          (s) => s.route_van_id === routeVanId,
         );
         routeMap[vanId] = stops.map((s) => ({
           kid: { ...s.students, schools: s.students.schools },
@@ -332,7 +307,7 @@ export function usePickupPlanner({ closeMenu }) {
       });
 
       const restoredAbsents = students.filter((s) =>
-        (routeData.absents || []).includes(s.id)
+        (routeData.absents || []).includes(s.id),
       );
 
       const availableStaff = baseRoster.filter((s) => !usedStaffIds.has(s.id));
@@ -358,7 +333,11 @@ export function usePickupPlanner({ closeMenu }) {
       setIsDirty(false);
       setRestoringRoute(false);
     };
-    fetchPickupRouteForDate();
+    fetchPickupRouteForDate().catch((error) => {
+      // Any failure while rebuilding the route ends the spinner and shows the real error
+      console.error("❌ Error restoring the route:", error);
+      setRestoringRoute(false);
+    });
   }, [route.date, canRestore]);
 
   const vanIdSet = useMemo(() => {
@@ -369,14 +348,17 @@ export function usePickupPlanner({ closeMenu }) {
 
   const selectedDay = useMemo(
     () => dayMap[route.date?.isoWeekday()] ?? null,
-    [route.date]
+    [route.date],
   );
   const studentsToday = useMemo(
     () =>
       !selectedDay
         ? []
-        : students.filter((k) => k.students_schedule?.[selectedDay]),
-    [students, selectedDay]
+        : students.filter(
+            (k) =>
+              k.students_schedule?.[selectedDay] && k.status !== "Inactive",
+          ),
+    [students, selectedDay],
   );
 
   const assignedIds = useMemo(
@@ -384,13 +366,13 @@ export function usePickupPlanner({ closeMenu }) {
       new Set(
         Object.values(route.kids)
           .flat()
-          .map((e) => e.kid.id)
+          .map((e) => e.kid.id),
       ),
-    [route.kids]
+    [route.kids],
   );
   const absentIds = useMemo(
     () => new Set(route.absents.map((k) => k.id)),
-    [route.absents]
+    [route.absents],
   );
 
   const groupedBySchool = useMemo(() => {
@@ -406,16 +388,16 @@ export function usePickupPlanner({ closeMenu }) {
   const kidsRemaining = useMemo(
     () =>
       Object.values(groupedBySchool).reduce((sum, arr) => sum + arr.length, 0),
-    [groupedBySchool]
+    [groupedBySchool],
   );
   const kidsOnRoute = useMemo(
     () => Object.values(route.kids).reduce((sum, arr) => sum + arr.length, 0),
-    [route.kids]
+    [route.kids],
   );
 
   const allSchoolKeys = useMemo(
     () => Object.keys(groupedBySchool),
-    [groupedBySchool]
+    [groupedBySchool],
   );
   const expandAll = () => setExpandedKeys(allSchoolKeys);
   const collapseAll = () => setExpandedKeys([]);
@@ -444,7 +426,7 @@ export function usePickupPlanner({ closeMenu }) {
       const nextOrder = { ...prev.schoolOrder };
       Object.keys(prev.schoolOrder).forEach((vanId) => {
         const present = new Set(
-          (prev.kids[vanId] || []).map((e) => e.kid.schools?.id ?? "no-school")
+          (prev.kids[vanId] || []).map((e) => e.kid.schools?.id ?? "no-school"),
         );
         const filtered =
           nextOrder[vanId]?.filter((id) => present.has(id)) || [];
@@ -475,7 +457,7 @@ export function usePickupPlanner({ closeMenu }) {
   function handleDateChange(date) {
     if (isDirty) {
       const confirmed = window.confirm(
-        "You have unsaved changes. If you switch the date, everything will be lost. Continue?"
+        "You have unsaved changes. If you switch the date, everything will be lost. Continue?",
       );
       if (!confirmed) return;
     }
@@ -518,7 +500,7 @@ export function usePickupPlanner({ closeMenu }) {
   const promoteToDriver = (staffObj, van) => {
     if (isRouteLocked)
       return message.warning(
-        "❌ Route closed. If you want to change, you need to re-open."
+        "❌ Route closed. If you want to change, you need to re-open.",
       );
     setIsDirty(true);
     setRoute((prev) => {
@@ -527,7 +509,7 @@ export function usePickupPlanner({ closeMenu }) {
         const isSameStaff = (a, b) =>
           a.id === b.id || a.originalId === b.id || a.id === b.originalId;
         const newHelpers = (v.helpers || []).filter(
-          (h) => !isSameStaff(h, staffObj)
+          (h) => !isSameStaff(h, staffObj),
         );
         if (v.driver) {
           const driverBack = {
@@ -552,7 +534,7 @@ export function usePickupPlanner({ closeMenu }) {
   const demoteFromDriver = (van) => {
     if (isRouteLocked)
       return message.warning(
-        "❌ Route closed. If you want to change, you need to re-open."
+        "❌ Route closed. If you want to change, you need to re-open.",
       );
     setIsDirty(true);
     setRoute((prev) => {
@@ -570,7 +552,7 @@ export function usePickupPlanner({ closeMenu }) {
           a.originalId === b.id ||
           a.originalId === b.originalId;
         const newHelpers = v.helpers.filter(
-          (h) => !isSameStaff(h, demotedHelper)
+          (h) => !isSameStaff(h, demotedHelper),
         );
         return { ...v, driver: null, helpers: [...newHelpers, demotedHelper] };
       });
@@ -581,7 +563,7 @@ export function usePickupPlanner({ closeMenu }) {
   function addKidToVan(kid, vanId) {
     if (isRouteLocked)
       return message.warning(
-        "❌ Route closed. If you want to change, you need to re-open."
+        "❌ Route closed. If you want to change, you need to re-open.",
       );
     setIsDirty(true);
     setRoute((prev) => {
@@ -591,16 +573,16 @@ export function usePickupPlanner({ closeMenu }) {
       const schoolId = kid.schools?.id ?? "no-school";
       const staffForSchool =
         list.find(
-          (e) => (e.kid.schools?.id ?? "no-school") === schoolId && e.staff
+          (e) => (e.kid.schools?.id ?? "no-school") === schoolId && e.staff,
         )?.staff ?? null;
       const updatedList = [...list, { kid, staff: staffForSchool }];
       const finalList = updatedList.map((entry) =>
         (entry.kid.schools?.id ?? "no-school") === schoolId
           ? { ...entry, staff: staffForSchool }
-          : entry
+          : entry,
       );
       const isFirstTime = !(prev.kids?.[vanId] || []).some(
-        (e) => (e.kid.schools?.id ?? "no-school") === schoolId
+        (e) => (e.kid.schools?.id ?? "no-school") === schoolId,
       );
       return {
         ...prev,
@@ -620,7 +602,7 @@ export function usePickupPlanner({ closeMenu }) {
     if (isRouteLocked) {
       // console.log("route is locked");
       return message.warning(
-        "❌ Route closed. If you want to change, you need to re-open."
+        "❌ Route closed. If you want to change, you need to re-open.",
       );
     }
     setIsDirty(true);
@@ -636,7 +618,7 @@ export function usePickupPlanner({ closeMenu }) {
         ? prev.absents?.some((a) => a.id === kid.id)
           ? prev.absents
           : [...(prev.absents || []), kid]
-        : prev.absents?.filter((a) => a.id !== kid.id) ?? [],
+        : (prev.absents?.filter((a) => a.id !== kid.id) ?? []),
     }));
 
     if (!fromVanId) return;
@@ -660,7 +642,7 @@ export function usePickupPlanner({ closeMenu }) {
 
       if (schoolId) {
         const stillOthersFromSameSchool = filteredList.some(
-          (e) => e.kid.schools?.id === schoolId
+          (e) => e.kid.schools?.id === schoolId,
         );
         if (!stillOthersFromSameSchool) {
           nextVanEta[fromVanId] = null; // write into cloned map
@@ -685,7 +667,7 @@ export function usePickupPlanner({ closeMenu }) {
         setStaff((prevPool) =>
           prevPool.some((s) => s.id === staffObj.id)
             ? prevPool
-            : [...prevPool, staffObj]
+            : [...prevPool, staffObj],
         );
 
         // clear staff for entries in the same school
@@ -707,7 +689,7 @@ export function usePickupPlanner({ closeMenu }) {
           (s) =>
             s.id !== staffObj.id &&
             s.originalId !== staffObj.id &&
-            s.id !== staffObj.originalId
+            s.id !== staffObj.originalId,
         );
       }
 
@@ -724,7 +706,7 @@ export function usePickupPlanner({ closeMenu }) {
     // Hard stop if the route is locked
     if (isRouteLocked) {
       message.warning(
-        "❌ Route closed. If you want to change, you need to re-open."
+        "❌ Route closed. If you want to change, you need to re-open.",
       );
       return;
     }
@@ -768,7 +750,7 @@ export function usePickupPlanner({ closeMenu }) {
         (s) =>
           s.id === normalizedStaff.id ||
           s.originalId === normalizedStaff.id ||
-          s.id === normalizedStaff.originalId
+          s.id === normalizedStaff.originalId,
       );
 
       if (!alreadyVisible) {
@@ -795,7 +777,7 @@ export function usePickupPlanner({ closeMenu }) {
           (h) =>
             h.id === normalizedStaff.id ||
             h.originalId === normalizedStaff.id ||
-            h.id === normalizedStaff.originalId
+            h.id === normalizedStaff.originalId,
         );
 
         return {
@@ -816,7 +798,7 @@ export function usePickupPlanner({ closeMenu }) {
   function returnStaff(staffObj, vanId) {
     if (isRouteLocked)
       return message.warning(
-        "❌ Route closed. If you want to change, you need to re-open."
+        "❌ Route closed. If you want to change, you need to re-open.",
       );
     setIsDirty(true);
     setRoute((prev) => {
@@ -834,7 +816,7 @@ export function usePickupPlanner({ closeMenu }) {
         entry.staff?.originalId === staffObj.id ||
         staffObj.originalId === entry.staff?.id
           ? { ...entry, staff: null }
-          : entry
+          : entry,
       );
 
       // remove from staffInVan (new array reference)
@@ -843,7 +825,7 @@ export function usePickupPlanner({ closeMenu }) {
         (s) =>
           s.id !== staffObj.id &&
           s.originalId !== staffObj.id &&
-          s.id !== staffObj.originalId
+          s.id !== staffObj.originalId,
       );
 
       // remove from van driver/helpers (new array reference)
@@ -862,7 +844,7 @@ export function usePickupPlanner({ closeMenu }) {
             (h) =>
               h.id !== staffObj.id &&
               h.originalId !== staffObj.id &&
-              h.id !== staffObj.originalId
+              h.id !== staffObj.originalId,
           ),
         };
       });
@@ -878,7 +860,7 @@ export function usePickupPlanner({ closeMenu }) {
     setStaff((prevPool) =>
       prevPool.some((s) => s.id === staffObj.id)
         ? prevPool
-        : [...prevPool, staffObj]
+        : [...prevPool, staffObj],
     );
   }
 
@@ -904,7 +886,7 @@ export function usePickupPlanner({ closeMenu }) {
     const orderedStops = orderedSchoolIds
       .map((schoolId) => {
         const entry = (route.kids[van.id] || []).find(
-          (e) => e.kid.schools?.id === schoolId
+          (e) => e.kid.schools?.id === schoolId,
         );
         const school = entry?.kid?.schools;
         if (school?.lat && school?.lng) {
@@ -921,8 +903,11 @@ export function usePickupPlanner({ closeMenu }) {
       .filter(Boolean);
 
     // console.log("orderedStops", orderedStops);
-    if (!route.startCoords)
-      return message.error("Starting location not available.");
+    // startCoords starts as {} (always truthy): check the numbers themselves
+    if (!route.startCoords?.lat || !route.startCoords?.lng)
+      return message.error(
+        "Starting location not set. Add pickup_start_coords in the settings.",
+      );
     if (orderedStops.length === 0)
       return message.warning("No valid school coordinates found for this van.");
     setSelectedVanId(van.id);
@@ -937,176 +922,252 @@ export function usePickupPlanner({ closeMenu }) {
     setShowMap(true);
   }
 
+  // async function savePickupRoute() {
+  //   // console.log(route?.status);
+  //   const today = route.date.format("YYYY-MM-DD");
+  //   let routeId;
+
+  //   const { data: existingRoute, error: fetchError } = await supabase
+  //     .from("routes")
+  //     .select("*")
+  //     .eq("date", today)
+  //     .eq("type", "pickup")
+  //     .maybeSingle();
+
+  //   if (fetchError) {
+  //     console.error("❌ Failed to fetch route:", fetchError);
+  //     message.error("Error fetching existing route.");
+  //     return;
+  //   }
+
+  //   if (existingRoute) {
+  //     const { error: updateError } = await supabase
+  //       .from("routes")
+  //       .update({ absents: route.absents.map((a) => a.id) })
+  //       .eq("id", existingRoute.id);
+
+  //     if (updateError) {
+  //       console.error("❌ Failed to update route:", updateError);
+  //       message.error("Error updating existing route.");
+  //       return;
+  //     }
+
+  //     routeId = existingRoute.id;
+
+  //     setRoute((prev) => ({
+  //       ...prev,
+  //       id: routeId,
+  //       status: "planning",
+  //     }));
+  //   } else {
+  //     const { data: newRoute, error: insertError } = await supabase
+  //       .from("routes")
+  //       .insert({
+  //         date: today,
+  //         type: "pickup",
+  //         status: "planning",
+  //         absents: route.absents.map((a) => a.id),
+  //         created_by: currentUser.id,
+  //       })
+  //       .select()
+  //       .single();
+  //     if (insertError) {
+  //       console.error("❌ Failed to create route:", insertError);
+  //       message.error("Error creating new route.");
+  //       return;
+  //     }
+  //     routeId = newRoute.id;
+  //     setRoute((prev) => ({
+  //       ...prev,
+  //       id: routeId,
+  //       status: "planning",
+  //     }));
+  //   }
+
+  //   for (const van of route.vans) {
+  //     const kids = route.kids[van.id] || [];
+  //     if (kids.length === 0) continue;
+
+  //     const { data: savedVan, error: vanError } = await supabase
+  //       .from("route_vans")
+  //       .upsert(
+  //         {
+  //           route_id: routeId,
+  //           van_id: van.id,
+  //           driver_id: van.driver?.originalId ?? van.driver?.id ?? null,
+  //           helper_ids: van.helpers?.map((h) => h.originalId ?? h.id) ?? [],
+  //           school_order: route.schoolOrder[van.id] ?? [],
+  //           total_eta: route.vanEta[van.id] ?? null,
+  //           total_people: peopleInVanCounts[van.id] ?? kids.length,
+  //         },
+  //         { onConflict: ["route_id", "van_id"] },
+  //       )
+  //       .select()
+  //       .single();
+
+  //     if (vanError || !savedVan) {
+  //       console.error(`❌ Error saving van ${van.name}:`, vanError);
+  //       message.error(`Error saving van ${van.name}`);
+  //       continue;
+  //     }
+
+  //     const routeVanId = savedVan.id;
+  //     await supabase
+  //       .from("route_stops")
+  //       .delete()
+  //       .eq("route_van_id", routeVanId);
+  //     const stops = kids.map((entry, index) => ({
+  //       route_van_id: routeVanId,
+  //       student_id: entry.kid.id,
+  //       responsible_staff_id: entry.staff?.id ?? null,
+  //       stop_order: index,
+  //     }));
+  //     const { error: stopError } = await supabase
+  //       .from("route_stops")
+  //       .insert(stops);
+  //     if (stopError) {
+  //       console.error(`❌ Error saving stops for van ${van.name}:`, stopError);
+  //       message.error(`Error saving stops for van ${van.name}`);
+  //       return;
+  //     }
+  //   }
+
+  //   setIsDirty(false);
+  //   message.success("✅ Pickup route saved!");
+  // }
+
   async function savePickupRoute() {
-    // console.log(route?.status);
-    const today = route.date.format("YYYY-MM-DD");
-    let routeId;
+    // The whole plan goes in ONE request: the API saves all of it, or nothing
+    const day = route.date.format("YYYY-MM-DD");
+    const plan = {
+      absents: route.absents.map((a) => a.id),
+      vans: route.vans
+        .filter((van) => (route.kids[van.id] || []).length > 0)
+        .map((van) => ({
+          van_id: van.id,
+          driver_id: van.driver?.originalId ?? van.driver?.id ?? null,
+          helper_ids: van.helpers?.map((h) => h.originalId ?? h.id) ?? [],
+          school_order: route.schoolOrder[van.id] ?? [],
+          total_eta: route.vanEta[van.id] ?? null,
+          total_people:
+            peopleInVanCounts[van.id] ?? (route.kids[van.id] || []).length,
+          stops: (route.kids[van.id] || []).map((entry) => ({
+            student_id: entry.kid.id,
+            responsible_staff_id:
+              entry.staff?.originalId ?? entry.staff?.id ?? null,
+          })),
+        })),
+    };
 
-    const { data: existingRoute, error: fetchError } = await supabase
-      .from("routes")
-      .select("*")
-      .eq("date", today)
-      .eq("type", "pickup")
-      .maybeSingle();
-
-    if (fetchError) {
-      console.error("❌ Failed to fetch route:", fetchError);
-      message.error("Error fetching existing route.");
-      return;
+    try {
+      const { data } = await api.put(`/planner/pickup/${day}`, plan);
+      setRoute((prev) => ({ ...prev, id: data.id, status: data.status }));
+      setIsDirty(false);
+      message.success("✅ Pickup route saved!");
+      fetchRouteDates(); // refresh the dots of the calendar
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to save the route:", error);
+      message.error(error.response?.data?.error || "Error saving the route.");
+      return false;
     }
-
-    if (existingRoute) {
-      const { error: updateError } = await supabase
-        .from("routes")
-        .update({ absents: route.absents.map((a) => a.id) })
-        .eq("id", existingRoute.id);
-
-      if (updateError) {
-        console.error("❌ Failed to update route:", updateError);
-        message.error("Error updating existing route.");
-        return;
-      }
-
-      routeId = existingRoute.id;
-
-      setRoute((prev) => ({
-        ...prev,
-        id: routeId,
-        status: "planning",
-      }));
-    } else {
-      const { data: newRoute, error: insertError } = await supabase
-        .from("routes")
-        .insert({
-          date: today,
-          type: "pickup",
-          status: "planning",
-          absents: route.absents.map((a) => a.id),
-          created_by: currentUser.id,
-        })
-        .select()
-        .single();
-      if (insertError) {
-        console.error("❌ Failed to create route:", insertError);
-        message.error("Error creating new route.");
-        return;
-      }
-      routeId = newRoute.id;
-      setRoute((prev) => ({
-        ...prev,
-        id: routeId,
-        status: "planning",
-      }));
-    }
-
-    for (const van of route.vans) {
-      const kids = route.kids[van.id] || [];
-      if (kids.length === 0) continue;
-
-      const { data: savedVan, error: vanError } = await supabase
-        .from("route_vans")
-        .upsert(
-          {
-            route_id: routeId,
-            van_id: van.id,
-            driver_id: van.driver?.originalId ?? van.driver?.id ?? null,
-            helper_ids: van.helpers?.map((h) => h.originalId ?? h.id) ?? [],
-            school_order: route.schoolOrder[van.id] ?? [],
-            total_eta: route.vanEta[van.id] ?? null,
-            total_people: peopleInVanCounts[van.id] ?? kids.length,
-          },
-          { onConflict: ["route_id", "van_id"] }
-        )
-        .select()
-        .single();
-
-      if (vanError || !savedVan) {
-        console.error(`❌ Error saving van ${van.name}:`, vanError);
-        message.error(`Error saving van ${van.name}`);
-        continue;
-      }
-
-      const routeVanId = savedVan.id;
-      await supabase
-        .from("route_stops")
-        .delete()
-        .eq("route_van_id", routeVanId);
-      const stops = kids.map((entry, index) => ({
-        route_van_id: routeVanId,
-        student_id: entry.kid.id,
-        responsible_staff_id: entry.staff?.id ?? null,
-        stop_order: index,
-      }));
-      const { error: stopError } = await supabase
-        .from("route_stops")
-        .insert(stops);
-      if (stopError) {
-        console.error(`❌ Error saving stops for van ${van.name}:`, stopError);
-        message.error(`Error saving stops for van ${van.name}`);
-        return;
-      }
-    }
-
-    setIsDirty(false);
-    message.success("✅ Pickup route saved!");
   }
 
-  async function sendPickupRoute() {
-    if (isDirty) await savePickupRoute();
+  // async function sendPickupRoute() {
+  //   if (isDirty) await savePickupRoute();
 
-    // console.log("route", route);
+  //   // console.log("route", route);
 
-    const { kids = {}, vans = [], date } = route;
-    if (kidsRemaining > 0) {
-      message.warning("All the kids must be on the route or absent!");
-      return;
-    }
+  //   const { kids = {}, vans = [], date } = route;
+  //   if (kidsRemaining > 0) {
+  //     message.warning("All the kids must be on the route or absent!");
+  //     return;
+  //   }
 
-    for (const van of vans) {
-      const list = kids[van.id] || [];
-      if (list.length === 0) continue;
-      if (!van.driver) {
-        message.warning(`🚐 ${van.name}: No driver assigned.`);
-        return;
-      }
+  //   for (const van of vans) {
+  //     const list = kids[van.id] || [];
+  //     if (list.length === 0) continue;
+  //     if (!van.driver) {
+  //       message.warning(`🚐 ${van.name}: No driver assigned.`);
+  //       return;
+  //     }
 
-      const schoolGroups = {};
-      for (const entry of list) {
-        const schoolId = entry.kid.schools?.id ?? "no-school";
-        (schoolGroups[schoolId] ??= []).push(entry);
-      }
-      for (const [schoolId, group] of Object.entries(schoolGroups)) {
-        const hasResponsible = group.some((e) => e.staff);
-        const schoolName = group[0]?.kid.schools?.name || "Unnamed School";
-        if (!hasResponsible) {
-          message.warning(
-            `🚐 ${van.name}: No responsible assigned for ${schoolName}`
-          );
-          return;
-        }
-      }
-    }
+  //     const schoolGroups = {};
+  //     for (const entry of list) {
+  //       const schoolId = entry.kid.schools?.id ?? "no-school";
+  //       (schoolGroups[schoolId] ??= []).push(entry);
+  //     }
+  //     for (const [schoolId, group] of Object.entries(schoolGroups)) {
+  //       const hasResponsible = group.some((e) => e.staff);
+  //       const schoolName = group[0]?.kid.schools?.name || "Unnamed School";
+  //       if (!hasResponsible) {
+  //         message.warning(
+  //           `🚐 ${van.name}: No responsible assigned for ${schoolName}`,
+  //         );
+  //         return;
+  //       }
+  //     }
+  //   }
 
-    // console.log("current route Id:", route.id);
+  //   // console.log("current route Id:", route.id);
 
-    const { error } = await supabase
-      .from("routes")
-      .update({ status: "waiting_to_start", sent_at: new Date().toISOString() })
-      .eq("type", "pickup")
-      .eq("id", route.id);
-    // console.log("route", route.id);
-    // console.log("date", route.date);
-    if (error) {
-      console.error("❌ Failed to update route status:", error);
-      message.error("Error sending the route.");
-      return;
-    }
+  //   const { error } = await supabase
+  //     .from("routes")
+  //     .update({ status: "waiting_to_start", sent_at: new Date().toISOString() })
+  //     .eq("type", "pickup")
+  //     .eq("id", route.id);
+  //   // console.log("route", route.id);
+  //   // console.log("date", route.date);
+  //   if (error) {
+  //     console.error("❌ Failed to update route status:", error);
+  //     message.error("Error sending the route.");
+  //     return;
+  //   }
 
-    setRoute((prev) => ({ ...prev, status: "waiting_to_start" }));
-    message.success("✅ Route sent and now waiting to start.");
-  }
+  //   setRoute((prev) => ({ ...prev, status: "waiting_to_start" }));
+  //   message.success("✅ Route sent and now waiting to start.");
+  // }
 
   // dnd handlers
+
+  async function sendPickupRoute() {
+    // The API checks the SAVED plan, so a plan with changes is saved first
+    if (isDirty && !(await savePickupRoute())) return;
+
+    try {
+      await api.post(`/planner/pickup/${route.date.format("YYYY-MM-DD")}/send`);
+      setRoute((prev) => ({ ...prev, status: "waiting_to_start" }));
+      message.success("✅ Route sent and now waiting to start.");
+      fetchRouteDates();
+    } catch (error) {
+      console.error("❌ Failed to send the route:", error);
+      const data = error.response?.data;
+      if (error.response?.status === 409 && data?.reasons) {
+        // The API says exactly what is missing
+        alert(`${data.error}\n\n- ${data.reasons.join("\n- ")}`);
+      } else {
+        message.error(data?.error || "Error sending the route.");
+      }
+    }
+  }
+
+  async function reopenRoute() {
+    if (!window.confirm("This route is locked. Re-open?")) return;
+    try {
+      await api.post(
+        `/planner/pickup/${route.date.format("YYYY-MM-DD")}/reopen`,
+      );
+      message.success("✅ Route is now editable again.");
+      setRoute((prev) => ({ ...prev, status: "planning" }));
+      fetchRouteDates();
+    } catch (error) {
+      console.error("❌ Failed to re-open the route:", error);
+      message.error(
+        error.response?.data?.error || "❌ Failed to re-open the route.",
+      );
+    }
+  }
+
   const onDragStart = (start) => {
     if (start.type === "school") {
       const schoolKey = start.draggableId.replace("school-", "");
@@ -1145,7 +1206,7 @@ export function usePickupPlanner({ closeMenu }) {
     if (type === "schoolOrder") {
       if (isRouteLocked)
         return message.warning(
-          "❌ Route closed. If you want to change, you need to re-open."
+          "❌ Route closed. If you want to change, you need to re-open.",
         );
       if (source.droppableId === destination.droppableId) {
         const vanId = source.droppableId.replace("order-", "");
@@ -1169,7 +1230,7 @@ export function usePickupPlanner({ closeMenu }) {
     if (type === "staff" && destination.droppableId.startsWith("resp-")) {
       if (isRouteLocked)
         return message.warning(
-          "❌ Route closed. If you want to change, you need to re-open."
+          "❌ Route closed. If you want to change, you need to re-open.",
         );
       // 1) Target kid context
       const kidId = destination.droppableId.replace("resp-", "");
@@ -1202,13 +1263,13 @@ export function usePickupPlanner({ closeMenu }) {
               (s) =>
                 s?.instanceId === instanceId ||
                 s?.id === staffId ||
-                s?.originalId === staffId
+                s?.originalId === staffId,
             ) ||
             visible.find(
               (s) =>
                 s?.instanceId === instanceId ||
                 s?.id === staffId ||
-                s?.originalId === staffId
+                s?.originalId === staffId,
             ) ||
             null;
         }
@@ -1217,17 +1278,17 @@ export function usePickupPlanner({ closeMenu }) {
 
       // 4) Find van for this kid
       const targetVanId = Object.entries(route.kids || {}).find(([, list]) =>
-        (list || []).some((e) => e.kid?.id === kidId)
+        (list || []).some((e) => e.kid?.id === kidId),
       )?.[0];
       if (!targetVanId) return;
 
       // 5) Check if the kid already has a responsible
       const kidEntry = (route.kids[targetVanId] || []).find(
-        (e) => e.kid?.id === kidId
+        (e) => e.kid?.id === kidId,
       );
       if (kidEntry?.staff) {
         message.info(
-          "This child already has a responsible. Use ↩ to remove it first."
+          "This child already has a responsible. Use ↩ to remove it first.",
         );
         return;
       }
@@ -1236,7 +1297,7 @@ export function usePickupPlanner({ closeMenu }) {
       // 6) If dragging from resp- to another school in the same van, clone with a fresh instanceId
       if (fromResp) {
         const allowDup = window.confirm(
-          "This staff is already assigned to another school in this van.\nDo you want to assign this staff to multiple schools?"
+          "This staff is already assigned to another school in this van.\nDo you want to assign this staff to multiple schools?",
         );
         if (!allowDup) return;
 
@@ -1267,13 +1328,13 @@ export function usePickupPlanner({ closeMenu }) {
     if (type === "school" && source.droppableId === "schools") {
       const schoolName = draggableId.replace("school-", "");
       const kidsToMove = studentsToday.filter(
-        (k) => (k.schools?.name || "— No School —") === schoolName
+        (k) => (k.schools?.name || "— No School —") === schoolName,
       );
       if (destination.droppableId === "absents") {
         setRoute((prev) => {
           const existing = prev.absents || [];
           const newAbsents = kidsToMove.filter(
-            (k) => !existing.some((a) => a.id === k.id)
+            (k) => !existing.some((a) => a.id === k.id),
           );
           return { ...prev, absents: [...existing, ...newAbsents] };
         });
@@ -1376,6 +1437,7 @@ export function usePickupPlanner({ closeMenu }) {
     handleDateChange,
     savePickupRoute,
     sendPickupRoute,
+    reopenRoute,
     handleViewRoute,
     handleModalReorder,
 

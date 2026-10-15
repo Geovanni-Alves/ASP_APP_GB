@@ -1,0 +1,81 @@
+/* src/styles/page.css
+   The standard look of every page of the dashboard: the white panel next to the sidebar, and the
+   header (title on the left, controls on the right). Every page uses these classes, so every page
+   starts at the same place, with the same margins and the same title size.
+
+   Use it like this:
+     <div className={`app-page ${closeMenu ? "menu-closed" : "menu-open"}`}>
+       <div className="app-page-header">
+         <h2 className="app-page-title">Schools</h2>
+         <div className="app-page-controls"> ...filter, buttons... </div>
+       </div>
+       ...the content of the page...
+     </div>
+*/
+
+/* ---- the panel ---- */
+.app-page {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 5rem; /* sidebar collapsed */
+  right: 0;
+  padding: 28px 36px;
+  background-color: #fff;
+  border-radius: 40px;
+  overflow-y: auto;
+  box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
+  transition: left 0.3s ease;
+}
+
+.app-page.menu-open {
+  left: 15rem; /* sidebar open */
+}
+
+.app-page.menu-closed {
+  left: 5rem;
+}
+
+/* ---- the header ---- */
+.app-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.app-page-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.app-page-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* Some old CSS styles every <input> of the app: keep the filter as tall as the buttons */
+.app-page-controls .ant-input {
+  height: 32px;
+  padding: 4px 11px;
+  font-size: 14px;
+}
+
+/* A filter with an icon or a clear button is wrapped by antd: size the wrapper, not the inner input */
+.app-page-controls .ant-input-affix-wrapper {
+  height: 32px;
+  padding: 0 11px;
+}
+
+.app-page-controls .ant-input-affix-wrapper input.ant-input {
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+}

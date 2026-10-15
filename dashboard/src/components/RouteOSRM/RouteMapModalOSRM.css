@@ -69,7 +69,14 @@
   border-left: 6px solid var(--accent, #3b82f6);
   border-radius: 10px;
   padding: 10px 12px;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow 0.15s ease, transform 0.15s ease,
+    background-color 0.15s ease;
+}
+
+/* the mouse is over this stop (in the list or on its pin) */
+.stop-row.is-hover {
+  background: #f8fafc;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
 }
 
 .stop-row.dragging {
@@ -104,6 +111,7 @@
 .stop-meta {
   display: grid;
   gap: 2px;
+  cursor: pointer; /* click: show this stop on the map */
 }
 
 .stop-name {
@@ -117,47 +125,144 @@
   color: #475569;
 }
 
+.stop-since {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.route-fit-btn {
+  margin-top: 12px;
+  padding: 6px 12px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.route-fit-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+/* ---------- Best order ---------- */
+.route-best {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.route-best-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.route-best .route-fit-btn {
+  margin-top: 0;
+}
+
+.route-fit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.route-best-result {
+  width: 100%;
+  padding: 8px 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #14532d;
+}
+
+.route-best-order {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.route-apply-btn {
+  padding: 5px 12px;
+  background: #16a34a;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.route-apply-btn:hover {
+  background: #15803d;
+}
+
+.route-best-note {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
 /* ---------- Headings / totals ---------- */
 .route-left h4 {
   margin: 12px 0 0;
   font-weight: 700;
 }
 
-/* ---------- MapLibre marker (HTML version) ---------- */
-.ml-marker {
-  pointer-events: auto;
-  cursor: pointer;
-  user-select: none;
-  border-radius: 50%;
-  border: 2px solid #fff; /* white ring */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  background: #1677ff; /* fallback color (JS overrides per school) */
-}
-
-.ml-marker.stop {
-  pointer-events: auto;
-  cursor: pointer;
-  user-select: none;
-  border-radius: 50%;
-  border: 2px solid #fff; /* white ring */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  width: 16px;
-  height: 16px;
-  background: #1677ff; /* fallback color (overridden in JS) */
-}
-
-.ml-marker.stop:hover {
-  transform: scale(1.2);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-}
-
-/* Fix clicks inside AntD Modal stacking contexts */
+/* ---------- Fix clicks inside AntD Modal stacking contexts ---------- */
 .maplibregl-canvas-container,
-.maplibregl-marker,
-.maplibregl-canvas-container,
-.ml-marker {
+.maplibregl-marker {
   pointer-events: auto;
   z-index: 5;
+}
+
+/* ---------- Numbered stop pins ----------
+   MapLibre moves the marker element with an inline "transform", so the zoom effect goes on the
+   image inside the wrapper, never on the wrapper itself. */
+.route-pin-wrap {
+  cursor: pointer;
+}
+
+.route-pin {
+  display: block;
+  user-select: none;
+  transform-origin: 50% 50%; /* the dot grows from its center */
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+  transition: transform 0.15s ease;
+}
+
+/* the teardrop version grows from its tip, which stays on the line */
+.route-pin-tip {
+  transform-origin: 50% 100%;
+}
+
+.route-pin-wrap:hover .route-pin,
+.route-pin-wrap.is-active .route-pin {
+  transform: scale(1.2);
+}
+
+.route-pin-wrap:hover,
+.route-pin-wrap.is-active {
+  z-index: 6;
+}
+
+/* ---------- Travel time written on each leg of the route ---------- */
+.leg-badge {
+  z-index: 4;
+  padding: 1px 8px;
+  background: #fff;
+  border: 2px solid #1d6fb8; /* the JS sets the color of the leg */
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
 }
 
 .maplibregl-popup {
@@ -165,9 +270,23 @@
 }
 /* MapLibre popup tweaks */
 .maplibregl-popup-content {
-  border-radius: 10px;
-  padding: 10px 12px;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  padding: 6px 10px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* the small balloon of a stop */
+.route-popup {
+  max-width: 200px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.route-popup-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
 }
 
 /* ---------- Responsive ---------- */

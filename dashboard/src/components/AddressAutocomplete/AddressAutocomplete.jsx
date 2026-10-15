@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import api from "../../lib/api";
+import { Input } from "antd";
 
 // Address search box. Replaces GoogleMapsAutocomplete (no Google key needed).
 // It asks OUR API (GET /geocode/autocomplete) and calls onPlaceSelect with an object that has
@@ -148,7 +149,7 @@ const AddressAutocomplete = forwardRef(
 
     return (
       <div style={styles.wrapper} ref={wrapperRef}>
-        <input
+        <Input
           type="text"
           value={text}
           placeholder="Start typing an address"

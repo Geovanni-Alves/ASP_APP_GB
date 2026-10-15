@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 // Sending invites (the email with the code) is still pending: see TODO(part 3) below.
 import api from "../../lib/api";
-import { Modal, Button, Card, Segmented, Tag } from "antd";
+import { Modal, Button, Card, Segmented, Tag, Input } from "antd";
 import "./Students.css";
 import StudentForm from "./StudentForm";
 import { STUDENT_REASONS } from "../../lib/inactiveReasons";
@@ -699,40 +699,31 @@ function Students({ closeMenu }) {
       <div>
         <div>
           <div
-            className={`students-container ${
-              closeMenu ? "menu-closed" : "menu-open"
-            }`}
+            className={`app-page ${closeMenu ? "menu-closed" : "menu-open"}`}
           >
             {mode === "list" && (
               <div>
-                <h3 style={{ textAlign: "center" }}>List of Students</h3>
-                <div className="filters">
-                  <input
-                    type="text"
-                    placeholder="Filter by Name"
-                    value={nameFilter}
-                    onChange={(e) => setNameFilter(e.target.value)}
-                  />
-                  <Segmented
-                    value={statusFilter}
-                    onChange={setStatusFilter}
-                    options={[
-                      { label: `Active (${activeCount})`, value: "Active" },
-                      {
-                        label: `Inactive (${inactiveCount})`,
-                        value: "Inactive",
-                      },
-                      { label: `All (${kids.length})`, value: "All" },
-                    ]}
-                  />
-                  {/* <input
-                    type="text"
-                    placeholder="Filter by Address"
-                    value={addressFilter}
-                    onChange={(e) => setAddressFilter(e.target.value)}
-                  /> */}
-                  <div className="addStudentButton">
-                    {/* Button to show modal */}
+                <div className="app-page-header">
+                  <h2 className="app-page-title">List of Students</h2>
+                  <div className="app-page-controls">
+                    <Input
+                      placeholder="Filter by name"
+                      value={nameFilter}
+                      onChange={(e) => setNameFilter(e.target.value)}
+                      style={{ width: 220 }}
+                    />
+                    <Segmented
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      options={[
+                        { label: `Active (${activeCount})`, value: "Active" },
+                        {
+                          label: `Inactive (${inactiveCount})`,
+                          value: "Inactive",
+                        },
+                        { label: `All (${kids.length})`, value: "All" },
+                      ]}
+                    />
                     <Button type="primary" onClick={showModal}>
                       + New Student
                     </Button>

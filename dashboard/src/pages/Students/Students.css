@@ -54,21 +54,7 @@
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
-.students-container {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 5rem; /* or 15rem if menu is open */
-  right: 0;
-  padding: 30px 40px;
-  background-color: #fff;
-  border-radius: 40px;
-  overflow-y: auto;
-  box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
-  transition: left 0.3s ease;
-}
-
-.students-container:has(> .update-student-container) {
+.app-page:has(> .update-student-container) {
   overflow: hidden;
 }
 
@@ -145,6 +131,15 @@
   margin-left: 10px;
   border-radius: 50%;
   object-fit: contain;
+}
+
+.students-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 /* .student-photo {

@@ -244,12 +244,10 @@ function Vans({ closeMenu }) {
   /* UI                                                               */
   /* ──────────────────────────────────────────────────────────────── */
   return (
-    <div
-      className={`vans-container ${closeMenu ? "menu-closed" : "menu-open"}`}
-    >
-      <div className="vans-header">
-        <h2>Van Management</h2>
-        <div className="vans-controls">
+    <div className={`app-page ${closeMenu ? "menu-closed" : "menu-open"}`}>
+      <div className="app-page-header">
+        <h2 className="app-page-title">Van Management</h2>
+        <div className="app-page-controls">
           <Segmented
             value={statusFilter}
             onChange={setStatusFilter}
@@ -271,10 +269,12 @@ function Vans({ closeMenu }) {
             title={
               <>
                 {van.name}
-                {!isActive(van) && <Tag style={{ marginLeft: 8 }}>Inactive</Tag>}
+                {!isActive(van) && (
+                  <Tag style={{ marginLeft: 8 }}>Inactive</Tag>
+                )}
               </>
             }
-            className={`van-card ${isActive(van) ? "" : "is-inactive"}`}
+            className={`vans-page-card ${isActive(van) ? "" : "is-inactive"}`}
             key={van.id}
           >
             <RemoteImage
@@ -421,7 +421,9 @@ function Vans({ closeMenu }) {
             <Button icon={<UploadOutlined />}>Select Image</Button>
           </Upload>
           {formValues.image && !imageFile && (
-            <small className="van-hint">Current photo: {formValues.image}</small>
+            <small className="van-hint">
+              Current photo: {formValues.image}
+            </small>
           )}
         </div>
       </Modal>

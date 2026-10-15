@@ -1,46 +1,12 @@
 /* Every class on this page starts with "van" (the CSS of all pages is global: the old generic names
    .menu-open, .menu-closed and .form-row could change other pages). */
 
-.vans-container {
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 5rem;
-  right: 0;
-  padding: 30px 40px;
-  background-color: #fff;
-  border-radius: 40px;
-  overflow-y: auto;
-  box-shadow: 9px 14px 33px -4px rgba(0, 0, 0, 0.32);
-  transition: left 0.3s ease;
-}
-
 .vans-container.menu-open {
   left: 15rem;
 }
 
 .vans-container.menu-closed {
   left: 5rem;
-}
-
-.vans-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.vans-header h2 {
-  margin: 0;
-}
-
-.vans-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .van-list {
@@ -50,7 +16,7 @@
   margin-top: 20px;
 }
 
-.van-card {
+.vans-page-card {
   flex: 1 1 250px;
   max-width: 250px;
   width: 260px;
@@ -58,7 +24,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.van-card.is-inactive {
+.vans-page-card.is-inactive {
   opacity: 0.6;
 }
 

@@ -175,10 +175,16 @@ function StudentForm({ onStudentAdded }) {
         footer={null}
         maskClosable={false} // Prevents closing by clicking outside
         getPopupContainer={(trigger) => trigger.parentNode} // Ensures proper rendering inside the modal
+        width={410}
+        styles={{
+          body: { padding: 6 },
+        }}
       >
         <AddSchool
-          onSchoolAdded={() => {
+          existingSchools={schoolList}
+          onSchoolAdded={(school) => {
             fetchSchools();
+            setSchoolId(school.id); // the new school is already selected in the form
             setIsAddSchoolModalVisible(false);
           }}
           closeModal={() => setIsAddSchoolModalVisible(false)}

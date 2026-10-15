@@ -2,7 +2,16 @@ import React, { useEffect, useState } from "react";
 import api from "../../lib/api";
 import "./StaffPage.css";
 import RemoteImage from "../../components/RemoteImage/RemoteImage";
-import { Button, Modal, Input, Card, Segmented, Select, Tag, message } from "antd";
+import {
+  Button,
+  Modal,
+  Input,
+  Card,
+  Segmented,
+  Select,
+  Tag,
+  message,
+} from "antd";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPenToSquare, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { useUsersContext } from "../../contexts/UsersContext";
@@ -208,7 +217,9 @@ function StaffPage({ closeMenu }) {
       console.error("Invite error:", error);
       const status = error.response?.status;
       if (status === 502) {
-        message.error("The invite could not be emailed. Please try again in a moment.");
+        message.error(
+          "The invite could not be emailed. Please try again in a moment.",
+        );
       } else if (status === 409) {
         message.error("This staff member is inactive.");
       } else if (status === 400) {
@@ -264,7 +275,8 @@ function StaffPage({ closeMenu }) {
       // Offer to send the invite right away
       Modal.confirm({
         title: `Send the invite to ${email} now?`,
-        content: "They will receive a code to create their password in the staff app.",
+        content:
+          "They will receive a code to create their password in the staff app.",
         okText: "Send Invite",
         cancelText: "Not Now",
         onOk: () => sendInvite(created),
@@ -273,11 +285,14 @@ function StaffPage({ closeMenu }) {
       console.error("Create staff error:", error);
       const status = error.response?.status;
       if (status === 409) {
-        message.error(error.response.data?.error || "This email is already registered.");
+        message.error(
+          error.response.data?.error || "This email is already registered.",
+        );
       } else if (status === 400) {
         // The API says exactly what is wrong (for example "Please enter a valid email address")
         message.error(
-          error.response.data?.error || "Please check the name and the email address.",
+          error.response.data?.error ||
+            "Please check the name and the email address.",
         );
       } else {
         message.error("Error saving the staff member.");
@@ -349,32 +364,32 @@ function StaffPage({ closeMenu }) {
   );
 
   return (
-    <div
-      className={`staff-container ${closeMenu ? "menu-closed" : "menu-open"}`}
-    >
+    <div className={`app-page ${closeMenu ? "menu-closed" : "menu-open"}`}>
       {/* ───────────── LIST ───────────── */}
       {!selectedStaff && (
         <div>
-          <h3 style={{ textAlign: "center" }}>Staff Members</h3>
-          <div className="staff-filters">
-            <Input
-              placeholder="Filter by name or email"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <Segmented
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={[
-                { label: `Active (${activeCount})`, value: "Active" },
-                { label: `Inactive (${inactiveCount})`, value: "Inactive" },
-                { label: `All (${staffList.length})`, value: "All" },
-              ]}
-            />
-            <Button type="primary" onClick={() => setIsNewModalVisible(true)}>
-              + New Staff
-            </Button>
+          <div className="app-page-header">
+            <h2 className="app-page-title">Staff Members</h2>
+            <div className="app-page-controls">
+              <Input
+                placeholder="Filter by name or email"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                style={{ width: 240 }}
+              />
+              <Segmented
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={[
+                  { label: `Active (${activeCount})`, value: "Active" },
+                  { label: `Inactive (${inactiveCount})`, value: "Inactive" },
+                  { label: `All (${staffList.length})`, value: "All" },
+                ]}
+              />
+              <Button type="primary" onClick={() => setIsNewModalVisible(true)}>
+                + New Staff
+              </Button>
+            </div>
           </div>
 
           <div className="staff-list">
@@ -391,7 +406,9 @@ function StaffPage({ closeMenu }) {
                 />
                 <div className="staff-details">
                   <div>
-                    <div className="staff-name">{staff.name || "(no name)"}</div>
+                    <div className="staff-name">
+                      {staff.name || "(no name)"}
+                    </div>
                     <div className="staff-email">{staff.email}</div>
                   </div>
                   <div className="staff-tags">
@@ -495,8 +512,8 @@ function StaffPage({ closeMenu }) {
                   disabled={!canChangeType}
                 />
                 <small className="staff-hint">
-                  Staff and drivers use the Staff app (a driver is also staff). Only
-                  admins use this dashboard.
+                  Staff and drivers use the Staff app (a driver is also staff).
+                  Only admins use this dashboard.
                 </small>
               </div>
             </Card>
@@ -521,14 +538,23 @@ function StaffPage({ closeMenu }) {
 
               <div className="staff-account-row">
                 <div>
-                  Status: <strong>{isActive(selectedStaff) ? "Active" : "Inactive"}</strong>
+                  Status:{" "}
+                  <strong>
+                    {isActive(selectedStaff) ? "Active" : "Inactive"}
+                  </strong>
                 </div>
                 {isActive(selectedStaff) ? (
-                  <Button danger onClick={() => setStaffToDeactivate(selectedStaff)}>
+                  <Button
+                    danger
+                    onClick={() => setStaffToDeactivate(selectedStaff)}
+                  >
                     Deactivate
                   </Button>
                 ) : (
-                  <Button type="primary" onClick={() => reactivate(selectedStaff)}>
+                  <Button
+                    type="primary"
+                    onClick={() => reactivate(selectedStaff)}
+                  >
                     Reactivate
                   </Button>
                 )}

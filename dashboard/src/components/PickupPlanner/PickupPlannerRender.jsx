@@ -8,7 +8,7 @@ import { MdOutlineAirlineSeatReclineNormal } from "react-icons/md";
 import { TbSteeringWheel } from "react-icons/tb";
 // import PickupRouteGoogleMapsModal from "../RouteGoogleMaps/PickupRouteGoogleMapsModal.jsx";
 import RouteMapModalOSRM from "../RouteOSRM/RouteMapModalOSRM";
-import supabase from "../../lib/supabase";
+// import supabase from "../../lib/supabase";
 import dayjs from "dayjs";
 import "./PickupPlanner.scss";
 
@@ -66,6 +66,7 @@ export default function PickupPlannerRender(props) {
     // actions
     handleDateChange,
     savePickupRoute,
+    reopenRoute,
     sendPickupRoute,
     handleViewRoute,
     handleModalReorder,
@@ -83,6 +84,13 @@ export default function PickupPlannerRender(props) {
 
   const loadingPage =
     settingsLoading || vansLoading || staffLoading || restoringRoute;
+
+  // console.log("planner flags", {
+  //   settingsLoading,
+  //   vansLoading,
+  //   staffLoading,
+  //   restoringRoute,
+  // });
 
   if (loadingPage) {
     return (
@@ -118,9 +126,7 @@ export default function PickupPlannerRender(props) {
   }
 
   return (
-    <div
-      className={`planner-container ${closeMenu ? "menu-closed" : "menu-open"}`}
-    >
+    <div className={`app-page ${closeMenu ? "menu-closed" : "menu-open"}`}>
       <div
         style={{
           display: "flex",
@@ -129,7 +135,7 @@ export default function PickupPlannerRender(props) {
           marginBottom: 16,
         }}
       >
-        <h1>Pickup Planner</h1>
+        <h2 className="app-page-title">Pickup Planner</h2>
 
         <Button
           type="primary"
@@ -142,20 +148,21 @@ export default function PickupPlannerRender(props) {
         {route.status === "waiting_to_start" ? (
           <Button
             danger
-            onClick={async () => {
-              const confirm = window.confirm("This route is locked. Re-open?");
-              if (!confirm) return;
-              const { error } = await supabase
-                .from("routes")
-                .update({ status: "planning" })
-                .eq("date", route.date.format("YYYY-MM-DD"))
-                .eq("type", "pickup");
-              if (error) message.error("❌ Failed to re-open the route.");
-              else {
-                message.success("✅ Route is now editable again.");
-                setRoute((prev) => ({ ...prev, status: "planning" }));
-              }
-            }}
+            // onClick={async () => {
+            //   const confirm = window.confirm("This route is locked. Re-open?");
+            //   if (!confirm) return;
+            //   const { error } = await supabase
+            //     .from("routes")
+            //     .update({ status: "planning" })
+            //     .eq("date", route.date.format("YYYY-MM-DD"))
+            //     .eq("type", "pickup");
+            //   if (error) message.error("❌ Failed to re-open the route.");
+            //   else {
+            //     message.success("✅ Route is now editable again.");
+            //     setRoute((prev) => ({ ...prev, status: "planning" }));
+            //   }
+            // }}
+            onClick={reopenRoute}
           >
             Re-open Route
           </Button>
@@ -385,7 +392,7 @@ export default function PickupPlannerRender(props) {
                           </div>
                         )}
                       </Draggable>
-                    )
+                    ),
                   )}
                   {provided.placeholder}
                 </div>
@@ -498,13 +505,13 @@ export default function PickupPlannerRender(props) {
               });
 
               const orderedIds = (route.schoolOrder?.[van.id] || []).filter(
-                (id) => groups[id]
+                (id) => groups[id],
               );
               const unorderedIds = Object.keys(groups).filter(
-                (id) => !orderedIds.includes(id)
+                (id) => !orderedIds.includes(id),
               );
               const flattened = [...orderedIds, ...unorderedIds].flatMap(
-                (id) => groups[id]
+                (id) => groups[id],
               );
 
               return (
@@ -570,14 +577,15 @@ export default function PickupPlannerRender(props) {
                               .filter((sid) =>
                                 kidsInVan.some(
                                   (e) =>
-                                    (e.kid.schools?.id ?? "no-school") === sid
-                                )
+                                    (e.kid.schools?.id ?? "no-school") === sid,
+                                ),
                               )
                               .map((sid, idx) => {
                                 const schoolName =
                                   kidsInVan.find(
                                     (e) =>
-                                      (e.kid.schools?.id ?? "no-school") === sid
+                                      (e.kid.schools?.id ?? "no-school") ===
+                                      sid,
                                   )?.kid.schools?.name || "—";
                                 return (
                                   <React.Fragment key={sid}>
@@ -762,7 +770,7 @@ export default function PickupPlannerRender(props) {
                                             style={{
                                               color: isDriverOfVan(
                                                 entry.staff,
-                                                van
+                                                van,
                                               )
                                                 ? "green"
                                                 : "gray",
@@ -808,7 +816,7 @@ export default function PickupPlannerRender(props) {
                                               ? null
                                               : v.driver,
                                           };
-                                        }
+                                        },
                                       );
                                       return {
                                         ...prevRoute,
@@ -825,7 +833,7 @@ export default function PickupPlannerRender(props) {
                                   onClick={(e) => {
                                     if (isRouteLocked)
                                       return message.warning(
-                                        "❌ Route closed. If you want to change, you need to re-open."
+                                        "❌ Route closed. If you want to change, you need to re-open.",
                                       );
                                     e.stopPropagation();
                                     setRoute((prevRoute) => {
@@ -842,7 +850,7 @@ export default function PickupPlannerRender(props) {
                                               ? null
                                               : v.driver,
                                           };
-                                        }
+                                        },
                                       );
                                       const updatedAbsents = [
                                         ...(prevRoute.absents || []),
