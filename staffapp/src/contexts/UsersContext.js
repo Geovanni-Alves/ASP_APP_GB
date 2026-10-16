@@ -1,186 +1,96 @@
-import { createContext, useState, useEffect, useContext } from "react";
-import { View } from "react-native";
-import { supabase } from "../lib/supabase";
-import { usePushNotificationsContext } from "./PushNotificationsContext";
+// src/contexts/UsersContext.js
+import {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+} from "react";
+import { View, Text } from "react-native";
+import { Button } from "react-native-paper";
+import api from "../lib/api";
 import { useAuthContext } from "./AuthContext";
 import CustomLoading from "../components/CustomLoading";
 
 const UsersContext = createContext({});
 
 const UsersContextProvider = ({ children }) => {
-  const [authUser, setAuthUser] = useState(null);
+  const { session, logout } = useAuthContext();
+
+  // The old app had two records for a person (the login user and the row of the "users" table).
+  // Now there is one: both names point to the same profile, so the screens do not change.
   const [dbUser, setDbUser] = useState(null);
-  const [userEmail, setUserEmail] = useState(null);
   const [currentUserData, setCurrentUserData] = useState(null);
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState([]); // the list of people (chat) comes in a later step
   const [loading, setLoading] = useState(true);
-  const { session } = useAuthContext();
-  const { fcmToken, expoToken, deviceType } = usePushNotificationsContext();
 
-  useEffect(() => {
-    if (session) {
-      setAuthUser(session.user);
-      setUserEmail(session.user.email);
-    }
-  }, [session]);
-
-  // const updatePushToken = async (id, updatedPushToken) => {
-  //   console.log({ updatePushToken });
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from("users")
-  //       .update({ pushToken: updatedPushToken })
-  //       .eq("id", id)
-  //       .select();
-
-  //     if (error) {
-  //       throw error;
-  //     }
-
-  //     console.log("Push token updated successfully:");
-  //   } catch (error) {
-  //     console.log("Error updating push token:", error);
-  //   }
-  // };
-
-  const listUser = async () => {
+  const getCurrentUserData = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select()
-        .eq("sub", authUser?.id);
-
-      if (error) {
-        throw error;
-      }
-      //if (data.length > 0) {
-      setDbUser(data[0]);
-      //}
+      const { data } = await api.get("/users/me");
+      setCurrentUserData(data);
+      setDbUser(data);
+      return data;
     } catch (error) {
-      console.error("Error fetching user:", error.message);
+      console.error(
+        "Error fetching user data:",
+        error?.response?.data || error.message,
+      );
+      return null;
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (authUser) {
-      listUser(); //setDbUser
-    }
-  }, [authUser]);
-
-  const getCurrentUserData = async () => {
-    try {
-      //console.log("dbUser", dbUser);
-      const { data, error } = await supabase
-        .from("users")
-        .select()
-        .eq("id", dbUser.id)
-        .single();
-      if (error) {
-        throw error;
-      }
-      setCurrentUserData(data);
-    } catch (error) {
-      console.error("Error fetching user data:", error.message);
-    }
-  };
-
-  useEffect(() => {
-    if (dbUser) {
-      getCurrentUserData();
-    }
-  }, [dbUser]);
-
-  // useEffect(() => {
-  //   console.log({ expoToken, fcmToken, deviceType });
-  //   // const checkPushToken = async () => {
-  //   //   if (currentUserData && pushToken) {
-  //   //     const actualPushToken = currentUserData.pushToken;
-  //   //     if (actualPushToken !== pushToken.data || actualPushToken === null) {
-  //   //       await updatePushToken(currentUserData.id, pushToken.data);
-  //   //     }
-  //   //   }
-  //   // };
-  //   // checkPushToken();
-  // }, [expoToken, fcmToken]);
-
-  useEffect(() => {
-    const updateTokensIfNeeded = async () => {
-      // current tokens from Db Users Table
-      const currentIosToken = currentUserData.pushToken;
-      const currentAndroidToken = currentUserData.fcmToken;
-
-      // console.log({ currentAndroidToken, currentIosToken });
-
-      if (!currentUserData) return;
-
-      const updates = {};
-
-      // iOS Expo token
-      if (expoToken && currentIosToken !== expoToken) {
-        updates.pushToken = expoToken;
-      }
-
-      // Android FCM token
-      if (fcmToken && currentAndroidToken !== fcmToken) {
-        updates.fcmToken = fcmToken;
-      }
-
-      if (Object.keys(updates).length === 0) return;
-
-      console.log("🔄 Updating tokens:", updates);
-
-      const { error } = await supabase
-        .from("users")
-        .update(updates)
-        .eq("id", currentUserData.id);
-
-      if (error) {
-        console.log("❌ Token update failed:", error);
-      } else {
-        console.log("✅ Tokens updated!");
-        getCurrentUserData();
-      }
-    };
-
-    updateTokensIfNeeded();
   }, []);
 
-  const getUsersData = async () => {
-    let { data, error } = await supabase.from("users").select("*");
-    if (error) {
-      throw error;
-    }
-    setUsers(data);
-  };
-
   useEffect(() => {
-    getUsersData();
-  }, [authUser]);
+    if (session) getCurrentUserData();
+  }, [session, getCurrentUserData]);
+
+  // Push tokens (iOS and Android) are sent to the API in a later step.
 
   const RefreshCurrentUserData = async () => {
     await getCurrentUserData();
   };
 
+  const isDriver = (currentUserData?.userType || "").toLowerCase() === "driver";
+
   return (
     <UsersContext.Provider
       value={{
         users,
-        authUser,
+        authUser: session?.user ?? null,
         dbUser,
         setDbUser,
-        userEmail,
+        userEmail: session?.user?.email ?? null,
         currentUserData,
         RefreshCurrentUserData,
+        isDriver,
       }}
     >
-      {loading ? ( // Show loading indicator while loading
+      {loading ? (
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          {/* <ActivityIndicator size="large" color="#0000ff" /> */}
           <CustomLoading imageSize={40} showContainer={false} />
+        </View>
+      ) : !dbUser ? (
+        // The profile did not load (no connection?): do not show the app without it
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+          }}
+        >
+          <Text style={{ marginBottom: 16, textAlign: "center" }}>
+            We could not load your profile.
+          </Text>
+          <Button mode="contained" onPress={getCurrentUserData}>
+            Try again
+          </Button>
+          <Button onPress={logout} style={{ marginTop: 8 }}>
+            Sign out
+          </Button>
         </View>
       ) : (
         children

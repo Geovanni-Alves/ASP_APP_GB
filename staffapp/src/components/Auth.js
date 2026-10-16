@@ -1,34 +1,57 @@
+// src/components/Auth.js
 import React, { useState } from "react";
 import {
-  Alert,
   StyleSheet,
   View,
   KeyboardAvoidingView,
   Platform,
   Image,
+  ScrollView,
 } from "react-native";
-import { supabase } from "../lib/supabase";
-import { TextInput, Button, Card, Title, Paragraph } from "react-native-paper";
+import {
+  TextInput,
+  Button,
+  Card,
+  Title,
+  Paragraph,
+  HelperText,
+} from "react-native-paper";
+import { useAuthContext } from "../contexts/AuthContext";
+import { errorMessage } from "../lib/api";
 
 export default function Auth() {
+  const { login, acceptInvite } = useAuthContext();
+
+  const [mode, setMode] = useState("signin"); // "signin" | "invite"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Only allow sign in with email and password
-  async function signInWithEmail() {
+  const switchMode = (next) => {
+    setMode(next);
+    setError("");
+    setPassword("");
+  };
+
+  async function handleSubmit() {
+    if (loading) return;
+    if (!email.trim() || !password || (mode === "invite" && !code.trim())) {
+      setError("Please fill in all the fields.");
+      return;
+    }
+
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
-
-    // if (error) {
-    //   Alert.alert("Sign-in Error", error.message);
-    // } else {
-    //   Alert.alert("Success", "Signed in successfully!");
-    // }
-    setLoading(false);
+    setError("");
+    try {
+      // On success the AuthContext opens the session and this screen is replaced by the app
+      if (mode === "signin") await login(email, password);
+      else await acceptInvite(email, code, password);
+    } catch (e) {
+      setError(errorMessage(e));
+      setLoading(false);
+    }
   }
 
   return (
@@ -36,42 +59,82 @@ export default function Auth() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <View style={styles.logoContainer}>
-        <Image
-          source={require("../../assets/afterlogo.png")}
-          style={styles.logo}
-        />
-      </View>
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title style={styles.title}>Welcome</Title>
-          <Paragraph style={styles.subtitle}>Sign in to continue</Paragraph>
-          <TextInput
-            label="Email"
-            value={email}
-            onChangeText={(text) => setEmail(text)}
-            style={styles.input}
-            keyboardType="email-address"
-            autoCapitalize="none"
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.logoContainer}>
+          <Image
+            source={require("../../assets/afterlogo.png")}
+            style={styles.logo}
           />
-          <TextInput
-            label="Password"
-            value={password}
-            onChangeText={(text) => setPassword(text)}
-            style={styles.input}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-          <Button
-            mode="contained"
-            onPress={signInWithEmail}
-            loading={loading}
-            style={styles.button}
-          >
-            Sign In
-          </Button>
-        </Card.Content>
-      </Card>
+        </View>
+        <Card style={styles.card}>
+          <Card.Content>
+            <Title style={styles.title}>
+              {mode === "signin" ? "Welcome" : "Create your password"}
+            </Title>
+            <Paragraph style={styles.subtitle}>
+              {mode === "signin"
+                ? "Sign in to continue"
+                : "Use the code from your invite e-mail"}
+            </Paragraph>
+
+            <TextInput
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              style={styles.input}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            {mode === "invite" && (
+              <TextInput
+                label="Invite code"
+                value={code}
+                onChangeText={setCode}
+                style={styles.input}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+            )}
+
+            <TextInput
+              label={mode === "signin" ? "Password" : "New password"}
+              value={password}
+              onChangeText={setPassword}
+              style={styles.input}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <HelperText type="error" visible={!!error}>
+              {error}
+            </HelperText>
+
+            <Button
+              mode="contained"
+              onPress={handleSubmit}
+              loading={loading}
+              disabled={loading}
+              style={styles.button}
+            >
+              {mode === "signin" ? "Sign In" : "Create password and sign in"}
+            </Button>
+
+            <Button
+              mode="text"
+              onPress={() => switchMode(mode === "signin" ? "invite" : "signin")}
+              disabled={loading}
+            >
+              {mode === "signin" ? "I have an invite" : "Back to sign in"}
+            </Button>
+          </Card.Content>
+        </Card>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -80,6 +143,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
+  },
+  scroll: {
+    flexGrow: 1,
     justifyContent: "center",
     padding: 16,
   },
@@ -108,7 +174,7 @@ const styles = StyleSheet.create({
     color: "#6c757d",
   },
   input: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   button: {
     marginVertical: 8,
