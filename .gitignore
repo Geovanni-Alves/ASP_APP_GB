@@ -29,3 +29,7 @@ staffapp/server/firebase/service-account.json
 
 # asp-backend
 asp-backend/api/target/
+
+# The native projects are generated from app.config.js on every build
+staffapp/android/
+staffapp/ios/

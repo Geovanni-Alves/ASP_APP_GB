@@ -47,6 +47,7 @@ export default {
         isAccessMediaLocationEnabled: true,
       },
     ],
+    "@react-native-community/datetimepicker",
   ],
 
   ios: {
