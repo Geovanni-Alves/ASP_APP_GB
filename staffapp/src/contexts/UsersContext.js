@@ -31,6 +31,11 @@ const UsersContextProvider = ({ children }) => {
       setDbUser(data);
       return data;
     } catch (error) {
+      // The login expired (it lasts 12 hours) or the account was deactivated: back to the login screen
+      if (error?.response?.status === 401) {
+        logout();
+        return null;
+      }
       console.error(
         "Error fetching user data:",
         error?.response?.data || error.message,
@@ -39,7 +44,7 @@ const UsersContextProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [logout]);
 
   useEffect(() => {
     if (session) getCurrentUserData();

@@ -134,7 +134,7 @@ const OpenCamera = ({
 
   const filteredKids = searchText
     ? kids.filter((kid) =>
-        kid.name.toLowerCase().includes(searchText.toLowerCase())
+        kid.name.toLowerCase().includes(searchText.toLowerCase()),
       )
     : [{ id: "all", name: "All", photo: "barrinha.png" }, ...kids];
 
@@ -169,7 +169,7 @@ const OpenCamera = ({
 
   const toggleFlashMode = () => {
     setFlashMode((current) =>
-      current === "off" ? "on" : current === "on" ? "auto" : "off"
+      current === "off" ? "on" : current === "on" ? "auto" : "off",
     );
   };
 
@@ -202,7 +202,7 @@ const OpenCamera = ({
           duration: 800,
           useNativeDriver: false,
         }),
-      ])
+      ]),
     ).start();
   };
 
@@ -435,7 +435,7 @@ const OpenCamera = ({
       setSelectedKids((prevSelected) =>
         prevSelected.includes(kidId)
           ? prevSelected.filter((id) => id !== kidId)
-          : [...prevSelected.filter((id) => id !== "all"), kidId]
+          : [...prevSelected.filter((id) => id !== "all"), kidId],
       );
     }
   };
@@ -595,7 +595,12 @@ const OpenCamera = ({
 
           <CustomMessageBox
             isVisible={isCustomMessageVisible}
-            onClose={() => setIsCustomMessageVisible(false)}
+            onClose={() => {
+              setIsCustomMessageVisible(false);
+              // Closing the note box (X or back button) goes back to where the person was:
+              // the tag list, or the photo with the "Retake" and "Use Photo" buttons
+              if (!showTagKids) setConfirmMedia(true);
+            }}
             header={`Do you want to add a note to this ${
               mode === "photo" ? "photo" : "video"
             }?`}
@@ -665,8 +670,8 @@ const OpenCamera = ({
                     flashMode === "on"
                       ? "flash-on"
                       : flashMode === "auto"
-                      ? "flash-auto"
-                      : "flash-off"
+                        ? "flash-auto"
+                        : "flash-off"
                   }
                   size={25}
                   color="gold"

@@ -10,7 +10,7 @@ import {
   Platform,
   FlatList,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
+import api from "../../lib/api";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -18,7 +18,7 @@ import { useNavigation } from "@react-navigation/native";
 // import { GOOGLE_MAPS_APIKEY } from "@env";
 //import PhoneInput from "react-native-phone-number-input";
 // import OSMAutocomplete from "../../components/OSMAutocomplete";
-import MapBoxAutocomplete from "../../components/MapBoxAutocomplete";
+import AddressAutocomplete from "../../components/AddressAutocomplete";
 import PhoneInput from "react-native-international-phone-number";
 import { useUsersContext } from "../../contexts/UsersContext";
 import styles from "./styles";
@@ -126,18 +126,8 @@ const ProfileScreen = () => {
         throw new Error("Filename or userId is not defined");
       }
 
-      const userDetails = {
-        photo: filename,
-      };
-
-      const { error } = await supabase
-        .from("users")
-        .update(userDetails)
-        .eq("id", dbUser.id);
-
-      if (error) {
-        throw error;
-      }
+      // The API changes only the photo of the person who is signed in
+      await api.patch("/users/me", { photo: filename });
     } catch (error) {
       console.error("Error updating user image:", error.message);
     }
@@ -145,25 +135,16 @@ const ProfileScreen = () => {
 
   const onSave = async () => {
     try {
-      const userDetails = {
+      // The API saves the profile and answers with the updated one
+      const { data: updatedUser } = await api.patch("/users/me", {
         name,
         unitNumber,
         address,
         lng,
         lat,
         phoneNumber,
-      };
-      const { data, error } = await supabase
-        .from("users")
-        .update(userDetails)
-        .eq("id", dbUser.id)
-        .select();
+      });
 
-      if (error) {
-        throw error;
-      }
-      //console.log(data);
-      const updatedUser = data[0];
       setDbUser(updatedUser);
       await RefreshCurrentUserData();
 
@@ -171,7 +152,10 @@ const ProfileScreen = () => {
 
       navigation.goBack();
     } catch (e) {
-      Alert.alert("Error updating profile", e.message);
+      Alert.alert(
+        "Error updating profile",
+        e?.response?.data?.error || e.message,
+      );
     }
   };
 
@@ -243,7 +227,7 @@ const ProfileScreen = () => {
 
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Address</Text>
-        <MapBoxAutocomplete
+        <AddressAutocomplete
           defaultValue={address}
           onSelect={(place) => {
             setAddress(place.address);

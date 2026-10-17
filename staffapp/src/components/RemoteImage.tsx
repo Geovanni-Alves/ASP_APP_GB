@@ -1,6 +1,6 @@
 import { Image, View, Text, StyleSheet } from "react-native";
 import React, { ComponentProps, useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { getSignedUrl } from "../lib/api";
 import CustomLoader from "../components/CustomLoading"; // Adjust the path to your CustomLoader
 
 // In-memory cache
@@ -65,27 +65,15 @@ const RemoteImage = ({
         setImage("");
 
         try {
-          const { data, error } = await supabase.storage
-            .from(bucketName)
-            .createSignedUrl(path, 60 * 60); // URL valid for 1 hour
+          // The API gives a temporary link (valid for 1 hour) to the photo
+          const url = await getSignedUrl(bucketName, path, 60 * 60);
+          setImage(url);
+          // Cache the signed URL
+          imageCache[path] = { url, timestamp: Date.now() };
 
-          if (error) {
-            console.log("data", data);
-            throw new Error("Error fetching image", error);
-          }
-          //console.log("render the image", data);
-          if (data?.signedUrl) {
-            const url = data.signedUrl;
-            setImage(url);
-            // Cache the signed URL
-            imageCache[path] = { url, timestamp: Date.now() };
-
-            if (onImageLoaded) onImageLoaded(url); // Return the URL
-          } else {
-            throw new Error("Image not found");
-          }
+          if (onImageLoaded) onImageLoaded(url); // Return the URL
         } catch (error) {
-          console.log(error);
+          console.log("Image not available:", path);
         } finally {
           setLoading(false); // Stop loading in all cases
         }

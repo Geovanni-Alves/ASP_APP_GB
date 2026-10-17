@@ -28,7 +28,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * The pickup planner.
+ * The pickup planner. Besides absent kids, the plan also keeps the staff who cannot work that day
+ * ("staff_absents"): they cannot be put in a van.
  *
  *   GET  /planner/roster                  who can drive, help or be responsible (active staff, drivers, admins)
  *   GET  /planner/pickup/{date}           the saved route of a day: route, vans and stops, in ONE answer
@@ -47,7 +48,9 @@ public class PlannerController {
     private static final Set<String> EDITABLE = Set.of("not_started", "planning");
 
     // ---- request bodies (the names of the JSON fields are the column names the dashboard already uses)
-    public record PlanRequest(List<UUID> absents, List<VanPlan> vans) {}
+    public record PlanRequest(List<UUID> absents,
+                              @JsonProperty("staff_absents") List<UUID> staffAbsents,
+                              List<VanPlan> vans) {}
 
     public record VanPlan(@JsonProperty("van_id") UUID vanId,
                           @JsonProperty("driver_id") UUID driverId,
@@ -142,14 +145,15 @@ public class PlannerController {
         UUID userId = UUID.fromString(auth.getName());
 
         List<UUID> absents = body.absents() == null ? List.of() : body.absents();
+        List<UUID> staffAbsents = body.staffAbsents() == null ? List.of() : body.staffAbsents();
         List<VanPlan> vans = body.vans() == null ? List.of() : body.vans();
-        validatePlan(absents, vans);
+        validatePlan(absents, staffAbsents, vans);
 
-        return transaction.execute(status -> persist(day, userId, absents, vans));
+        return transaction.execute(status -> persist(day, userId, absents, staffAbsents, vans));
     }
 
     // Everything that can be wrong with the plan itself (400), before anything is written
-    private void validatePlan(List<UUID> absents, List<VanPlan> vans) {
+    private void validatePlan(List<UUID> absents, List<UUID> staffAbsents, List<VanPlan> vans) {
         Set<UUID> vanIds = new HashSet<>();
         Set<UUID> studentIds = new HashSet<>();
         Set<UUID> staffIds = new HashSet<>();
@@ -181,6 +185,19 @@ public class PlannerController {
             }
         }
 
+        // Someone marked as absent for the day cannot drive, help or be responsible
+        Set<UUID> absentStaff = new HashSet<>(staffAbsents);
+        Set<UUID> conflicts = new HashSet<>(staffIds);
+        conflicts.retainAll(absentStaff);
+        if (!conflicts.isEmpty()) {
+            String names = jdbc.queryForObject(
+                "select string_agg(name, ', ') from users where id = any(CAST(? AS uuid[]))",
+                String.class, uuidArray(conflicts));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                names + " is marked absent and cannot be in a van. Remove them from the van first.");
+        }
+        staffIds.addAll(absentStaff); // the absent ones must be real, active staff too
+
         // Only vans that exist and are active
         if (!vanIds.isEmpty() && count("select count(*) from vans where id = any(CAST(? AS uuid[])) and active",
                 vanIds) != vanIds.size()) {
@@ -204,7 +221,8 @@ public class PlannerController {
     }
 
     // Runs inside the transaction
-    private Map<String, Object> persist(LocalDate day, UUID userId, List<UUID> absents, List<VanPlan> vans) {
+    private Map<String, Object> persist(LocalDate day, UUID userId, List<UUID> absents,
+                                        List<UUID> staffAbsents, List<VanPlan> vans) {
         List<Map<String, Object>> rows = jdbc.queryForList(
             "select id, status from routes where date = CAST(? AS date) and type = 'pickup' for update",
             day.toString());
@@ -212,9 +230,10 @@ public class PlannerController {
         UUID routeId;
         if (rows.isEmpty()) {
             routeId = jdbc.queryForObject(
-                "insert into routes (date, type, status, absents, created_by) "
-                    + "values (CAST(? AS date), 'pickup', 'planning', CAST(? AS uuid[]), ?) returning id",
-                UUID.class, day.toString(), uuidArray(absents), userId);
+                "insert into routes (date, type, status, absents, staff_absents, created_by) "
+                    + "values (CAST(? AS date), 'pickup', 'planning', CAST(? AS uuid[]), CAST(? AS uuid[]), ?) "
+                    + "returning id",
+                UUID.class, day.toString(), uuidArray(absents), uuidArray(staffAbsents), userId);
         } else {
             routeId = (UUID) rows.get(0).get("id");
             String status = String.valueOf(rows.get(0).get("status"));
@@ -222,8 +241,9 @@ public class PlannerController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "This route is " + status + " and cannot be changed. Re-open it first.");
             }
-            jdbc.update("update routes set absents = CAST(? AS uuid[]), status = 'planning' where id = ?",
-                uuidArray(absents), routeId);
+            jdbc.update("update routes set absents = CAST(? AS uuid[]), staff_absents = CAST(? AS uuid[]), "
+                    + "status = 'planning' where id = ?",
+                uuidArray(absents), uuidArray(staffAbsents), routeId);
         }
 
         // The plan REPLACES what was saved: the vans of the plan are written, the others are removed

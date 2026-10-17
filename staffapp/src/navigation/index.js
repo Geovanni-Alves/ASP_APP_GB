@@ -284,10 +284,10 @@ const DrawerNavigator = ({ currentUserData }) => (
 const RootNavigator = () => {
   const { dbUser, currentUserData } = useUsersContext();
 
-  return dbUser ? (
-    <DrawerNavigator currentUserData={currentUserData} />
-  ) : (
+  return dbUser?.firstLogin ? (
     <CompleteProfileScreen />
+  ) : (
+    <DrawerNavigator currentUserData={currentUserData} />
   );
 };
 

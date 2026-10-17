@@ -38,8 +38,8 @@ const PickupListScreen = () => {
           route.vans.some(
             (van) =>
               van.driverUser?.id === dbUser.id ||
-              van.helperUsers?.some((h) => h.id === dbUser.id)
-          )
+              van.helperUsers?.some((h) => h.id === dbUser.id),
+          ),
       )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -50,7 +50,7 @@ const PickupListScreen = () => {
       const van = route.vans.find(
         (v) =>
           v.driverUser?.id === dbUser.id ||
-          v.helperUsers?.some((h) => h.id === dbUser.id)
+          v.helperUsers?.some((h) => h.id === dbUser.id),
       );
       setUserVan(van);
       setUserRole(van.driverUser?.id === dbUser.id ? "Driver" : "Helper");
@@ -134,7 +134,7 @@ const PickupListScreen = () => {
               userRole === "Driver"
                 ? "DriverPickupScreen"
                 : "PickupCheckInScreen",
-              { routeId: lastRoute.id }
+              { routeId: lastRoute.id },
             );
           }}
         >

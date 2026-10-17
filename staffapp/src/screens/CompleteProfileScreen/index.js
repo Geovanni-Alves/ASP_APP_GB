@@ -1,365 +1,315 @@
+// src/screens/CompleteProfileScreen/index.js
+import React, { useState } from "react";
 import {
   View,
   Text,
-  TextInput,
   StyleSheet,
   Alert,
-  Keyboard,
-  TouchableOpacity,
+  Image,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
-import React, { useEffect, useState } from "react";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
-import { useUsersContext } from "../../contexts/UsersContext";
-import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
-import { useNavigation } from "@react-navigation/native";
-// import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
-// import { GOOGLE_MAPS_APIKEY } from "@env";
-//import PhoneInput from "react-native-phone-number-input";
-import MapBoxAutocomplete from "../../components/MapBoxAutocomplete";
-import { supabase } from "../../lib/supabase";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Card, Button, TextInput } from "react-native-paper";
 import PhoneInput from "react-native-international-phone-number";
+import api from "../../lib/api";
+import AddressAutocomplete from "../../components/AddressAutocomplete";
+import { useUsersContext } from "../../contexts/UsersContext";
+import { useAuthContext } from "../../contexts/AuthContext";
+
+// The first access after the invite: the person completes the profile (name, address and phone).
+// The API marks the profile as completed ("firstLogin" = false) and the app goes to the home screen.
+
+// A small round mark that is green with a check when the item is done
+const StepMark = ({ done, label }) => (
+  <View style={styles.step}>
+    <View style={[styles.stepCircle, done && styles.stepCircleDone]}>
+      <Text style={[styles.stepCheck, done && styles.stepCheckDone]}>
+        {done ? "✓" : ""}
+      </Text>
+    </View>
+    <Text style={[styles.stepLabel, done && styles.stepLabelDone]}>{label}</Text>
+  </View>
+);
 
 const CompleteProfileScreen = () => {
-  const { authUser, setDbUser, dbUser, userEmail } = useUsersContext();
-  const { expoPushToken } = usePushNotificationsContext();
+  const { setDbUser, dbUser, userEmail, RefreshCurrentUserData } =
+    useUsersContext();
+  const { logout } = useAuthContext();
+
   const [name, setName] = useState(dbUser?.name || "");
   const [address, setAddress] = useState(dbUser?.address || "");
   const [phoneNumber, setPhoneNumber] = useState(dbUser?.phoneNumber || "");
   const [selectedCountry, setSelectedCountry] = useState(null);
-  const [isSaveDisabled, setIsSaveDisabled] = useState(true);
-  const [isPhoneNumberValid, setIsPhoneNumberValid] = useState(false);
-  //const phoneInputRef = useRef(null);
+  const [lat, setLat] = useState(dbUser?.lat ?? null);
+  const [lng, setLng] = useState(dbUser?.lng ?? null);
+  const [saving, setSaving] = useState(false);
 
-  const [lat, setLat] = useState(dbUser?.lat || null);
-  const [lng, setLng] = useState(dbUser?.lng || null);
+  const nameDone = name.trim().length > 0;
+  const addressDone = address.trim().length > 0;
+  // 10 digits or more (the same rule as before)
+  const phoneDone = phoneNumber.replace(/\D/g, "").length >= 10;
+  const canSave = nameDone && addressDone && phoneDone && !saving;
 
-  const navigation = useNavigation();
-
-  useEffect(() => {
-    if (name && address && isPhoneNumberValid) {
-      setIsSaveDisabled(false);
-    } else {
-      setIsSaveDisabled(true);
-    }
-  });
-
-  const handlePhoneNumberChange = (phone) => {
-    setPhoneNumber(phone);
-    // Validate phone number length (10 digits for most countries)
-    const phoneDigitsOnly = phone.replace(/\D/g, ""); // Removes non-numeric characters
-    if (phoneDigitsOnly.length >= 10) {
-      setIsPhoneNumberValid(true);
-    } else {
-      setIsPhoneNumberValid(false);
-    }
-  };
-
-  // const handleConfirm = () => {
-  //   if (phoneInputRef.current.isValidNumber(phoneNumber)) {
-  //     Keyboard.dismiss();
-  //   } else {
-  //     Alert.alert("Invalid Phone Number", "Please enter a valid phone number.");
-  //   }
-  // };
-
-  const handleConfirm = () => {
-    if (phoneNumber) {
-      Keyboard.dismiss();
-      // Alert.alert(
-      //   "Phone Number",
-      //   `Phone: ${phoneNumber}, Country: ${selectedCountry.cca2}`
-      // );
-    } else {
-      Alert.alert("Invalid Phone Number", "Please enter a valid phone number.");
-    }
-  };
+  const firstName = name.trim().split(" ")[0];
 
   const onSave = async () => {
-    if (dbUser) {
-      await onUpdateUser();
-    } else {
-      await onCreateUser();
-    }
-    navigation.navigate("Home");
-  };
-
-  // const onUpdateUser = async () => {
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from("users")
-  //       .update({
-  //         name,
-  //         sub: authUser.id,
-  //         address,
-  //         phoneNumber,
-  //         lat: parseFloat(lat),
-  //         lng: parseFloat(lng),
-  //       })
-  //       .eq("id", dbUser.id);
-
-  //     if (error) throw error;
-
-  //     setDbUser(data[0]);
-  //   } catch (error) {
-  //     Alert.alert("Error updating user", error.message);
-  //   }
-  // };
-
-  const onCreateUser = async () => {
+    setSaving(true);
     try {
-      const userType =
-        authUser.email === "geo-estevam@hotmail.com" ? "SuperAdmin" : "Staff";
-      const userDetails = {
-        sub: authUser.id,
-        name,
-        userType,
+      // The API saves the profile and marks it as completed (the "firstLogin" key does that)
+      const { data: updatedUser } = await api.patch("/users/me", {
+        name: name.trim(),
         address,
-        lng,
         lat,
+        lng,
         phoneNumber,
-        pushToken: expoPushToken.data,
-        email: userEmail,
-      };
+        firstLogin: false,
+      });
 
-      const { data, error } = await supabase
-        .from("users")
-        .insert(userDetails)
-        .select("*");
-
-      if (error) throw error;
-
-      setDbUser(data[0]);
+      // The profile is complete: the app shows the home screen by itself
+      setDbUser(updatedUser);
+      await RefreshCurrentUserData();
     } catch (error) {
-      Alert.alert("Error saving new user", error.message);
+      Alert.alert(
+        "Error saving the profile",
+        error?.response?.data?.error || error.message,
+      );
+      setSaving(false);
     }
   };
 
   return (
-    <SafeAreaView>
-      <Text style={styles.title}>Complete your Profile</Text>
-      <Text style={{ textAlign: "center", fontSize: 15 }}>
-        E-mail: {authUser.email}{" "}
-      </Text>
-      <TextInput
-        value={name}
-        onChangeText={setName}
-        placeholder="Full Name"
-        style={styles.input}
-      />
-      {/* <GooglePlacesAutocomplete
-        nearbyPlacesAPI="GooglePlacesSearch"
-        placeholder="Address"
-        listViewDisplayed="auto"
-        debounce={400}
-        minLength={2}
-        onFail={(error) => console.log(error)}
-        onNotFound={() => console.log("no results")}
-        enablePoweredByContainer={false}
-        fetchDetails={true}
-        autoFocus={true}
-        styles={autoComplete}
-        onPress={(data, details = null) => {
-          setAddress(details.formatted_address);
-          setLat(details.geometry.location.lat);
-          setLng(details.geometry.location.lng);
-        }}
-        query={{
-          key: GOOGLE_MAPS_APIKEY,
-          Language: "en",
-          components: "country:ca",
-        }}
-      /> */}
-      <MapBoxAutocomplete
-        defaultValue={address}
-        onSelect={(place) => {
-          setAddress(place.address);
-          setLat(place.lat);
-          setLng(place.lng);
-          // console.log(place);
-          // flatListRef.current.scrollToOffset({
-          //   offset: 150,
-          //   animated: true,
-          // });
-        }}
-      />
-      <View style={styles.phoneInputContainer}>
-        {/* <PhoneInput
-          ref={phoneInputRef}
-          value={phoneNumber}
-          onChangeText={(text) => {
-            setPhoneNumber(text);
-          }}
-          defaultCode="CA"
-          layout="first"
-          placeholder="Phone Number"
-          style={styles.phoneInputField}
-        /> */}
-        <PhoneInput
-          value={phoneNumber}
-          onChangePhoneNumber={handlePhoneNumberChange}
-          selectedCountry={selectedCountry}
-          onChangeSelectedCountry={(country) => {
-            setSelectedCountry(country);
-          }}
-          placeholder="Phone Number"
-          language="en"
-          defaultCountry="CA"
-          phoneInputStyles={{
-            container: {
-              width: "85%",
-              padding: 2,
-            },
-          }}
-        />
-        <TouchableOpacity style={styles.okButton} onPress={handleConfirm}>
-          <Text style={styles.okButtonText}>OK</Text>
-        </TouchableOpacity>
-      </View>
-      <View>
-        <View style={styles.saveContainer}>
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              isSaveDisabled && styles.saveButtonDisabled,
-            ]}
-            onPress={onSave}
-            disabled={isSaveDisabled}
-          >
-            <Text style={styles.saveButtonText}>Save</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity
-          style={styles.signOutButton}
-          onPress={() => supabase.auth.signOut()}
+    <SafeAreaView style={styles.screen}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.signOutButtonText}>Sign out</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.header}>
+            <Image
+              source={require("../../../assets/afterlogo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            <Text style={styles.title}>
+              {firstName ? `Welcome, ${firstName}!` : "Welcome!"}
+            </Text>
+            <Text style={styles.subtitle}>
+              Complete your profile before you start using the app.
+            </Text>
+          </View>
+
+          <Card style={styles.card}>
+            <Card.Content>
+              {/* Progress */}
+              <View style={styles.stepsRow}>
+                <StepMark done={nameDone} label="Name" />
+                <View style={styles.stepLine} />
+                <StepMark done={addressDone} label="Address" />
+                <View style={styles.stepLine} />
+                <StepMark done={phoneDone} label="Phone" />
+              </View>
+
+              {/* Name */}
+              <TextInput
+                mode="outlined"
+                label="Full name"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                style={styles.field}
+              />
+
+              {/* Address */}
+              <Text style={styles.label}>Address</Text>
+              <AddressAutocomplete
+                defaultValue={address}
+                containerStyle={{ padding: 0 }}
+                inputStyle={styles.addressInput}
+                onSelect={(place) => {
+                  setAddress(place.address);
+                  setLat(place.lat);
+                  setLng(place.lng);
+                }}
+              />
+              <Text style={styles.hint}>
+                Start typing and choose your address from the list.
+              </Text>
+
+              {/* Phone */}
+              <Text style={[styles.label, { marginTop: 18 }]}>Phone number</Text>
+              <PhoneInput
+                value={phoneNumber}
+                onChangePhoneNumber={setPhoneNumber}
+                selectedCountry={selectedCountry}
+                onChangeSelectedCountry={setSelectedCountry}
+                placeholder="Phone Number"
+                language="en"
+                defaultCountry="CA"
+                phoneInputStyles={{
+                  container: {
+                    width: "100%",
+                    backgroundColor: "#ffffff",
+                  },
+                }}
+              />
+
+              <Button
+                mode="contained"
+                onPress={onSave}
+                disabled={!canSave}
+                loading={saving}
+                style={styles.saveButton}
+                contentStyle={{ paddingVertical: 6 }}
+              >
+                Save and continue
+              </Button>
+
+              {!canSave && !saving && (
+                <Text style={styles.disabledHint}>
+                  Fill in your name, address and phone to continue.
+                </Text>
+              )}
+            </Card.Content>
+          </Card>
+
+          <Text style={styles.signedAs}>Signed in as {userEmail}</Text>
+          <Button mode="text" onPress={logout} textColor="#c0392b">
+            Sign out
+          </Button>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    textAlign: "center",
-    margin: 10,
-    marginTop: 25,
-  },
-  subTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-    margin: 10,
-    marginTop: 10,
-  },
-  input: {
-    marginTop: 10,
-    marginLeft: 11,
-    marginRight: 21,
-    backgroundColor: "white",
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ccc",
-  },
-  googleAutoComp: {
-    padding: 20,
-  },
-  kidContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginVertical: 5,
-    paddingHorizontal: 10,
-  },
-  container: {
+  screen: {
     flex: 1,
-    justifyContent: "space-between",
-    padding: 20,
+    backgroundColor: "#f5f5f5",
   },
-  kidName: {
-    fontSize: 16,
+  scroll: {
+    padding: 16,
+    paddingBottom: 32,
   },
-  confirmButton: {
-    backgroundColor: "green",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5,
-    elevation: 2,
+  header: {
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 16,
   },
-  confirmButtonText: {
-    color: "white",
+  logo: {
+    width: 110,
+    height: 110,
+  },
+  title: {
+    fontSize: 26,
     fontWeight: "bold",
+    marginTop: 8,
+    color: "#1f2937",
+  },
+  subtitle: {
+    fontSize: 15,
+    color: "#6b7280",
     textAlign: "center",
+    marginTop: 4,
+    paddingHorizontal: 12,
+  },
+  card: {
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
+    paddingVertical: 6,
+  },
+  stepsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 18,
+  },
+  step: {
+    alignItems: "center",
+  },
+  stepCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: "#d1d5db",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#ffffff",
+  },
+  stepCircleDone: {
+    backgroundColor: "#16a34a",
+    borderColor: "#16a34a",
+  },
+  stepCheck: {
+    fontSize: 14,
+    color: "#d1d5db",
+  },
+  stepCheckDone: {
+    color: "#ffffff",
+    fontWeight: "bold",
+  },
+  stepLabel: {
+    fontSize: 12,
+    color: "#9ca3af",
+    marginTop: 4,
+  },
+  stepLabelDone: {
+    color: "#16a34a",
+    fontWeight: "600",
+  },
+  stepLine: {
+    width: 36,
+    height: 2,
+    backgroundColor: "#e5e7eb",
+    marginHorizontal: 6,
+    marginBottom: 16,
+  },
+  field: {
+    backgroundColor: "#ffffff",
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 6,
+  },
+  addressInput: {
+    left: 0,
+    backgroundColor: "#ffffff",
+    fontSize: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    borderColor: "#79747e",
+  },
+  hint: {
+    fontSize: 12,
+    color: "#9ca3af",
+    marginTop: 4,
   },
   saveButton: {
-    backgroundColor: "blue",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
+    marginTop: 24,
     borderRadius: 10,
-    elevation: 2,
-    marginBottom: 15,
   },
-  saveButtonDisabled: {
-    backgroundColor: "gray",
-  },
-  saveContainer: {
-    padding: 10,
-    alignItems: "center",
-  },
-  saveButtonText: {
-    color: "white",
-    fontWeight: "bold",
+  disabledHint: {
+    fontSize: 12,
+    color: "#9ca3af",
     textAlign: "center",
+    marginTop: 8,
   },
-  signOutButton: {
-    backgroundColor: "red",
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 10,
-    elevation: 2,
-  },
-  signOutButtonText: {
-    color: "white",
-    fontWeight: "bold",
+  signedAs: {
     textAlign: "center",
-  },
-  phoneInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-  },
-  phoneInputField: {
-    flex: 1,
-    paddingVertical: 8,
-  },
-  okButton: {
-    backgroundColor: "green",
-    paddingHorizontal: 10,
-    borderRadius: 5,
-    marginLeft: 5,
-  },
-  okButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    textAlign: "center",
+    color: "#9ca3af",
+    fontSize: 12,
+    marginTop: 16,
   },
 });
-
-const autoComplete = {
-  container: {
-    margin: 10,
-    marginLeft: 15,
-    flex: 0,
-  },
-  TextInput: {
-    fontSize: 18,
-  },
-};
 
 export default CompleteProfileScreen;

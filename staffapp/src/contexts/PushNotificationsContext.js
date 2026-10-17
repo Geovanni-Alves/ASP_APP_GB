@@ -1,10 +1,27 @@
 import { createContext, useState, useEffect, useRef, useContext } from "react";
 import { Platform, Linking, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+// import * as Device from "expo-device";
+// import * as Notifications from "expo-notifications";
+// import Constants from "expo-constants";
+// import { supabase } from "../lib/supabase";
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { supabase } from "../lib/supabase";
+
+// Expo Go cannot load the native notification modules (loading them crashes the app), so there the
+// package is not loaded and the push features do nothing. Development builds and the production
+// app load it normally.
+const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+const Notifications = isExpoGo
+  ? {
+      setNotificationHandler: () => {},
+      addNotificationReceivedListener: () => ({ remove() {} }),
+      addNotificationResponseReceivedListener: () => ({ remove() {} }),
+    }
+  : require("expo-notifications");
 
 const SUPABASE_PUSH_URL = process.env.EXPO_PUBLIC_SUPABASE_PUSH_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_KEY;
@@ -203,6 +220,7 @@ const PushNotificationsContextProvider = ({ children }) => {
   //  REGISTER DEVICE FOR PUSH TOKENS
   // ----------------------------------------------------------
   async function registerForPushNotificationsAsync() {
+    if (isExpoGo) return null;
     if (!Device.isDevice) {
       alert("Must use a physical device for push notifications");
       return null;
@@ -236,7 +254,7 @@ const PushNotificationsContextProvider = ({ children }) => {
               setPermissionMessage(false);
             },
           },
-        ]
+        ],
       );
       return null;
     }

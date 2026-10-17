@@ -2,7 +2,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as TaskManager from "expo-task-manager";
 import React, { useEffect } from "react";
-import { LogBox } from "react-native";
+import { LogBox, Appearance } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import AuthContextProvider from "./src/contexts/AuthContext";
 // import RouteContextProvider from "./src/contexts/DropOffRouteContext";
@@ -21,6 +21,9 @@ import PendingActionsContext, {
 } from "./src/contexts/PendingActionsContext";
 
 LogBox.ignoreLogs(["NSLocation*UsageDescription"]);
+// console.log("LOG TEST", new Date().toISOString());
+// The app was drawn for a light background: it ignores the dark mode of the phone
+Appearance.setColorScheme("light");
 
 function App() {
   useEffect(() => {

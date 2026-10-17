@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Text, Image } from "react-native";
-import { supabase } from "../lib/supabase";
+import { getSignedUrl } from "../lib/api";
 // import { Video, ResizeMode } from "expo-av";
 import { useVideoPlayer, VideoView, VideoSource } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -41,7 +41,7 @@ const RemoteVideo = ({
     (playerInstance) => {
       playerInstance.loop = true;
       if (!onlyThumbnail) playerInstance.play();
-    }
+    },
   );
 
   useEffect(() => {
@@ -80,22 +80,17 @@ const RemoteVideo = ({
       setError("");
 
       try {
-        const { data, error } = await supabase.storage
-          .from(bucketName)
-          .createSignedUrl(path, 60 * 60); // URL valid for 1 hour
+        // The API gives a temporary link (valid for 1 hour) to the video
+        const url = await getSignedUrl(bucketName, path, 60 * 60);
 
-        if (error || !data) {
-          throw error || new Error("Failed to get video URL");
-        }
-
-        setVideoUrl(data.signedUrl);
+        setVideoUrl(url);
 
         if (onlyThumbnail) {
-          await generateThumbnail(data.signedUrl);
+          await generateThumbnail(url);
         }
 
         // Cache video URL
-        videoCache[path] = { url: data.signedUrl, timestamp: Date.now() };
+        videoCache[path] = { url, timestamp: Date.now() };
       } catch (err: any) {
         console.error("Error fetching video:", err.message);
         setError(err.message);

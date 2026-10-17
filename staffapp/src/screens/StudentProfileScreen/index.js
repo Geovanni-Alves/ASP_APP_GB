@@ -12,8 +12,6 @@ import {
 import { FontAwesome5, MaterialIcons, FontAwesome } from "@expo/vector-icons";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import FullScreenImage from "../../components/FullScreenImageModal";
-import { supabase } from "../../lib/supabase";
-import OpenCamera from "../../components/OpenCamera";
 import RemoteImage from "../../components/RemoteImage";
 // import ConfirmationModal from "../../components/ConfirmationModal";
 // import InfoModal from "../../components/InfoModal";
@@ -29,25 +27,25 @@ import SchoolInfoScreen from "./SchoolInfoScreen";
 import ContactsScreen from "./ContactsScreen";
 import AddressInfoScreen from "./AddressInfoScreen";
 import JiuJitsuInfoScreen from "./JiuJitsuInfoScreen";
-import { usePicturesContext } from "../../contexts/PicturesContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 
 const StudentProfileScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { id: kidId, readOnly } = route.params;
+  const { id: kidId } = route.params;
+  // In the app the team only LOOKS at a student: everything is changed in the dashboard.
+  // (The one thing the team adds is the photos of the dismissal door, in the School Info tab.)
+  const readOnly = true;
   const [selectedKid, setSelectedKid] = useState(null);
   const [actualPhoto, setActualPhoto] = useState(null);
   const [activeTab, setActiveTab] = useState("BasicInfo");
   const [age, SetAge] = useState("");
   const [belt, setBelt] = useState("White");
   const [stripes, setStripes] = useState(2);
-  const [callOpenCamera, setCallOpenCamera] = useState(false);
   const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const { RefreshKidsData, kids, fetchSelectedKid } = useKidsContext();
   const Tab = createBottomTabNavigator();
-  const { deleteMediaFromBucket } = usePicturesContext();
   const [containerPosition, setContainerPosition] = useState({ x: 0, y: 0 });
 
   const avatarSize = activeTab === "BasicInfo" ? 120 : 40;
@@ -132,31 +130,6 @@ const StudentProfileScreen = () => {
     setActiveTab(tabName);
   };
 
-  const handleNewProfilePhoto = async (imagePath) => {
-    try {
-      setLoading(true);
-      setCallOpenCamera(false);
-      const mediaToDeletePath = actualPhoto;
-
-      if (mediaToDeletePath) {
-        await deleteMediaFromBucket(mediaToDeletePath, "profilePhotos");
-      }
-
-      const newMediaPath = imagePath[0];
-      if (newMediaPath) {
-        await handleUpdateKid({ photo: newMediaPath });
-        setActualPhoto(newMediaPath);
-        await RefreshKidsData();
-      }
-
-      // Use handleUpdateKid to update only the photo field
-    } catch (error) {
-      console.error("Error changing the profile photo", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleImagePress = (image) => {
     if (image) {
       //setSelectedImage(image);
@@ -167,38 +140,6 @@ const StudentProfileScreen = () => {
   const closeFullScreenModal = () => {
     //setSelectedImage(null);
     setFullScreenImageModal(false);
-  };
-
-  const handleUpdateKid = async (updatedFields) => {
-    try {
-      setLoading(true);
-      // Merge the existing kid data with the updated fields
-      const kidDetails = {
-        ...updatedFields,
-      };
-
-      const { data, error } = await supabase
-        .from("students")
-        .update(kidDetails)
-        .eq("id", kidId)
-        .select();
-
-      if (error) {
-        throw error;
-      }
-      const updateKid = data[0];
-      //setSelectedKid(updateKid);
-      await RefreshKidsData();
-      // await fetchData();
-
-      //setIsFormChanged(false);
-      return updateKid;
-    } catch (error) {
-      console.error("Error updating kid's data:", error);
-    } finally {
-      setLoading(false);
-      // setShowConfirmationModal(true);
-    }
   };
 
   if (!selectedKid || loading) {
@@ -247,27 +188,6 @@ const StudentProfileScreen = () => {
               />
             </Pressable>
 
-            {activeTab === "BasicInfo" && (
-              <View style={styles.cameraContainer}>
-                {!readOnly && (
-                  <>
-                    <TouchableOpacity
-                      style={styles.cameraIcon}
-                      onPress={() => {
-                        setCallOpenCamera(true);
-                      }}
-                    >
-                      <MaterialIcons
-                        name="photo-camera"
-                        size={32}
-                        color="gray"
-                      />
-                    </TouchableOpacity>
-                    <Text style={styles.editText}>Edit </Text>
-                  </>
-                )}
-              </View>
-            )}
           </View>
           <Text
             style={
@@ -298,7 +218,6 @@ const StudentProfileScreen = () => {
               <BasicInfoScreen
                 kidId={selectedKid.id}
                 setKidDetails={setSelectedKid}
-                handleUpdateKid={handleUpdateKid}
                 readOnly={readOnly}
               />
             )}
@@ -354,15 +273,6 @@ const StudentProfileScreen = () => {
           /> */}
         </Tab.Navigator>
 
-        <OpenCamera
-          isVisible={callOpenCamera}
-          onPhotoTaken={() => setCallOpenCamera(false)}
-          onSelectOption={handleNewProfilePhoto}
-          onClose={() => setCallOpenCamera(false)}
-          mode="photo"
-          bucketName="profilePhotos"
-          allowMultipleImages={false}
-        />
         {/* <OpenCamera
           isVisible={callOpenCameraForSchool}
           onPhotoTaken={() => setCallOpenCameraForSchool(false)}

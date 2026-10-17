@@ -11,7 +11,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import RemoteImage from "../../../components/RemoteImage";
 import { useRoutesContext } from "../../../contexts/RoutesContext";
 import { useUsersContext } from "../../../contexts/UsersContext";
-import { supabase } from "../../../lib/supabase";
+import api from "../../../lib/api";
 import { usePendingActions } from "../../../contexts/PendingActionsContext";
 import { useFeedContext } from "../../../contexts/FeedContext";
 import OpenCamera from "../../../components/OpenCamera";
@@ -67,7 +67,7 @@ const PickupCheckInScreen = ({ routeId, onClose }) => {
 
       // find van where this helper or driver is assigned
       const myVan = routeData.vans.find(
-        (v) => v.driver_id === dbUser.id || v.helper_ids?.includes(dbUser.id)
+        (v) => v.driver_id === dbUser.id || v.helper_ids?.includes(dbUser.id),
       );
 
       if (!myVan) {
@@ -77,34 +77,14 @@ const PickupCheckInScreen = ({ routeId, onClose }) => {
 
       // Filter only kids assigned to THIS STAFF
       const assignedKids = myVan.kids.filter(
-        (k) => k.responsible_staff_id === dbUser.id
+        (k) => k.responsible_staff_id === dbUser.id,
       );
 
       // console.log("assignedKids", assignedKids);
 
-      const routeDate = routeData.date;
-      const vanId = routeData.vans[0].id;
-
-      const kidsWithAttendance = await Promise.all(
-        assignedKids.map(async (kidObj) => {
-          const { data: attendanceRecord } = await supabase
-            .from("student_attendance")
-            .select("*")
-            .eq("student_id", kidObj.kid.id)
-            .eq("date", routeDate)
-            .eq("route_id", routeId)
-            .eq("van_id", vanId)
-            .maybeSingle();
-
-          // console.log("attendanceRecord", attendanceRecord);
-          // console.log("kidObj", kidObj);
-
-          return {
-            ...kidObj,
-            attendance: attendanceRecord || null,
-          };
-        })
-      );
+      // The API already sends the attendance of each kid (check-in / absence) with the route,
+      // so there is nothing else to ask for
+      const kidsWithAttendance = assignedKids;
 
       setKids(kidsWithAttendance);
 
@@ -227,26 +207,10 @@ const PickupCheckInScreen = ({ routeId, onClose }) => {
             onExecute: async ({ payload }) => {
               console.log("⏳ Saving CHECK-IN...", payload);
 
-              const { error } = await supabase
-                .from("student_attendance")
-                .insert({
-                  student_id: payload.kidId,
-                  route_id: payload.routeId,
-                  van_id: payload.vanId,
-                  date: payload.date,
-                  checked_in: true,
-                  checked_in_at: new Date().toISOString(),
-                  checked_in_by: dbUser.id,
-                });
-
-              if (error) throw error;
-
-              // Create new feed check in and send push nots for contacts
-              await createNewFeedForKid(
-                payload.kidId,
-                "", // no media
-                "ATTENDANCE", //attendance type
-                "Picked up from school"
+              // The API saves the check-in AND the news for the family ("Picked up from school")
+              // in one step, so the feed item is not created here any more
+              await api.post(
+                `/my/routes/${payload.routeId}/kids/${payload.kidId}/check-in`,
               );
             },
 
@@ -297,26 +261,9 @@ const PickupCheckInScreen = ({ routeId, onClose }) => {
             onExecute: async ({ payload }) => {
               console.log("⏳ Saving ABSENT...", payload);
 
-              const { error } = await supabase
-                .from("student_attendance")
-                .insert({
-                  student_id: payload.kidId,
-                  route_id: payload.routeId,
-                  van_id: payload.vanId,
-                  date: payload.date,
-                  is_absent: true,
-                  absent_at: new Date().toISOString(),
-                  absent_by: dbUser.id,
-                });
-
-              if (error) throw error;
-
-              // 🔔 Create feed + send push
-              await createNewFeedForKid(
-                payload.kidId,
-                "",
-                "ATTENDANCE",
-                "Marked as absent"
+              // The API saves the absence AND the news for the family ("Marked as absent")
+              await api.post(
+                `/my/routes/${payload.routeId}/kids/${payload.kidId}/absent`,
               );
             },
 

@@ -208,9 +208,16 @@ public class InviteService {
         }
 
         // Correct code: save the password, close the invite, mark the contacts as registered.
-        // The name and email were registered with the invite, so there is no "complete profile" step.
-        jdbc.update("update users set password_hash = ?, \"firstLogin\" = false, updated_at = now() where id = ?",
-            encoder.encode(password), userId);
+        // The staff app asks the person to complete the profile (name, address and phone) on the first
+        // access, so there the "firstLogin" flag stays until they do it. The dashboard and the parents'
+        // app have no such step.
+        if ("staff".equals(appName)) {
+            jdbc.update("update users set password_hash = ?, updated_at = now() where id = ?",
+                encoder.encode(password), userId);
+        } else {
+            jdbc.update("update users set password_hash = ?, \"firstLogin\" = false, updated_at = now() where id = ?",
+                encoder.encode(password), userId);
+        }
         jdbc.update("update invites set used_at = now() where id = ?", inviteId);
         jdbc.update("update contacts set signed = true where user_id = ?", userId);
 

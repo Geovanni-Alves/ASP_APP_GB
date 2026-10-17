@@ -5,13 +5,26 @@
 //   const { data } = await api.get("/users/me");
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 
 const TOKEN_KEY = "asp.staff.token";
 
-// The address of the API. It comes from the .env file of the app (EXPO_PUBLIC_API_URL).
-// A phone cannot use "localhost" (that would be the phone itself), so for tests the address is
-// the one of a tunnel that points to the API running on the computer.
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8080";
+// The address of the API:
+//  1. EXPO_PUBLIC_API_URL in the .env file, when it is set (for example the address of a tunnel);
+//  2. otherwise the computer that serves the app (Metro), on port 8080. The phone already knows that
+//     computer, because the app itself is loaded from it.
+function findApiUrl() {
+  const fromEnv = process.env.EXPO_PUBLIC_API_URL;
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+
+  const metroHost = Constants.expoConfig?.hostUri?.split(":")[0];
+  if (metroHost) return `http://${metroHost}:8080`;
+
+  return "http://localhost:8080";
+}
+
+export const API_URL = findApiUrl();
+console.log("API address:", API_URL);
 
 const api = axios.create({ baseURL: API_URL, timeout: 20000 });
 
@@ -66,11 +79,22 @@ export function errorMessage(
     return "Cannot reach the server. Check your internet connection.";
   }
   const { code, error: message } = error.response.data || {};
-  if (code === "app_not_allowed") return "This account cannot use the staff app.";
+  if (code === "app_not_allowed")
+    return "This account cannot use the staff app.";
   if (code === "account_disabled")
     return "This account is deactivated. Please contact your manager.";
   if (error.response.status === 401) return "Wrong email or password.";
   return message || fallback;
+}
+
+/* ---------- photos and videos ---------- */
+// A temporary link to a photo or a video. The API answers with a path ("/files/...?exp=...&sig=...");
+// the link is complete once the address of the API is put in front of it.
+export async function getSignedUrl(bucket, path, expires = 3600) {
+  const { data } = await api.get("/files/signed-url", {
+    params: { bucket, path, expires },
+  });
+  return `${API_URL}${data.signedUrl}`;
 }
 
 export default api;

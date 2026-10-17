@@ -41,6 +41,17 @@ public final class Roles {
         }
     }
 
+    /** Throws 403 unless the user's role may use the staff app (staff, driver, admin, superadmin). */
+    public static void requireStaffApp(Authentication auth) {
+        boolean allowed = auth.getAuthorities().stream()
+            .map(Roles::roleOf)
+            .anyMatch(role -> AppAccess.canUse("staff", role));
+
+        if (!allowed) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "This account cannot use the staff app");
+        }
+    }
+
     /** True when the authenticated user is a super admin (the owner / developer account). */
     public static boolean isSuperAdmin(Authentication auth) {
         return auth.getAuthorities().stream()

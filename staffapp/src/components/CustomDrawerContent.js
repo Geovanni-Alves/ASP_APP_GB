@@ -22,8 +22,8 @@ export default function CustomDrawerContent(props) {
 
   const confirmLogout = async () => {
     try {
-      // Sign out the user using supabase Auth
-      await logout(); //supabase.auth.signOut();
+      // Sign out the user using api auth
+      await logout();
     } catch (error) {
       console.error("Logout error:", error);
     } finally {

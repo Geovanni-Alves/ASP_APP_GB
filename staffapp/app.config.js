@@ -5,7 +5,7 @@ export default {
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
-  userInterfaceStyle: "automatic",
+  userInterfaceStyle: "light",
   splash: {
     image: "./assets/splash.png",
     //resizeMode: "contain",
@@ -48,6 +48,8 @@ export default {
       },
     ],
     "@react-native-community/datetimepicker",
+    "expo-splash-screen",
+    "expo-status-bar",
   ],
 
   ios: {

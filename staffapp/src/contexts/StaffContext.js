@@ -1,5 +1,6 @@
+// src/contexts/StaffContext.js
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import api from "../lib/api";
 
 const StaffContext = createContext({});
 
@@ -8,19 +9,14 @@ const StaffContextProvider = ({ children }) => {
 
   const fetchStaffData = async () => {
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select()
-        .or(`userType.eq.STAFF,userType.eq.SuperAdmin,userType.eq.DRIVER`);
-      if (error) {
-        throw error;
-      }
-
-      const fetchedStaff = data;
-
-      setStaff(fetchedStaff);
+      // The team: active staff, drivers and managers (the API decides who is on the list)
+      const { data } = await api.get("/app/staff");
+      setStaff(data);
     } catch (error) {
-      console.error("Error fetching staff data", error);
+      console.error(
+        "Error fetching staff data",
+        error?.response?.data || error.message,
+      );
     }
   };
 

@@ -1,83 +1,68 @@
+// src/contexts/PicturesContext.js
 import React, { createContext, useContext } from "react";
-import { supabase } from "../lib/supabase";
-import { File } from "expo-file-system";
-import { randomUUID } from "expo-crypto";
-import { decode } from "base64-arraybuffer";
+import api from "../lib/api";
 
 const PicturesContext = createContext({});
 
+// Sends one file to the API and returns the "path" (the file name) that the database keeps.
+// The file goes as a normal form upload: the API checks the type and the size.
+async function uploadFile(uri, bucketName, mimeType, extension) {
+  const form = new FormData();
+  form.append("file", { uri, name: `upload.${extension}`, type: mimeType });
+
+  const { data } = await api.post(`/files/${bucketName}`, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+    transformRequest: (body) => body, // send the form as it is
+    timeout: 120000, // a video can take a while on a weak connection
+  });
+  return data.path;
+}
+
 const PicturesContextProvider = ({ children }) => {
   const savePhotoInBucket = async (image, bucketName = "photos") => {
-    // const imageUri = image.uri;
     try {
-      if (!image?.uri?.startsWith("file://")) {
+      const uri = image?.uri;
+      if (!uri || !(uri.startsWith("file://") || uri.startsWith("content://"))) {
         console.error("Invalid image URI");
         return null;
       }
 
-      const file = new File(image.uri);
-
-      const base64 = await file.base64();
-
-      // const base64 = await FileSystem.readAsStringAsync(imageUri, {
-      //   encoding: "base64",
-      // });
-
-      const filePath = `${randomUUID()}.png`;
-      // const buffer = await file.readAsync();
-
-      // const contentType = "image/png";
-
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .upload(filePath, decode(base64), {
-          contentType: "image/png",
-          upsert: false,
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        return data.path;
-      }
+      // The real type of the photo (the camera and the gallery tell it); JPEG when unknown
+      const isPng = (image.mimeType || "").includes("png") || /\.png$/i.test(uri);
+      return await uploadFile(
+        uri,
+        bucketName,
+        isPng ? "image/png" : "image/jpeg",
+        isPng ? "png" : "jpg",
+      );
     } catch (error) {
-      console.error("Error saving image to storage:", error);
+      console.error(
+        "Error saving image to storage:",
+        error?.response?.data || error.message,
+      );
       return null;
     }
   };
 
   const saveVideoInBucket = async (video, bucketName = "videos") => {
     try {
-      if (!video?.startsWith("file://")) {
+      if (!video?.startsWith("file://") && !video?.startsWith("content://")) {
         console.error("Invalid video URI");
         return null;
       }
 
-      const file = new File(video);
-      // const base64 = await FileSystem.readAsStringAsync(video, {
-      //   encoding: "base64",
-      // });
-
-      const base64 = await file.base64();
-
-      const filePath = `${randomUUID()}.mp4`;
-      const contentType = "video/mp4";
-
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .upload(filePath, decode(base64), { contentType });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data) {
-        return data.path;
-      }
+      const isMov = /\.mov$/i.test(video);
+      return await uploadFile(
+        video,
+        bucketName,
+        isMov ? "video/quicktime" : "video/mp4",
+        isMov ? "mov" : "mp4",
+      );
     } catch (error) {
-      console.error("Error saving image to storage:", error);
+      console.error(
+        "Error saving video to storage:",
+        error?.response?.data || error.message,
+      );
       return null;
     }
   };
@@ -87,19 +72,13 @@ const PicturesContextProvider = ({ children }) => {
       if (!filePath) {
         throw new Error("Files path is required to delete media.");
       }
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .remove([filePath]);
-
-      if (error) {
-        throw error;
-      }
-      if (data) {
-        //console.log(`Successfully deleted file: ${filePath}`);
-        return true;
-      }
+      await api.delete(`/files/${bucketName}/${filePath}`);
+      return true;
     } catch (error) {
-      console.error("Error deleting media from storage:", error);
+      console.error(
+        "Error deleting media from storage:",
+        error?.response?.data || error.message,
+      );
       return false;
     }
   };

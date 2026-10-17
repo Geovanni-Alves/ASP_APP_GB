@@ -32,7 +32,10 @@ import org.springframework.web.server.ResponseStatusException;
  *   DELETE /files/{bucket}/{name}          -> { deleted }
  *
  * The database only stores the returned "path" (a random file name), exactly like before.
- * For now every endpoint except the signed download requires a staff/admin user.
+ * Every endpoint except the signed download needs a logged-in user. The staff app (staff, drivers,
+ * admins) may UPLOAD to the buckets of kids, feed and profiles, and delete only profile photos.
+ * Everything else (the vans, deleting kid photos) is for managers.
+ * Bucket names are accepted in any letter case ("schoolExitPhotos" or "schoolexitphotos").
  */
 @RestController
 @RequestMapping("/files")
@@ -41,6 +44,14 @@ public class FilesController {
     // Same bucket names the old Supabase storage used.
     private static final Set<String> BUCKETS = Set.of(
         "vans", "profilePhotos", "schoolexitphotos", "feedPhotos", "feedVideos", "photos", "videos");
+
+    // Buckets the staff app may upload to and delete from (everything but the vans)
+    private static final Set<String> STAFF_APP_BUCKETS = Set.of(
+        "profilePhotos", "schoolexitphotos", "feedPhotos", "feedVideos", "photos", "videos");
+
+    // Buckets where the staff app may DELETE a file (a person changing their own profile photo).
+    // Photos of kids, of the dismissal door and of the feed are only removed by managers.
+    private static final Set<String> STAFF_APP_DELETE_BUCKETS = Set.of("profilePhotos");
 
     // Allowed upload types -> the extension we store. Anything else is rejected.
     private static final Map<String, String> EXTENSIONS = Map.of(
@@ -79,8 +90,8 @@ public class FilesController {
     public Map<String, String> upload(@PathVariable String bucket,
                                       @RequestParam("file") MultipartFile file,
                                       Authentication auth) throws IOException {
-        Roles.requireManager(auth);
-        requireBucket(bucket);
+        bucket = canonicalBucket(bucket);
+        requireWriteAccess(auth, bucket);
         if (file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Empty file");
         }
@@ -102,8 +113,8 @@ public class FilesController {
                                          @RequestParam String path,
                                          @RequestParam(defaultValue = "3600") long expires,
                                          Authentication auth) {
-        Roles.requireManager(auth);
-        requireBucket(bucket);
+        Roles.requireStaffApp(auth);
+        bucket = canonicalBucket(bucket);
         requireName(path);
         if (storage.load(bucket, path) == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found");
@@ -122,7 +133,7 @@ public class FilesController {
                                              @PathVariable String name,
                                              @RequestParam long exp,
                                              @RequestParam String sig) {
-        requireBucket(bucket);
+        bucket = canonicalBucket(bucket);
         requireName(name);
         if (!signer.verify(bucket, name, exp, sig)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid or expired link");
@@ -145,15 +156,32 @@ public class FilesController {
     public Map<String, Integer> delete(@PathVariable String bucket,
                                        @PathVariable String name,
                                        Authentication auth) throws IOException {
-        Roles.requireManager(auth);
-        requireBucket(bucket);
+        bucket = canonicalBucket(bucket);
+        if (STAFF_APP_DELETE_BUCKETS.contains(bucket)) {
+            Roles.requireStaffApp(auth);
+        } else {
+            Roles.requireManager(auth);
+        }
         requireName(name);
         return Map.of("deleted", storage.delete(bucket, name) ? 1 : 0);
     }
 
-    private void requireBucket(String bucket) {
-        if (!BUCKETS.contains(bucket)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown bucket: " + bucket);
+    // "schoolExitPhotos" and "schoolexitphotos" are the same bucket: returns the official name
+    private String canonicalBucket(String bucket) {
+        for (String known : BUCKETS) {
+            if (known.equalsIgnoreCase(bucket)) {
+                return known;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown bucket: " + bucket);
+    }
+
+    // Kids, feed and profile photos: the staff app. The vans: only managers.
+    private void requireWriteAccess(Authentication auth, String bucket) {
+        if (STAFF_APP_BUCKETS.contains(bucket)) {
+            Roles.requireStaffApp(auth);
+        } else {
+            Roles.requireManager(auth);
         }
     }
 

@@ -11,19 +11,20 @@ import {
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native";
 import * as Location from "expo-location";
-import { supabase } from "../../../lib/supabase";
+import api from "../../../lib/api";
+import { useRoutesContext } from "../../../contexts/RoutesContext";
 import { useUsersContext } from "../../../contexts/UsersContext";
 import styles from "./styles";
 import PickupCheckInScreen from "../PickupCheckInScreen";
 
 /**
- * Fixed base location
- * (future: load from settings table)
+ * Where the route starts. The real place comes from the settings (the dashboard sets it);
+ * this is only used until they arrive.
  */
 const BASE_LOCATION = {
-  id: "base-gb-guildford",
-  name: "Gracie Barra Guildford",
-  address: "15310 103A Ave #205, Surrey, BC V3R 7A2",
+  id: "base",
+  name: "Start",
+  address: "",
   isBase: true,
 };
 
@@ -33,6 +34,8 @@ const DriverPickupScreen = () => {
   const navigation = useNavigation();
 
   const { dbUser } = useUsersContext();
+  const { routesData, refreshRoutes } = useRoutesContext();
+  const [baseLocation, setBaseLocation] = useState(BASE_LOCATION);
 
   const [legs, setLegs] = useState([]);
   const [currentLegIndex, setCurrentLegIndex] = useState(0);
@@ -58,7 +61,7 @@ const DriverPickupScreen = () => {
     if (status !== "granted") {
       Alert.alert(
         "Permission required",
-        "Location permission is required to start the route."
+        "Location permission is required to start the route.",
       );
       return null;
     }
@@ -119,43 +122,68 @@ const DriverPickupScreen = () => {
   // Load driver route
   // --------------------------------------------------
 
-  const loadDriverRoute = async () => {
+  // The start of the route (the settings the dashboard sets)
+  useEffect(() => {
+    const loadBaseLocation = async () => {
+      try {
+        const { data } = await api.get("/app/settings");
+        const value = (key) =>
+          data.find((setting) => setting.key === key)?.value;
+        const coords = value("pickup_start_coords")
+          ? JSON.parse(value("pickup_start_coords"))
+          : null;
+
+        setBaseLocation({
+          id: "base",
+          name: value("after_school_name") || "Start",
+          address: value("pickup_start_address") || "",
+          lat: coords?.lat,
+          lng: coords?.lng,
+          isBase: true,
+        });
+      } catch (error) {
+        console.error(
+          "Error loading the start of the route:",
+          error?.response?.data || error.message,
+        );
+      }
+    };
+    loadBaseLocation();
+  }, []);
+
+  // The route, my van and the schools are already in the routes the API sent (no extra request):
+  // the order of the schools is in the van, and each school comes with the kids of the van.
+  const loadDriverRoute = () => {
     if (!routeId || !dbUser) return;
 
-    setLoading(true);
+    const routeData = routesData.find((r) => r.id === routeId);
+    const myVan = routeData?.vans?.find((v) => v.driver_id === dbUser.id);
 
-    const { data: routeVan, error } = await supabase
-      .from("route_vans")
-      .select("id, school_order, current_leg_index")
-      .eq("route_id", routeId)
-      .eq("driver_id", dbUser.id)
-      .single();
-
-    if (error || !routeVan?.school_order?.length) {
+    if (!myVan?.school_order?.length) {
       setLegs([]);
       setLoading(false);
       return;
     }
 
-    const { data: schoolsData } = await supabase
-      .from("schools")
-      .select("id, name, address,lat,lng")
-      .in("id", routeVan.school_order);
+    const schoolsById = {};
+    (myVan.kids || []).forEach((k) => {
+      if (k.school) schoolsById[k.school.id] = k.school;
+    });
 
-    const orderedSchools = routeVan.school_order
-      .map((id) => schoolsData.find((s) => s.id === id))
+    const orderedSchools = myVan.school_order
+      .map((id) => schoolsById[id])
       .filter(Boolean);
 
-    setLegs(buildRouteLegs(BASE_LOCATION, orderedSchools));
-    setRouteVanId(routeVan.id);
-    setCurrentLegIndex(routeVan.current_leg_index || 0);
+    setLegs(buildRouteLegs(baseLocation, orderedSchools));
+    setRouteVanId(myVan.id);
+    setCurrentLegIndex(myVan.current_leg_index || 0);
 
     setLoading(false);
   };
 
   useEffect(() => {
     loadDriverRoute();
-  }, [routeId, dbUser]);
+  }, [routeId, dbUser, routesData, baseLocation]);
 
   useEffect(() => {
     if (currentLegIndex > 0) {
@@ -165,7 +193,7 @@ const DriverPickupScreen = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadDriverRoute();
+    await refreshRoutes();
     setRefreshing(false);
   };
 
@@ -189,13 +217,13 @@ const DriverPickupScreen = () => {
             location.coords.latitude,
             location.coords.longitude,
             currentLeg.to.lat,
-            currentLeg.to.lng
+            currentLeg.to.lng,
           );
 
           // console.log({ distance });
 
           setNearDestination(distance <= 80);
-        }
+        },
       );
     };
 
@@ -223,10 +251,20 @@ const DriverPickupScreen = () => {
             setCurrentLocation(location);
             setStartedManually(true);
 
+            // The route is now in progress: the manager sees it in the dashboard
+            try {
+              await api.post(`/my/routes/${routeId}/start`);
+            } catch (error) {
+              console.error(
+                "Error starting the route:",
+                error?.response?.data || error.message,
+              );
+            }
+
             // openGoogleMapsWithOrigin(location, leg.to.address);
           },
         },
-      ]
+      ],
     );
   };
 
@@ -248,15 +286,13 @@ const DriverPickupScreen = () => {
     const hasNextLeg = nextIndex < legs.length;
 
     try {
-      // await supabase
-      //   .from("route_vans")
-      //   .update({ current_leg_index: nextIndex })
-      //   .eq("id", routeVanId);
+      // The API keeps the number of the current leg, so the progress survives closing the app
+      await api.put(`/my/routes/${routeId}/leg`, { index: nextIndex });
     } catch (err) {
       Alert.alert(
         "Error",
         "Failed to update route progress. Please try again.",
-        err
+        err,
       );
     }
 
@@ -313,8 +349,8 @@ const DriverPickupScreen = () => {
       index < currentLegIndex
         ? "completed"
         : index === currentLegIndex
-        ? "current"
-        : "upcoming";
+          ? "current"
+          : "upcoming";
 
     return (
       <View
@@ -331,7 +367,7 @@ const DriverPickupScreen = () => {
         {status === "current" && (
           <View style={styles.routeInfo}>
             <Text style={styles.routeLabel}>Origin</Text>
-            <Text style={styles.routeValue}>{BASE_LOCATION.address}</Text>
+            <Text style={styles.routeValue}>{baseLocation.address}</Text>
 
             <Text style={[styles.routeLabel, { marginTop: 6 }]}>
               Destination
