@@ -30,6 +30,7 @@ import KidsContext from "./contexts/KidsContext.jsx";
 import PicturesContext from "./contexts/PicturesContext.jsx";
 import PickupPlanner from "./components/PickupPlanner/PickupPlanner.jsx";
 import Schools from "./pages/Schools/Schools.jsx";
+import Activity from "./pages/Activity/Activity.jsx";
 
 function App() {
   const [closeMenu, setCloseMenu] = useState(false);
@@ -69,6 +70,10 @@ function App() {
                       <Route
                         path="/staff"
                         element={<Staff closeMenu={closeMenu} />}
+                      />
+                      <Route
+                        path="/activity"
+                        element={<Activity closeMenu={closeMenu} />}
                       />
                       <Route
                         path="/schools"

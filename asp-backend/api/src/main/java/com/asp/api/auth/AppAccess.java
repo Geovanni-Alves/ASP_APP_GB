@@ -11,9 +11,10 @@ import java.util.Set;
 public final class AppAccess {
 
     private static final Map<String, Set<String>> ALLOWED = Map.of(
-        "dashboard", Set.of("admin", "superadmin"),
-        // a driver is also staff; the manager (admin) can drive and post photos too
-        "staff", Set.of("staff", "driver", "admin", "superadmin"),
+        // the people who run the school
+        "dashboard", Set.of("owner", "manager", "admin", "superadmin"),
+        // a driver is also staff; the owner, the managers and the admins can drive and post photos too
+        "staff", Set.of("staff", "driver", "admin", "manager", "owner", "superadmin"),
         // only the super admin may look at the parent app (for support and tests)
         "parent", Set.of("parent", "superadmin"));
 

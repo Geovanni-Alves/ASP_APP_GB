@@ -1,5 +1,6 @@
 package com.asp.api.invites;
 
+import com.asp.api.audit.AuditService;
 import com.asp.api.auth.Roles;
 import java.util.Map;
 import java.util.UUID;
@@ -15,9 +16,11 @@ public class InviteController {
     public record AcceptRequest(String email, String code, String password, String app) {}
 
     private final InviteService invites;
+    private final AuditService audit;
 
-    public InviteController(InviteService invites) {
+    public InviteController(InviteService invites, AuditService audit) {
         this.invites = invites;
+        this.audit = audit;
     }
 
     // POST /contacts/{contactId}/invite  (staff and admins)
@@ -32,6 +35,18 @@ public class InviteController {
     // Body: { email, code, password, app? } -> { token, user }, the same shape as the login
     @PostMapping("/auth/accept-invite")
     public Map<String, Object> accept(@RequestBody AcceptRequest request) {
-        return invites.accept(request.email(), request.code(), request.password(), request.app());
+        Map<String, Object> result = invites.accept(request.email(), request.code(), request.password(), request.app());
+
+        // The person is signed in now: the first access leaves a trace (this is not the login route)
+        if (result.get("user") instanceof Map<?, ?> user) {
+            try {
+                audit.loginOk(UUID.fromString(String.valueOf(user.get("id"))), String.valueOf(user.get("name")),
+                    String.valueOf(user.get("userType")), request.app() == null ? "" : request.app(),
+                    "invite.accepted");
+            } catch (IllegalArgumentException e) {
+                // not an id we can record: the invite itself worked
+            }
+        }
+        return result;
     }
 }

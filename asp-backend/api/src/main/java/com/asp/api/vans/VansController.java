@@ -1,5 +1,6 @@
 package com.asp.api.vans;
 
+import com.asp.api.audit.AuditService;
 import com.asp.api.auth.Roles;
 import com.asp.api.common.InactiveReasons;
 import com.asp.api.files.FileStorage;
@@ -50,11 +51,14 @@ public class VansController {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final FileStorage storage;
+    private final AuditService audit;
 
-    public VansController(JdbcTemplate jdbc, TransactionTemplate transaction, FileStorage storage) {
+    public VansController(JdbcTemplate jdbc, TransactionTemplate transaction, FileStorage storage,
+                          AuditService audit) {
         this.jdbc = jdbc;
         this.transaction = transaction;
         this.storage = storage;
+        this.audit = audit;
     }
 
     // ------------------------------------------------------------------ usage
@@ -100,6 +104,15 @@ public class VansController {
                 + "\"inactiveSince\" = null where id = ?", vanId);
         }
 
+        List<String> vanNames = jdbc.queryForList("select name from vans where id = ?", String.class, vanId);
+        Map<String, Object> details = new LinkedHashMap<>();
+        if (!active) {
+            details.put("reason", body.get("reason"));
+            details.put("note", body.get("note"));
+        }
+        audit.log(auth, active ? "van.reactivate" : "van.deactivate", "vans", vanId,
+            vanNames.isEmpty() ? null : vanNames.get(0), details);
+
         Map<String, Object> ok = new LinkedHashMap<>();
         ok.put("active", active);
         return ResponseEntity.ok(ok);
@@ -110,6 +123,9 @@ public class VansController {
     @DeleteMapping("/{vanId}")
     public ResponseEntity<Map<String, Object>> delete(@PathVariable UUID vanId, Authentication auth) {
         Roles.requireManager(auth);
+
+        List<String> namesBefore = jdbc.queryForList("select name from vans where id = ?", String.class, vanId);
+        String vanName = namesBefore.isEmpty() ? null : namesBefore.get(0);
 
         // Lock the van, check and delete in ONE transaction. A route that is being created for this van
         // at the same moment has to wait for us, so a route can never be erased by the cascade.
@@ -144,6 +160,8 @@ public class VansController {
                 // a photo that cannot be removed does not undo the deletion
             }
         }
+
+        audit.log(auth, "van.delete", "vans", vanId, vanName, new LinkedHashMap<>());
 
         Map<String, Object> ok = new LinkedHashMap<>();
         ok.put("deleted", 1);

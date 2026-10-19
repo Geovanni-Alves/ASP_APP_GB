@@ -121,7 +121,7 @@ public class PlannerController {
         Roles.requireManager(auth);
         return jdbc.queryForList(
             "select id, name, \"userType\" from users "
-                + "where active and lower(coalesce(\"userType\", '')) in ('staff', 'driver', 'admin') "
+                + "where active and lower(coalesce(\"userType\", '')) in ('staff', 'driver', 'admin', 'manager', 'owner') "
                 + "order by lower(name)");
     }
 
@@ -210,7 +210,7 @@ public class PlannerController {
         }
         // Only people who can work in a route (active staff, drivers and admins)
         if (!staffIds.isEmpty() && count("select count(*) from users where id = any(CAST(? AS uuid[])) and active "
-                + "and lower(coalesce(\"userType\", '')) in ('staff', 'driver', 'admin')", staffIds) != staffIds.size()) {
+                + "and lower(coalesce(\"userType\", '')) in ('staff', 'driver', 'admin', 'manager', 'owner')", staffIds) != staffIds.size()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A staff member is unknown or inactive");
         }
     }

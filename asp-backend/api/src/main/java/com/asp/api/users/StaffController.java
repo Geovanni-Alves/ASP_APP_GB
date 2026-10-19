@@ -1,5 +1,6 @@
 package com.asp.api.users;
 
+import com.asp.api.audit.AuditService;
 import com.asp.api.auth.ActiveUsers;
 import com.asp.api.auth.Roles;
 import com.asp.api.common.InactiveReasons;
@@ -25,40 +26,47 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Staff management for the dashboard (the list itself comes from GET /users).
+ * People management for the dashboard (the list itself comes from GET /users).
  *
- *   POST  /staff                     register a new staff member (a user without a password yet)
- *   PATCH /staff/{id}                edit name, phone, address and type (Staff or Driver)
- *   PUT   /staff/{id}/active         deactivate or reactivate (staff are never deleted from the app)
- *   POST  /staff/{id}/invite         email the invite code (the person sets a password in the app)
+ *   POST  /staff                     register a new person (a user without a password yet)
+ *   PATCH /staff/{id}                edit name, phone, address and type
+ *   PUT   /staff/{id}/active         deactivate or reactivate (people are never deleted from the app)
+ *   POST  /staff/{id}/invite         email the invite (the person sets a password)
+ *
+ * The rule is one (see Roles): only the owner and the managers manage people, and only people of a
+ * LOWER level than their own. The owner creates managers, admins, staff and drivers; a manager
+ * creates admins, staff and drivers; an admin creates nobody.
  */
 @RestController
 @RequestMapping("/staff")
 public class StaffController {
 
-    // The account types that can be chosen in the dashboard. Only a super admin can also pick ADMIN
-    // (the ASP manager, who uses the dashboard).
-    // Everybody who counts as "staff" here (lower case)
-    private static final Set<String> STAFF_LIKE = Set.of("staff", "driver", "admin", "superadmin");
+    // Everybody who counts as part of the team here (lower case)
+    private static final Set<String> TEAM =
+        Set.of("staff", "driver", "admin", "manager", "owner", "superadmin");
     // Who can open the dashboard (staff and drivers only use the staff app)
-    private static final Set<String> PORTAL_USERS = Set.of("admin", "superadmin");
+    private static final Set<String> PORTAL_USERS = Set.of("owner", "manager", "admin", "superadmin");
+    // The people who manage people: at least one of them must always be active
+    private static final Set<String> PEOPLE_MANAGER_TYPES = Set.of("owner", "manager");
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     private final JdbcTemplate jdbc;
     private final InviteService invites;
     private final ActiveUsers activeUsers;
+    private final AuditService audit;
 
-    public StaffController(JdbcTemplate jdbc, InviteService invites, ActiveUsers activeUsers) {
+    public StaffController(JdbcTemplate jdbc, InviteService invites, ActiveUsers activeUsers, AuditService audit) {
         this.jdbc = jdbc;
         this.invites = invites;
         this.activeUsers = activeUsers;
+        this.audit = audit;
     }
 
     // ------------------------------------------------------------------ create
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> create(@RequestBody Map<String, Object> body, Authentication auth) {
-        Roles.requireManager(auth);
+        Roles.requirePeopleManager(auth);
 
         String name = text(body.get("name"));
         String email = text(body.get("email")).toLowerCase();
@@ -68,7 +76,8 @@ public class StaffController {
         if (!EMAIL.matcher(email).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Please enter a valid email address");
         }
-        String type = assignableType(body.get("userType"), "STAFF", assignableFor(auth));
+        String type = assignableType(body.get("userType"), "STAFF", Roles.assignableTypes(Roles.roleOf(auth)));
+        requireSingleOwner(type, null);
 
         // Never turn an existing account (for example a parent) into staff by accident
         Integer taken = jdbc.queryForObject(
@@ -82,6 +91,11 @@ public class StaffController {
                 + "active, updated_at) values (?, ?, ?, ?, ?, true, false, true, now()) returning "
                 + UsersController.COLUMNS,
             name, email, blankToNull(body.get("phoneNumber")), blankToNull(body.get("address")), type);
+
+        Map<String, Object> createdDetails = new LinkedHashMap<>();
+        createdDetails.put("type", type);
+        createdDetails.put("email", email);
+        audit.log(auth, "user.create", "users", created.get("id"), name, createdDetails);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -90,9 +104,12 @@ public class StaffController {
     @PatchMapping("/{id}")
     public Map<String, Object> update(@PathVariable UUID id, @RequestBody Map<String, Object> body,
                                       Authentication auth) {
-        Roles.requireManager(auth);
-        String currentType = requireStaffUser(id);
-        protectPrivileged(currentType, auth);
+        Roles.requirePeopleManager(auth);
+        String currentType = requireTeamUser(id);
+        requireCanManage(auth, currentType);
+
+        Map<String, Object> before =
+            jdbc.queryForMap("select " + UsersController.COLUMNS + " from users where id = ?", id);
 
         List<String> sets = new ArrayList<>();
         List<Object> args = new ArrayList<>();
@@ -114,15 +131,18 @@ public class StaffController {
             args.add(blankToNull(body.get("address")));
         }
         if (body.containsKey("userType")) {
-            String newType = assignableType(body.get("userType"), currentType.toUpperCase(), assignableFor(auth));
+            String newType = assignableType(body.get("userType"), currentType.toUpperCase(),
+                Roles.assignableTypes(Roles.roleOf(auth)));
             if (!newType.equalsIgnoreCase(currentType)) {
-                // A super admin account keeps its type, and nobody changes their own
-                if (!assignableFor(auth).contains(currentType.toUpperCase())) {
-                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "The type of this account cannot be changed here");
-                }
                 if (id.toString().equals(auth.getName())) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "You cannot change your own account type");
+                }
+                requireSingleOwner(newType, id);
+                // Moving the last owner or manager to another type would leave nobody to manage people
+                if (PEOPLE_MANAGER_TYPES.contains(currentType) && !PEOPLE_MANAGER_TYPES.contains(newType.toLowerCase())
+                    && !Roles.isSuperAdmin(auth) && !anotherPeopleManager(id)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "This is the last active owner or manager: someone must be able to manage people.");
                 }
                 sets.add("\"userType\" = ?");
                 args.add(newType);
@@ -134,20 +154,33 @@ public class StaffController {
             args.add(id);
             jdbc.update("update users set " + String.join(", ", sets) + " where id = ?", args.toArray());
         }
-        return jdbc.queryForMap("select " + UsersController.COLUMNS + " from users where id = ?", id);
+        Map<String, Object> after =
+            jdbc.queryForMap("select " + UsersController.COLUMNS + " from users where id = ?", id);
+
+        // The activity log: only what really changed, with the old and the new value
+        Map<String, Object> changes = AuditService.diff(before, after);
+        if (changes.isEmpty()) {
+            audit.markLogged();
+        } else {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("changes", changes);
+            audit.log(auth, "user.update", "users", id, AuditService.labelOf(after), details);
+        }
+        return after;
     }
 
     // ------------------------------------------------------------------ deactivate / reactivate
 
     // Body: { "active": false }. Deactivating is blocked while the person works in an open route,
-    // and nobody can deactivate themselves or the last active staff member.
+    // and nobody can deactivate themselves or the last active owner or manager.
     // A blocked request answers 409 { error, reasons: [...] }.
     @PutMapping("/{id}/active")
     public ResponseEntity<Map<String, Object>> setActive(@PathVariable UUID id,
                                                          @RequestBody Map<String, Object> body,
                                                          Authentication auth) {
-        Roles.requireManager(auth);
-        protectPrivileged(requireStaffUser(id), auth);
+        Roles.requirePeopleManager(auth);
+        String type = requireTeamUser(id);
+        requireCanManage(auth, type);
 
         if (!(body.get("active") instanceof Boolean)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "active must be true or false");
@@ -160,10 +193,12 @@ public class StaffController {
             if (id.toString().equals(auth.getName())) {
                 return conflict("You cannot deactivate your own account.", null);
             }
-            List<String> reasons = deactivationBlockers(id);
+            List<String> reasons = deactivationBlockers(id, type, Roles.isSuperAdmin(auth));
             if (!reasons.isEmpty()) {
-                return conflict("This staff member cannot be deactivated yet.", reasons);
+                return conflict("This person cannot be deactivated yet.", reasons);
             }
+        } else if (type.equals("owner")) {
+            requireSingleOwner("OWNER", id); // there is only one active owner
         }
 
         if (why != null) {
@@ -175,6 +210,13 @@ public class StaffController {
         }
         activeUsers.forget(id); // a deactivated person loses access right away
 
+        Map<String, Object> details = new LinkedHashMap<>();
+        if (why != null) {
+            details.put("reason", why.reason());
+            details.put("note", why.note());
+        }
+        audit.log(auth, active ? "user.reactivate" : "user.deactivate", "users", id, nameOf(id), details);
+
         Map<String, Object> ok = new LinkedHashMap<>();
         ok.put("active", active);
         return ResponseEntity.ok(ok);
@@ -184,15 +226,17 @@ public class StaffController {
 
     @PostMapping("/{id}/invite")
     public Map<String, Object> invite(@PathVariable UUID id, Authentication auth) {
-        Roles.requireManager(auth);
-        protectPrivileged(requireStaffUser(id), auth);
-        return invites.inviteStaff(id, UUID.fromString(auth.getName()));
+        Roles.requirePeopleManager(auth);
+        requireCanManage(auth, requireTeamUser(id));
+        Map<String, Object> result = invites.inviteStaff(id, UUID.fromString(auth.getName()));
+        audit.log(auth, "user.invite", "users", id, nameOf(id), new LinkedHashMap<>());
+        return result;
     }
 
     // ------------------------------------------------------------------ helpers
 
-    // Why a staff member cannot be deactivated right now (an empty list means they can)
-    private List<String> deactivationBlockers(UUID userId) {
+    // Why a person cannot be deactivated right now (an empty list means they can)
+    private List<String> deactivationBlockers(UUID userId, String type, boolean actorIsSuperAdmin) {
         List<String> reasons = new ArrayList<>();
 
         List<Map<String, Object>> routes = jdbc.queryForList(
@@ -210,44 +254,61 @@ public class StaffController {
                 + " (" + route.get("status") + van + ").");
         }
 
-        // Somebody has to be able to sign in to the dashboard
-        Integer others = jdbc.queryForObject(
-            "select count(*) from users where id <> ? and active and lower(\"userType\") in ('admin', 'superadmin')",
-            Integer.class, userId);
-        boolean isPortalUser = PORTAL_USERS.contains(typeOf(userId));
-        if (isPortalUser && (others == null || others == 0)) {
-            reasons.add("This is the last active administrator: someone must be able to use the dashboard.");
+        // Somebody has to be able to manage people (the superadmin can always step in)
+        if (PEOPLE_MANAGER_TYPES.contains(type) && !actorIsSuperAdmin && !anotherPeopleManager(userId)) {
+            reasons.add("This is the last active owner or manager: someone must be able to manage people.");
         }
         return reasons;
     }
 
-    // Admin and SuperAdmin accounts can only be managed by a SuperAdmin (a regular staff member
-    // must not be able to edit, deactivate or invite the owner).
-    private void protectPrivileged(String type, Authentication auth) {
-        boolean privileged = type.equals("admin") || type.equals("superadmin");
-        if (privileged && !Roles.isSuperAdmin(auth)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only a super admin can manage this account");
+    // Is there an active owner or manager besides this person?
+    private boolean anotherPeopleManager(UUID userId) {
+        Integer others = jdbc.queryForObject(
+            "select count(*) from users where id <> ? and active and lower(coalesce(\"userType\", '')) in ('owner', 'manager')",
+            Integer.class, userId);
+        return others != null && others > 0;
+    }
+
+    // There is only one active owner (the database enforces it too)
+    private void requireSingleOwner(String type, UUID exceptId) {
+        if (!"OWNER".equalsIgnoreCase(type)) {
+            return;
+        }
+        Integer others = jdbc.queryForObject(
+            "select count(*) from users where active and lower(coalesce(\"userType\", '')) = 'owner' "
+                + "and (CAST(? AS uuid) is null or id <> CAST(? AS uuid))",
+            Integer.class, exceptId, exceptId);
+        if (others != null && others > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "There is already an owner. Deactivate the current one first.");
         }
     }
 
-    // The account type of a staff member (lower case); 404 for anybody who is not staff (parents...)
-    private String requireStaffUser(UUID id) {
+    // The caller may only manage people of a lower level than their own
+    private void requireCanManage(Authentication auth, String targetType) {
+        if (!Roles.canManage(Roles.roleOf(auth), targetType)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You cannot manage this account");
+        }
+    }
+
+    // The account type of a team member (lower case); 404 for anybody who is not in the team (parents...)
+    private String requireTeamUser(UUID id) {
         String type = typeOf(id);
-        if (type == null || !STAFF_LIKE.contains(type)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Staff member not found");
+        if (type == null || !TEAM.contains(type)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Person not found");
         }
         return type;
+    }
+
+    private String nameOf(UUID id) {
+        List<String> names = jdbc.queryForList("select name from users where id = ?", String.class, id);
+        return names.isEmpty() ? null : names.get(0);
     }
 
     private String typeOf(UUID id) {
         List<String> types = jdbc.queryForList(
             "select lower(coalesce(\"userType\", '')) from users where id = ?", String.class, id);
         return types.isEmpty() ? null : types.get(0);
-    }
-
-    // The types the caller may assign. A driver is also staff; ADMIN is the ASP manager.
-    private static Set<String> assignableFor(Authentication auth) {
-        return Roles.isSuperAdmin(auth) ? Set.of("STAFF", "DRIVER", "ADMIN") : Set.of("STAFF", "DRIVER");
     }
 
     private static String assignableType(Object raw, String fallback, Set<String> allowed) {

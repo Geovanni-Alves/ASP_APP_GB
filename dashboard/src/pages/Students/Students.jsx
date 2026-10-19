@@ -80,6 +80,7 @@ function Students({ closeMenu }) {
   const [statusChanged, setStatusChanged] = useState(false);
   const [savedDays, setSavedDays] = useState(null); // schedule as it is saved in the database
   const [loadedStudentId, setLoadedStudentId] = useState(null); // which student the form is showing
+  const [sortBy, setSortBy] = useState("name");
 
   const [attendanceDays, setAttendanceDays] = useState({
     Monday: false,
@@ -220,15 +221,33 @@ function Students({ closeMenu }) {
   const activeCount = kids.filter((kid) => !isInactive(kid)).length;
   const inactiveCount = kids.length - activeCount;
 
-  const filteredKids = kids.filter((kid) => {
-    const matchesName =
-      nameFilter === "" ||
-      kid.name?.toLowerCase().includes(nameFilter.toLowerCase());
-    const matchesStatus =
-      statusFilter === "All" ||
-      (statusFilter === "Inactive" ? isInactive(kid) : !isInactive(kid));
-    return matchesName && matchesStatus;
-  });
+  const filteredKids = kids
+    .filter((kid) => {
+      const matchesName =
+        nameFilter === "" ||
+        kid.name?.toLowerCase().includes(nameFilter.toLowerCase());
+
+      const matchesStatus =
+        statusFilter === "All" ||
+        (statusFilter === "Inactive" ? isInactive(kid) : !isInactive(kid));
+
+      return matchesName && matchesStatus;
+    })
+    .sort((a, b) => {
+      if (sortBy === "school") {
+        const schoolA = a.schools?.name || "";
+        const schoolB = b.schools?.name || "";
+
+        return (
+          schoolA.localeCompare(schoolB, "en", { sensitivity: "base" }) ||
+          a.name.localeCompare(b.name, "en", { sensitivity: "base" })
+        );
+      }
+
+      return a.name.localeCompare(b.name, "en", {
+        sensitivity: "base",
+      });
+    });
 
   // const displayedKids = filteredKids.slice(startIndex, endIndex);
 
@@ -687,6 +706,8 @@ function Students({ closeMenu }) {
     }
   };
 
+  // console.log("filteredKids", filteredKids);
+
   // (unused: the search box that called this was removed from the details screen)
   // const handleUpdateAddressSelect = (selectedPlace) => {
   //   setUpdatedDropOffAddress(selectedPlace.formatted_address);
@@ -713,6 +734,14 @@ function Students({ closeMenu }) {
                       style={{ width: 220 }}
                     />
                     <Segmented
+                      value={sortBy}
+                      onChange={setSortBy}
+                      options={[
+                        { label: "A-Z", value: "name" },
+                        { label: "By School", value: "school" },
+                      ]}
+                    />
+                    <Segmented
                       value={statusFilter}
                       onChange={setStatusFilter}
                       options={[
@@ -731,83 +760,86 @@ function Students({ closeMenu }) {
                 </div>
                 <div className="student-list">
                   {filteredKids.map((kid) => (
-                    <div
-                      className={`student-details-container ${
-                        isInactive(kid) ? "is-inactive" : ""
-                      }`}
-                      key={kid.id}
-                    >
-                      <RemoteImage
-                        path={kid.photo}
-                        name={kid.name}
-                        bucketName="profilePhotos"
-                        className="student-photo"
-                      />
-                      <div className="student-details">
-                        <div className="student-name">
-                          {kid.name}
-                          {isInactive(kid) && (
-                            <Tag
-                              style={{ marginLeft: 8 }}
-                              title={kid.inactiveReason || ""}
+                    <div className="student-details-container" key={kid.id}>
+                      <div className="student-card-header">
+                        <RemoteImage
+                          path={kid.photo}
+                          name={kid.name}
+                          bucketName="profilePhotos"
+                          className="student-photo"
+                        />
+
+                        <div className="student-info">
+                          <div className="student-name">{kid.name}</div>
+
+                          <div className="student-school">
+                            {kid.schools?.name || "Not Assigned"}
+                          </div>
+
+                          <div className="student-meta">
+                            <span
+                              className={`student-status ${
+                                isInactive(kid) ? "is-inactive" : ""
+                              }`}
                             >
-                              Inactive
-                            </Tag>
-                          )}
-                        </div>
-                        <div className="student-address">
-                          {kid.dropOffAddress?.addressLine1}
-                          {kid.dropOffAddress?.city}
-                        </div>
-                        <div className="studentSchedule">
-                          <h4>Attendance</h4>
-                          <div className="attendance-icons">
-                            <div className="days-of-week">
-                              <span>Mon</span>
-                              <span>Tue</span>
-                              <span>Wed</span>
-                              <span>Thu</span>
-                              <span>Fri</span>
-                            </div>
-                            <div className="stars">
-                              {[
-                                "Monday",
-                                "Tuesday",
-                                "Wednesday",
-                                "Thursday",
-                                "Friday",
-                              ].map((day) => (
-                                <FontAwesomeIcon
-                                  key={day}
-                                  icon={faStar}
-                                  style={{
-                                    color:
-                                      kid.students_schedule &&
-                                      kid.students_schedule?.[day.toLowerCase()]
-                                        ? "green"
-                                        : "gray",
-                                  }}
-                                />
-                              ))}
-                            </div>
+                              {isInactive(kid) ? "Inactive" : "Active"}
+                            </span>
+
+                            <span
+                              type="button"
+                              className="student-profile-link"
+                            >
+                              Student profile
+                            </span>
                           </div>
                         </div>
+
+                        <div className="student-details-btn">
+                          <button
+                            type="button"
+                            className="btn-student btn-student-edit"
+                            onClick={() => handleStudentClick(kid)}
+                            aria-label={`Edit ${kid.name}`}
+                          >
+                            <FontAwesomeIcon icon={faPenToSquare} />
+                            <span>Edit</span>
+                          </button>
+                        </div>
                       </div>
-                      <div className="student-details-btn">
-                        <button
-                          className="btn-student btn-student-edit"
-                          onClick={() => handleStudentClick(kid)}
-                        >
-                          <FontAwesomeIcon icon={faPenToSquare} />
-                        </button>
-                        {/* <button
-                          className="btn-student btn-student-delete"
-                          onClick={() => {
-                            handleDeleteClick(kid);
-                          }}
-                        >
-                          <FontAwesomeIcon icon={faTrash} />
-                        </button> */}
+
+                      <div className="studentSchedule">
+                        <h4>ATTENDANCE</h4>
+
+                        <div className="attendance-icons">
+                          {[
+                            { label: "Mon", day: "monday" },
+                            { label: "Tue", day: "tuesday" },
+                            { label: "Wed", day: "wednesday" },
+                            { label: "Thu", day: "thursday" },
+                            { label: "Fri", day: "friday" },
+                          ].map(({ label, day }) => {
+                            const isScheduled = Boolean(
+                              kid.students_schedule?.[day],
+                            );
+
+                            return (
+                              <div className="attendance-day" key={day}>
+                                <span className="attendance-day-label">
+                                  {label}
+                                </span>
+
+                                <FontAwesomeIcon
+                                  icon={faStar}
+                                  className={
+                                    isScheduled
+                                      ? "star-active"
+                                      : "star-inactive"
+                                  }
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ))}

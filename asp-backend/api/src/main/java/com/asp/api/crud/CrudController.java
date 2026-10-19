@@ -3,12 +3,14 @@ package com.asp.api.crud;
 import com.asp.api.auth.Roles;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import com.asp.api.audit.AuditService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,10 +61,13 @@ public class CrudController {
     private final TableMetaService meta;
     private final ValueConverter converter;
 
-    public CrudController(JdbcTemplate jdbc, TableMetaService meta, ValueConverter converter) {
+    private final AuditService audit;
+
+    public CrudController(JdbcTemplate jdbc, TableMetaService meta, ValueConverter converter, AuditService audit) {
         this.jdbc = jdbc;
         this.meta = meta;
         this.converter = converter;
+        this.audit = audit;
     }
 
     // ---------------------------------------------------------------- READ
@@ -121,9 +126,14 @@ public class CrudController {
             for (Object item : items) {
                 created.add(insertOne(resource, cols, asRow(item)));
             }
+            for (String createdRow : created) {
+                auditCreated(auth, resource, createdRow);
+            }
             return json(HttpStatus.CREATED, "[" + String.join(",", created) + "]");
         }
-        return json(HttpStatus.CREATED, insertOne(resource, cols, asRow(body)));
+        String newRow = insertOne(resource, cols, asRow(body));
+        auditCreated(auth, resource, newRow);
+        return json(HttpStatus.CREATED, newRow);
     }
 
     // -------------------------------------------------------------- UPDATE
@@ -161,6 +171,8 @@ public class CrudController {
         }
         args.add(id);
 
+        Map<String, Object> before = rowOf(resource, pk, cols, id); // for the activity log
+
         String sql = "with upd as (update " + quote(resource) + " set " + String.join(", ", sets)
             + " where " + quote(pk) + " = CAST(? AS " + cols.get(pk).castType() + ") returning *) "
             + "select row_to_json(upd)::text from upd";
@@ -168,6 +180,17 @@ public class CrudController {
         List<String> rows = jdbc.queryForList(sql, String.class, args.toArray());
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Row not found");
+        }
+
+        // The activity log: only what really changed, with the old and the new value
+        Map<String, Object> after = audit.parse(rows.get(0));
+        Map<String, Object> changes = AuditService.diff(before, after);
+        if (changes.isEmpty()) {
+            audit.markLogged();
+        } else {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("changes", changes);
+            audit.log(auth, resource + ".update", resource, id, AuditService.labelOf(after), details);
         }
         return json(HttpStatus.OK, rows.get(0));
     }
@@ -184,11 +207,18 @@ public class CrudController {
         Map<String, TableMetaService.Column> cols = columnsOf(resource);
         String pk = requirePrimaryKey(resource);
 
+        Map<String, Object> before = rowOf(resource, pk, cols, id); // for the activity log
+
         Long deleted = jdbc.queryForObject(
             "with del as (delete from " + quote(resource) + " where " + quote(pk)
                 + " = CAST(? AS " + cols.get(pk).castType() + ") returning 1) select count(*) from del",
             Long.class, id);
 
+        if (deleted != null && deleted > 0) {
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("deleted", AuditService.clean(before));
+            audit.log(auth, resource + ".delete", resource, id, AuditService.labelOf(before), details);
+        }
         return json(HttpStatus.OK, "{\"deleted\":" + deleted + "}");
     }
 
@@ -206,11 +236,27 @@ public class CrudController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                 "At least one filter is required (refusing to delete the whole table)");
         }
+        // The first rows that are about to go, for the activity log
+        String doomed = jdbc.queryForObject(
+            "select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb)::text from (select * from "
+                + quote(resource) + where.sql() + " limit 20) t",
+            String.class, where.args().toArray());
+
         Long deleted = jdbc.queryForObject(
             "with del as (delete from " + quote(resource) + where.sql()
                 + " returning 1) select count(*) from del",
             Long.class, where.args().toArray());
 
+        if (deleted != null && deleted > 0) {
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (Map<String, Object> row : audit.parseList(doomed)) {
+                rows.add(AuditService.clean(row));
+            }
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("count", deleted);
+            details.put("rows", rows);
+            audit.log(auth, resource + ".delete", resource, null, deleted + " row(s)", details);
+        }
         return json(HttpStatus.OK, "{\"deleted\":" + deleted + "}");
     }
 
@@ -241,6 +287,30 @@ public class CrudController {
     }
 
     @SuppressWarnings("unchecked")
+    // The row as it is now (for the activity log); empty when it does not exist
+    private Map<String, Object> rowOf(String resource, String pk, Map<String, TableMetaService.Column> cols, String id) {
+        List<String> rows = jdbc.queryForList(
+            "select row_to_json(t)::text from " + quote(resource) + " t where " + quote(pk)
+                + " = CAST(? AS " + cols.get(pk).castType() + ")",
+            String.class, id);
+        return rows.isEmpty() ? new LinkedHashMap<>() : audit.parse(rows.get(0));
+    }
+
+    // A new row in the activity log: the values it was created with
+    private void auditCreated(Authentication auth, String resource, String rowJson) {
+        Map<String, Object> row = audit.parse(rowJson);
+        String pk = null;
+        try {
+            pk = requirePrimaryKey(resource);
+        } catch (ResponseStatusException e) {
+            // a table with a composite key (student_family): the values say everything
+        }
+        Object id = pk == null ? null : row.get(pk);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("values", AuditService.clean(row));
+        audit.log(auth, resource + ".create", resource, id, AuditService.labelOf(row), details);
+    }
+
     private Map<String, Object> asRow(Object item) {
         if (item instanceof Map<?, ?> map) {
             return (Map<String, Object>) map;

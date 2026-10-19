@@ -1,0 +1,25 @@
+/* src/pages/Activity/Activity.css
+   The panel and the header come from styles/page.css. */
+.activity-details {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 4px 8px;
+}
+
+.activity-indent {
+  margin-left: 16px;
+}
+
+.activity-old {
+  color: #b42318;
+  text-decoration: line-through;
+}
+
+.activity-new {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.activity-muted {
+  color: #9ca3af;
+}

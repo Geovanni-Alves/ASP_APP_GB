@@ -1,6 +1,13 @@
-import { createContext, useState, useEffect, useContext, useCallback } from "react";
+import {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+} from "react";
 import api from "../lib/api";
 import { useAuthContext } from "./AuthContext";
+import { canUseDashboard } from "../lib/roles";
 import CompleteProfile from "../components/CompleteProfile/CompleteProfile";
 
 const UsersContext = createContext({});
@@ -11,8 +18,7 @@ const userTypeOf = (user) => (user?.userType || "").toLowerCase();
 
 // Only administrators use the dashboard (the ASP manager and the super admin).
 // Staff and drivers use the staff app, parents use the parent app.
-const PORTAL_TYPES = ["admin", "superadmin"];
-const canUsePortal = (user) => PORTAL_TYPES.includes(userTypeOf(user));
+const canUsePortal = canUseDashboard;
 
 const UsersContextProvider = ({ children }) => {
   const { session, logout } = useAuthContext();
@@ -127,7 +133,10 @@ const UsersContextProvider = ({ children }) => {
           <button onClick={logout}>Sign out</button>
         </div>
       ) : needsProfile ? (
-        <CompleteProfile email={authUser.email} onCreateUser={completeProfile} />
+        <CompleteProfile
+          email={authUser.email}
+          onCreateUser={completeProfile}
+        />
       ) : (
         children
       )}

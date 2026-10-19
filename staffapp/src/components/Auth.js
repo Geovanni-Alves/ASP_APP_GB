@@ -127,7 +127,9 @@ export default function Auth() {
 
             <Button
               mode="text"
-              onPress={() => switchMode(mode === "signin" ? "invite" : "signin")}
+              onPress={() =>
+                switchMode(mode === "signin" ? "invite" : "signin")
+              }
               disabled={loading}
             >
               {mode === "signin" ? "I have an invite" : "Back to sign in"}

@@ -13,7 +13,8 @@ import ArrowIcon from "../../Images/drop-down-arrow.png";
 import { useLocation } from "react-router-dom";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { useAuthContext } from "../../contexts/AuthContext";
-import { FaSignOutAlt, FaUser } from "react-icons/fa";
+import { FaSignOutAlt, FaUser, FaHistory } from "react-icons/fa";
+import { canManagePeople } from "../../lib/roles";
 import RemoteImage from "../../components/RemoteImage/RemoteImage.jsx";
 import DialogBox from "../UiComponents/DialogBox";
 
@@ -268,6 +269,12 @@ const Sidebar = ({ closeMenu, toggleMenu }) => {
             <img src={House} alt="drop-off" />
             <a href="/routes">Drop-Off</a>
           </li>
+          {canManagePeople(currentUserData) && (
+            <li className={location.pathname === "/activity" ? "active" : ""}>
+              <FaHistory style={{ width: 22, height: 22, marginRight: 12 }} />
+              <a href="/activity">Activity</a>
+            </li>
+          )}
           <li className={location.pathname === "/settings" ? "active" : ""}>
             <img src={Settings} alt="settings" />
             <a href="/settings">Settings</a>

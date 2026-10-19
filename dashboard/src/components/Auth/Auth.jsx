@@ -48,27 +48,64 @@ const Auth = ({ onLogin, onAcceptInvite }) => {
       const user = await onLogin(email, password);
       console.log("Logged in:", user);
     } catch (error) {
+      console.log("Login status:", error.response?.status);
+      console.log("Login response:", error.response?.data);
+      console.log("Login error code:", error.response?.data?.code);
+
       const reason = error.response?.data?.code;
+
       if (!error.response) {
-        // No response at all: the API is down or the address in .env is wrong
-        setError("Cannot reach the server. Please try again later.");
+        setError("Unable to connect to the server. Please try again.");
+      } else if (reason === "parent_app_required") {
+        setError(
+          "Parents must use the User app. Please download the ASP Parent App to sign in. for more info contact the ASP manager",
+        );
       } else if (reason === "app_not_allowed") {
-        // Staff and drivers use the staff app; only administrators use the dashboard
-        setError(
-          "This account cannot use the dashboard. Staff and drivers use the Staff app.",
-        );
-      } else if (reason === "account_disabled") {
-        setError(
-          "This account has been disabled. Please contact the administrator.",
-        );
+        setError("This account cannot access the Dashboard.");
       } else {
         setError("Login failed. Please check your credentials.");
       }
-      console.error("Error during login:", error);
     }
   };
 
   // First access: the person types the code from the invite email and chooses a password
+  // const handleAcceptInvite = async (e) => {
+  //   e.preventDefault();
+  //   setError("");
+
+  //   if (password.length < MIN_PASSWORD_LENGTH) {
+  //     setError(
+  //       `The password must have at least ${MIN_PASSWORD_LENGTH} characters.`,
+  //     );
+  //     return;
+  //   }
+  //   if (password !== confirmPassword) {
+  //     setError("The passwords do not match.");
+  //     return;
+  //   }
+
+  //   setSubmitting(true);
+  //   try {
+  //     await onAcceptInvite(email.trim(), code.trim(), password);
+  //   } catch (error) {
+  //     if (!error.response) {
+  //       setError("Cannot reach the server. Please try again later.");
+  //     } else if (error.response.data?.code === "app_not_allowed") {
+  //       // The code was right and is NOT used up: it works in the Staff app
+  //       setError(
+  //         "This account must be activated in the Staff app. The dashboard is only for administrators.",
+  //       );
+  //     } else {
+  //       setError(
+  //         "This invite code is invalid or has expired. Ask the administrator to send a new invite.",
+  //       );
+  //     }
+  //     console.error("Error accepting the invite:", error);
+  //   } finally {
+  //     setSubmitting(false);
+  //   }
+  // };
+
   const handleAcceptInvite = async (e) => {
     e.preventDefault();
     setError("");
@@ -79,27 +116,36 @@ const Auth = ({ onLogin, onAcceptInvite }) => {
       );
       return;
     }
+
     if (password !== confirmPassword) {
       setError("The passwords do not match.");
       return;
     }
 
     setSubmitting(true);
+
     try {
       await onAcceptInvite(email.trim(), code.trim(), password);
     } catch (error) {
+      const reason = error.response?.data?.code;
+      console.log("reason", reason);
+
       if (!error.response) {
         setError("Cannot reach the server. Please try again later.");
-      } else if (error.response.data?.code === "app_not_allowed") {
-        // The code was right and is NOT used up: it works in the Staff app
+      } else if (reason === "parent_app_required") {
         setError(
-          "This account must be activated in the Staff app. The dashboard is only for administrators.",
+          "This account must be activated in the User app. Please contact the After School manager.",
+        );
+      } else if (reason === "app_not_allowed") {
+        setError(
+          "This account must be activated in the Staff app. Please contact the administrator.",
         );
       } else {
         setError(
           "This invite code is invalid or has expired. Ask the administrator to send a new invite.",
         );
       }
+
       console.error("Error accepting the invite:", error);
     } finally {
       setSubmitting(false);

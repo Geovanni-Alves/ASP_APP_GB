@@ -62,7 +62,7 @@ public class AppDataController {
     private static final String FROM_FAMILY =
         "(m.sender_contact_id is not null or not exists (select 1 from users su "
             + "where su.id = m.sender_user_id "
-            + "and lower(coalesce(su.\"userType\", '')) in ('staff', 'driver', 'admin', 'superadmin')))";
+            + "and lower(coalesce(su.\"userType\", '')) in ('staff', 'driver', 'admin', 'manager', 'owner', 'superadmin')))";
 
     // One kid with everything the screens use. The invite code of a contact never goes out.
     private static final String STUDENT_SELECT = """
@@ -102,7 +102,7 @@ public class AppDataController {
         Roles.requireStaffApp(auth);
         return jdbc.queryForList(
             "select id, name, email, photo, \"phoneNumber\", \"userType\" from users "
-                + "where active and lower(coalesce(\"userType\", '')) in ('staff', 'driver', 'admin') "
+                + "where active and lower(coalesce(\"userType\", '')) in ('staff', 'driver', 'admin', 'manager', 'owner') "
                 + "order by lower(name)");
     }
 

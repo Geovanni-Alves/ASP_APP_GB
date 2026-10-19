@@ -17,32 +17,35 @@ import { faPenToSquare, faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { useUsersContext } from "../../contexts/UsersContext";
 import DeactivateModal from "../../components/DeactivateModal/DeactivateModal";
 import { STAFF_REASONS } from "../../lib/inactiveReasons";
+import {
+  ROLE_LABELS,
+  assignableTypes,
+  canManage,
+  canManagePeople,
+  canUseDashboard,
+} from "../../lib/roles";
 
 // Everybody listed on this page (GET /users also returns parents, who are not staff)
-const STAFF_TYPES = ["staff", "driver", "admin", "superadmin"];
-const TYPE_LABELS = {
-  staff: "Staff",
-  driver: "Driver",
-  admin: "Admin (manager)",
-  superadmin: "Super admin",
-};
-// The types anybody can choose. A driver is also staff. Only a super admin can also choose Admin.
-const BASE_OPTIONS = [
-  { value: "STAFF", label: "Staff" },
-  { value: "DRIVER", label: "Driver" },
+const STAFF_TYPES = [
+  "owner",
+  "manager",
+  "admin",
+  "staff",
+  "driver",
+  "superadmin",
 ];
+const TYPE_LABELS = ROLE_LABELS;
 
 const typeOf = (user) => (user?.userType || "").toLowerCase();
 const isStaffMember = (user) => STAFF_TYPES.includes(typeOf(user));
 const isActive = (user) => user?.active !== false;
 
 function StaffPage({ closeMenu }) {
-  // Only a super admin may create or promote an Admin (the ASP manager, who uses the dashboard)
-  const { dbUser } = useUsersContext();
-  const assignableOptions =
-    typeOf(dbUser) === "superadmin"
-      ? [...BASE_OPTIONS, { value: "ADMIN", label: "Admin (manager)" }]
-      : BASE_OPTIONS;
+  // Only the owner and the managers manage people, and only people of a lower level than theirs.
+  // The types in the list are the ones THIS person may give (the API checks it again).
+  const { dbUser, RefreshCurrentUserData } = useUsersContext();
+  const assignableOptions = assignableTypes(dbUser);
+  const canCreate = canManagePeople(dbUser);
 
   /* ──────────────────────────────────
      LIST + FILTERS
@@ -128,7 +131,7 @@ function StaffPage({ closeMenu }) {
       editAddress.trim() !== (selectedStaff.address || "") ||
       editType !== typeOf(selectedStaff).toUpperCase());
 
-  // Keeps an account type that cannot be chosen here (for example "Admin") visible
+  // Keeps an account type that cannot be chosen here (for example the owner) visible
   const currentType = typeOf(selectedStaff);
   const typeOptions = assignableOptions.some(
     (option) => option.value === currentType.toUpperCase(),
@@ -141,9 +144,19 @@ function StaffPage({ closeMenu }) {
           label: TYPE_LABELS[currentType] || currentType,
         },
       ];
-  const canChangeType = assignableOptions.some(
-    (option) => option.value === currentType.toUpperCase(),
-  );
+
+  // Can this person change the one that is open?
+  const canEditSelected = !!selectedStaff && canManage(dbUser, selectedStaff);
+  const canChangeType =
+    canEditSelected &&
+    assignableOptions.some(
+      (option) => option.value === currentType.toUpperCase(),
+    );
+
+  // The person who is signed in may always change their own name, phone and address
+  // (their type and status are changed by somebody above them)
+  const isSelf = !!selectedStaff && selectedStaff.id === dbUser?.id;
+  const canEditBasic = canEditSelected || isSelf;
 
   const handleBackToList = () => {
     if (
@@ -169,24 +182,30 @@ function StaffPage({ closeMenu }) {
         phoneNumber: editPhone.trim() || null,
         address: editAddress.trim() || null,
       };
-      // The type is sent only when it was changed
-      if (editType !== currentType.toUpperCase()) {
-        updates.userType = editType;
+      if (isSelf) {
+        // Your own profile: only name, phone and address (the type is never sent)
+        await api.patch("/users/me", updates);
+        await RefreshCurrentUserData(); // so the name in the menu changes too
+      } else {
+        // The type is sent only when it was changed
+        if (editType !== currentType.toUpperCase()) {
+          updates.userType = editType;
+        }
+        await api.patch(`/staff/${selectedStaff.id}`, updates);
       }
-
-      await api.patch(`/staff/${selectedStaff.id}`, updates);
-      message.success("Staff member updated.");
+      message.success("Person updated.");
       await fetchStaff();
       setSelectedStaff(null);
     } catch (error) {
       console.error("Update staff error:", error);
       const status = error.response?.status;
-      if (status === 409) {
-        message.error("You cannot change your own account type.");
-      } else if (status === 403) {
-        message.error("The type of this account cannot be changed here.");
+      if (status === 409 || status === 403) {
+        // The API says exactly why (your own account, the only owner, a level you cannot manage...)
+        message.error(
+          error.response.data?.error || "You cannot change this account.",
+        );
       } else {
-        message.error("Failed to update the staff member.");
+        message.error("Failed to update the person.");
       }
     } finally {
       setSaving(false);
@@ -196,10 +215,11 @@ function StaffPage({ closeMenu }) {
   /* ──────────────────────────────────
      INVITE
   ────────────────────────────────── */
-  // Emails a one-time code. The person enters it in the staff app ("I have an invite").
+  // Emails a one-time code (staff and drivers, who enter it in the staff app) or a link (the people
+  // who use the dashboard).
   const sendInvite = async (staff) => {
     if (!staff.email) {
-      message.warning("This staff member has no email.");
+      message.warning("This person has no email.");
       return;
     }
 
@@ -221,9 +241,13 @@ function StaffPage({ closeMenu }) {
           "The invite could not be emailed. Please try again in a moment.",
         );
       } else if (status === 409) {
-        message.error("This staff member is inactive.");
+        message.error("This person is inactive.");
       } else if (status === 400) {
-        message.error("This staff member has no valid email address.");
+        message.error("This person has no valid email address.");
+      } else if (status === 403) {
+        message.error(
+          error.response.data?.error || "You cannot invite this person.",
+        );
       } else {
         message.error("An unexpected error occurred while sending the invite.");
       }
@@ -275,8 +299,9 @@ function StaffPage({ closeMenu }) {
       // Offer to send the invite right away
       Modal.confirm({
         title: `Send the invite to ${email} now?`,
-        content:
-          "They will receive a code to create their password in the staff app.",
+        content: canUseDashboard(created)
+          ? "They will receive an e-mail with a link to create their password in the dashboard."
+          : "They will receive a code to create their password in the staff app.",
         okText: "Send Invite",
         cancelText: "Not Now",
         onOk: () => sendInvite(created),
@@ -288,14 +313,14 @@ function StaffPage({ closeMenu }) {
         message.error(
           error.response.data?.error || "This email is already registered.",
         );
-      } else if (status === 400) {
+      } else if (status === 400 || status === 403) {
         // The API says exactly what is wrong (for example "Please enter a valid email address")
         message.error(
           error.response.data?.error ||
             "Please check the name and the email address.",
         );
       } else {
-        message.error("Error saving the staff member.");
+        message.error("Error saving the person.");
       }
     } finally {
       setSaving(false);
@@ -303,13 +328,13 @@ function StaffPage({ closeMenu }) {
   };
 
   /* ──────────────────────────────────
-     DEACTIVATE / REACTIVATE (staff are never deleted from the app)
+     DEACTIVATE / REACTIVATE (people are never deleted from the app)
   ────────────────────────────────── */
   const showBlockedMessage = (error, fallback) => {
     console.error("Change status error:", error);
     const data = error.response?.data;
     if ([403, 409].includes(error.response?.status) && data?.error) {
-      // The API says why (open routes, your own account, an account only a super admin can manage...)
+      // The API says why (open routes, your own account, the last owner or manager...)
       alert(
         data.reasons?.length
           ? `${data.error}\n\n- ${data.reasons.join("\n- ")}`
@@ -329,13 +354,13 @@ function StaffPage({ closeMenu }) {
         reason,
         note,
       });
-      message.success("Staff member deactivated.");
+      message.success("Person deactivated.");
       setStaffToDeactivate(null);
       await fetchStaff();
       setSelectedStaff(null);
     } catch (error) {
       setStaffToDeactivate(null);
-      showBlockedMessage(error, "Failed to deactivate the staff member.");
+      showBlockedMessage(error, "Failed to deactivate the person.");
     } finally {
       setDeactivating(false);
     }
@@ -344,11 +369,11 @@ function StaffPage({ closeMenu }) {
   const reactivate = async (staff) => {
     try {
       await api.put(`/staff/${staff.id}/active`, { active: true });
-      message.success("Staff member reactivated.");
+      message.success("Person reactivated.");
       await fetchStaff();
       setSelectedStaff(null);
     } catch (error) {
-      showBlockedMessage(error, "Failed to reactivate the staff member.");
+      showBlockedMessage(error, "Failed to reactivate the person.");
     }
   };
 
@@ -369,7 +394,7 @@ function StaffPage({ closeMenu }) {
       {!selectedStaff && (
         <div>
           <div className="app-page-header">
-            <h2 className="app-page-title">Staff Members</h2>
+            <h2 className="app-page-title">People</h2>
             <div className="app-page-controls">
               <Input
                 placeholder="Filter by name or email"
@@ -386,9 +411,14 @@ function StaffPage({ closeMenu }) {
                   { label: `All (${staffList.length})`, value: "All" },
                 ]}
               />
-              <Button type="primary" onClick={() => setIsNewModalVisible(true)}>
-                + New Staff
-              </Button>
+              {canCreate && (
+                <Button
+                  type="primary"
+                  onClick={() => setIsNewModalVisible(true)}
+                >
+                  + New Person
+                </Button>
+              )}
             </div>
           </div>
 
@@ -417,15 +447,17 @@ function StaffPage({ closeMenu }) {
                   </div>
                 </div>
                 <div className="staff-actions">
-                  {isActive(staff) && !staff.registered && (
-                    <Button
-                      size="small"
-                      onClick={() => handleInviteClick(staff)}
-                      type={staff.invited ? "default" : "primary"}
-                    >
-                      {staff.invited ? "Resend Invite" : "Invite"}
-                    </Button>
-                  )}
+                  {isActive(staff) &&
+                    !staff.registered &&
+                    canManage(dbUser, staff) && (
+                      <Button
+                        size="small"
+                        onClick={() => handleInviteClick(staff)}
+                        type={staff.invited ? "default" : "primary"}
+                      >
+                        {staff.invited ? "Resend Invite" : "Invite"}
+                      </Button>
+                    )}
                   <button onClick={() => openStaff(staff)} title="Edit">
                     <FontAwesomeIcon icon={faPenToSquare} />
                   </button>
@@ -434,7 +466,7 @@ function StaffPage({ closeMenu }) {
             ))}
             {filteredStaff.length === 0 && (
               <p style={{ textAlign: "center", color: "#999" }}>
-                No staff members match.
+                Nobody matches.
               </p>
             )}
           </div>
@@ -458,10 +490,17 @@ function StaffPage({ closeMenu }) {
           </div>
 
           <div className="staff-body">
+            {!canEditSelected && (
+              <div className="staff-banner">
+                {isSelf
+                  ? "This is you: you can change your name, phone and address. Your account type and status are changed by the person above you."
+                  : "You can look at this person, but you cannot change them: only an owner or a manager changes people of a lower level."}
+              </div>
+            )}
             {!isActive(selectedStaff) && (
               <div className="staff-banner">
-                This staff member is inactive: they cannot sign in and are
-                hidden from the lists. Reactivate them below to restore access.
+                This person is inactive: they cannot sign in and are hidden from
+                the lists. Reactivate them below to restore access.
                 {selectedStaff.inactiveReason && (
                   <div>
                     <strong>Reason:</strong> {selectedStaff.inactiveReason}
@@ -479,6 +518,7 @@ function StaffPage({ closeMenu }) {
                 <Input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
+                  disabled={!canEditBasic}
                 />
               </div>
 
@@ -492,6 +532,7 @@ function StaffPage({ closeMenu }) {
                 <Input
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
+                  disabled={!canEditBasic}
                 />
               </div>
 
@@ -500,6 +541,7 @@ function StaffPage({ closeMenu }) {
                 <Input
                   value={editAddress}
                   onChange={(e) => setEditAddress(e.target.value)}
+                  disabled={!canEditBasic}
                 />
               </div>
 
@@ -512,8 +554,8 @@ function StaffPage({ closeMenu }) {
                   disabled={!canChangeType}
                 />
                 <small className="staff-hint">
-                  Staff and drivers use the Staff app (a driver is also staff).
-                  Only admins use this dashboard.
+                  Staff and drivers only use the Staff app. The owner, managers
+                  and admins also use this dashboard.
                 </small>
               </div>
             </Card>
@@ -529,11 +571,13 @@ function StaffPage({ closeMenu }) {
                         : "No invite was sent yet."}
                   </div>
                 </div>
-                {isActive(selectedStaff) && !selectedStaff.registered && (
-                  <Button onClick={() => handleInviteClick(selectedStaff)}>
-                    {selectedStaff.invited ? "Resend Invite" : "Send Invite"}
-                  </Button>
-                )}
+                {canEditSelected &&
+                  isActive(selectedStaff) &&
+                  !selectedStaff.registered && (
+                    <Button onClick={() => handleInviteClick(selectedStaff)}>
+                      {selectedStaff.invited ? "Resend Invite" : "Send Invite"}
+                    </Button>
+                  )}
               </div>
 
               <div className="staff-account-row">
@@ -543,21 +587,22 @@ function StaffPage({ closeMenu }) {
                     {isActive(selectedStaff) ? "Active" : "Inactive"}
                   </strong>
                 </div>
-                {isActive(selectedStaff) ? (
-                  <Button
-                    danger
-                    onClick={() => setStaffToDeactivate(selectedStaff)}
-                  >
-                    Deactivate
-                  </Button>
-                ) : (
-                  <Button
-                    type="primary"
-                    onClick={() => reactivate(selectedStaff)}
-                  >
-                    Reactivate
-                  </Button>
-                )}
+                {canEditSelected &&
+                  (isActive(selectedStaff) ? (
+                    <Button
+                      danger
+                      onClick={() => setStaffToDeactivate(selectedStaff)}
+                    >
+                      Deactivate
+                    </Button>
+                  ) : (
+                    <Button
+                      type="primary"
+                      onClick={() => reactivate(selectedStaff)}
+                    >
+                      Reactivate
+                    </Button>
+                  ))}
               </div>
             </Card>
           </div>
@@ -574,7 +619,7 @@ function StaffPage({ closeMenu }) {
             </Button>
             <Button
               type="primary"
-              disabled={!hasChanges}
+              disabled={!hasChanges || !canEditBasic}
               loading={saving}
               onClick={handleSaveEdits}
             >
@@ -594,15 +639,15 @@ function StaffPage({ closeMenu }) {
         onCancel={() => setStaffToDeactivate(null)}
       />
 
-      {/* ───────────── NEW STAFF MODAL ───────────── */}
+      {/* ───────────── NEW PERSON MODAL ───────────── */}
       <Modal
         open={isNewModalVisible}
         onCancel={resetNewForm}
         onOk={handleSaveStaff}
         confirmLoading={saving}
-        okText="Save Staff"
+        okText="Save"
         cancelText="Cancel"
-        title="Register New Staff"
+        title="Register New Person"
         maskClosable={false}
       >
         <div className="staff-form">

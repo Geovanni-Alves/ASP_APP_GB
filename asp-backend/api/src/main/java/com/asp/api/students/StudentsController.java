@@ -1,5 +1,6 @@
 package com.asp.api.students;
 
+import com.asp.api.audit.AuditService;
 import com.asp.api.auth.Roles;
 import com.asp.api.common.InactiveReasons;
 import java.util.ArrayList;
@@ -115,10 +116,12 @@ public class StudentsController {
 
     private final JdbcTemplate jdbc;
     private final StudentDeletionService deletion;
+    private final AuditService audit;
 
-    public StudentsController(JdbcTemplate jdbc, StudentDeletionService deletion) {
+    public StudentsController(JdbcTemplate jdbc, StudentDeletionService deletion, AuditService audit) {
         this.jdbc = jdbc;
         this.deletion = deletion;
+        this.audit = audit;
     }
 
     // GET /students/full -> all students with school, contacts, schedule and drop-off address
@@ -399,6 +402,15 @@ public class StudentsController {
             jdbc.update("update students set status = 'Active', \"inactiveReason\" = null, \"inactiveNote\" = null, "
                 + "\"inactiveSince\" = null where id = ?", studentId);
         }
+        List<String> studentNames = jdbc.queryForList("select name from students where id = ?", String.class, studentId);
+        Map<String, Object> details = new LinkedHashMap<>();
+        if (why != null) {
+            details.put("reason", why.reason());
+            details.put("note", why.note());
+        }
+        audit.log(auth, status.equals("Inactive") ? "student.deactivate" : "student.reactivate", "students",
+            studentId, studentNames.isEmpty() ? null : studentNames.get(0), details);
+
         Map<String, Object> ok = new LinkedHashMap<>();
         ok.put("status", status);
         return ResponseEntity.ok(ok);

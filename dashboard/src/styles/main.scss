@@ -54,12 +54,15 @@ body {
 .sidebar {
   background-color: $white;
   border-radius: 40px;
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
+  z-index: 1000;
   padding: 1rem;
   width: 14.8rem;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
   transition: width 0.5s ease;
 
   .profileContainer {
@@ -243,6 +246,7 @@ body {
     right: math.div(-35px, 2);
     // top: math.div(35px, 2);
     right: -20px;
+    top: 70px;
     width: 35px;
     height: 35px;
     border-radius: 2rem;
@@ -311,6 +315,11 @@ body {
 
   .contentsContainer {
     margin: 2rem 0 0 0;
+    flex: 1 1 auto;
+    min-height: 0; // lets the list shrink, so it scrolls by itself when the screen is short
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
 
     ul {
       display: flex;

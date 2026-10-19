@@ -1,4 +1,10 @@
-import { createContext, useState, useEffect, useContext, useCallback } from "react";
+import {
+  createContext,
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+} from "react";
 import api, { getToken, setToken } from "../lib/api";
 import Auth from "../components/Auth/Auth"; // Login form component
 
@@ -28,16 +34,27 @@ const AuthContextProvider = ({ children }) => {
   };
 
   // Called by the "I have an invite" form: sets the password and logs the person in
+
   const acceptInvite = async (email, code, password) => {
-    const { data } = await api.post("/auth/accept-invite", {
-      email,
-      code,
-      password,
-      app: "dashboard",
-    });
-    setToken(data.token);
-    setSession({ access_token: data.token, user: data.user });
-    return data.user;
+    try {
+      const { data } = await api.post("/auth/accept-invite", {
+        email,
+        code,
+        password,
+        app: "dashboard",
+      });
+
+      setToken(data.token);
+      setSession({ access_token: data.token, user: data.user });
+
+      return data.user;
+    } catch (error) {
+      console.log("Accept invite status:", error.response?.status);
+      console.log("Accept invite response:", error.response?.data);
+      console.log("Accept invite code:", error.response?.data?.code);
+
+      throw error; // Important: propagate the original error to Auth.jsx
+    }
   };
 
   useEffect(() => {

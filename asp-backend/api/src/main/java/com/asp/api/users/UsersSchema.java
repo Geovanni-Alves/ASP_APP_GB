@@ -1,8 +1,11 @@
 package com.asp.api.users;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +17,8 @@ import org.springframework.stereotype.Component;
 @Component
 @Order(0)
 public class UsersSchema implements ApplicationRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(UsersSchema.class);
 
     private final JdbcTemplate jdbc;
 
@@ -28,5 +33,13 @@ public class UsersSchema implements ApplicationRunner {
         jdbc.execute("alter table users add column if not exists \"inactiveReason\" text");
         jdbc.execute("alter table users add column if not exists \"inactiveNote\" text");
         jdbc.execute("alter table users add column if not exists \"inactiveSince\" timestamptz");
+
+        // There is only ONE active owner: the database refuses a second one
+        try {
+            jdbc.execute("create unique index if not exists uq_one_active_owner on users ((true)) "
+                + "where lower(coalesce(\"userType\", '')) = 'owner' and active");
+        } catch (DataAccessException e) {
+            log.warn("Could not make the owner unique: there is more than one active owner already.");
+        }
     }
 }

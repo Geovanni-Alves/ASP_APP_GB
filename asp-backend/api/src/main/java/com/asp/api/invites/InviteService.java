@@ -11,6 +11,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -106,7 +107,7 @@ public class InviteService {
         // An administrator activates the account in the dashboard (the email has a link);
         // staff and drivers activate it in the staff app (they type the code)
         String role = text(user.get("userType")).toLowerCase();
-        MailService.Audience audience = (role.equals("admin") || role.equals("superadmin"))
+        MailService.Audience audience = Set.of("owner", "manager", "admin", "superadmin").contains(role)
             ? MailService.Audience.DASHBOARD
             : MailService.Audience.STAFF;
         return sendInvite(userId, null, email, firstName, audience, invitedBy);
@@ -201,10 +202,28 @@ public class InviteService {
             if (!AppAccess.isKnown(appName)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown app");
             }
+            // if (!AppAccess.canUse(appName, role)) {
+            //     throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed",
+            //         "This account cannot use this app");
+            // }
+            
             if (!AppAccess.canUse(appName, role)) {
-                throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed",
-                    "This account cannot use this app");
+                if ("parent".equalsIgnoreCase(role)
+                        && "dashboard".equalsIgnoreCase(appName)) {
+                    throw new AuthProblem(
+                        HttpStatus.FORBIDDEN,
+                        "parent_app_required",
+                        "Parents must use the User app"
+                    );
+                }
+
+                throw new AuthProblem(
+                    HttpStatus.FORBIDDEN,
+                    "app_not_allowed",
+                    "This account cannot use this app"
+                );
             }
+
         }
 
         // Correct code: save the password, close the invite, mark the contacts as registered.
