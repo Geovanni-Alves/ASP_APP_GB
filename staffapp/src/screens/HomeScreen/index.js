@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import styles from "./styles";
 import { Text, View, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { useMessageContext } from "../../contexts/MessageContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 import { useUsersContext } from "../../contexts/UsersContext";
+import { useTodayContext } from "../../contexts/TodayContext";
 import { useNavigation } from "@react-navigation/native";
 
 const HomeScreen = () => {
@@ -15,29 +16,31 @@ const HomeScreen = () => {
   const { unreadMessages } = useMessageContext();
   const { kids } = useKidsContext();
   const { currentUserData } = useUsersContext();
-  //
-  const [msgsCount, setMsgsCount] = useState(0);
+  const { loaded, statusOf } = useTodayContext();
 
-  // useEffect to fetch and update the message count
-  useEffect(() => {
-    if (unreadMessages && kids) {
-      // Count the number of unread messages
-      try {
-        const unreadCount = unreadMessages.filter((message) =>
-          kids.some((kid) => !message.isRead && message.senderId === kid.id)
-        ).length;
-        setMsgsCount(unreadCount);
-      } catch (error) {
-        console.log("error updating the unread Message", error);
-      }
-    }
-  }, [unreadMessages, kids]);
+  // The API only sends the messages from the families that nobody read yet
+  const msgsCount = unreadMessages?.length || 0;
+
+  // Who is here today (checked in), and who is still expected
+  const hereCount = loaded
+    ? kids.filter((kid) => statusOf(kid) === "checked_in").length
+    : 0;
+  const expectedCount = loaded
+    ? kids.filter((kid) => statusOf(kid) === "waiting").length
+    : 0;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerGreetings}>
           <Text style={styles.title}>{`Hello, ${currentUserData?.name}`}</Text>
+          {loaded && (
+            <Text style={{ fontSize: 15, color: "#198754", fontWeight: "600" }}>
+              {hereCount === 0 && expectedCount === 0
+                ? "No kids at the ASP yet today"
+                : `Today: ${hereCount} here · ${expectedCount} still expected`}
+            </Text>
+          )}
         </View>
         <View style={styles.headerButtons}>
           <TouchableOpacity
@@ -52,13 +55,6 @@ const HomeScreen = () => {
               </View>
             )}
           </TouchableOpacity>
-          {/* <TouchableOpacity
-            style={styles.checkInButton}
-            onPress={() => navigation.navigate("CheckIn")}
-          >
-            <AntDesign name="check-circle" size={20} color="white" />
-            <Text style={styles.buttonText}>Check In</Text>
-          </TouchableOpacity> */}
           <TouchableOpacity
             style={styles.activityButton}
             onPress={() => {
@@ -76,6 +72,16 @@ const HomeScreen = () => {
           >
             <FontAwesome name="child" size={20} color="white" />
             <Text style={styles.buttonText}>Students</Text>
+            {hereCount > 0 && (
+              <View
+                style={[
+                  styles.messageCountBadge,
+                  { backgroundColor: "#198754" },
+                ]}
+              >
+                <Text style={styles.messageCountText}>{hereCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
         <View style={styles.headerButtons}>

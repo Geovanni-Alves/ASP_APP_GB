@@ -1,5 +1,5 @@
 import styles from "./styles";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useKidsContext } from "../../contexts/KidsContext";
+import { useTodayContext } from "../../contexts/TodayContext";
 import RemoteImage from "../../components/RemoteImage";
-import { FontAwesome } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
 const StudentSelectionScreen = () => {
@@ -20,19 +20,9 @@ const StudentSelectionScreen = () => {
   const [selectedStudents, setSelectedStudents] = useState([]);
   const { kids } = useKidsContext();
 
-  const goBack = () => {
-    navigation.navigate("Activities");
-  };
-
-  // useEffect(() => {
-  //   navigation.setOptions({
-  //     headerLeft: () => (
-  //       <TouchableOpacity onPress={goBack}>
-  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-  //       </TouchableOpacity>
-  //     ),
-  //   });
-  // }, [route]);
+  // Only the kids who are HERE today (checked in) can be chosen, so nobody is picked by mistake
+  const { hereKids } = useTodayContext();
+  const taggableKids = hereKids(kids);
 
   const handleSelectStudent = (student) => {
     if (selectedStudents.includes(student)) {
@@ -43,17 +33,11 @@ const StudentSelectionScreen = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedStudents.length === kids.length) {
+    if (selectedStudents.length === taggableKids.length) {
       setSelectedStudents([]);
     } else {
-      setSelectedStudents(kids);
+      setSelectedStudents(taggableKids);
     }
-  };
-
-  const handleSelectCheckedIn = () => {
-    // Placeholder logic, you can replace this with your actual logic for selecting checked-in students.
-    // const checkedInStudents = kids.filter((student) => student.checkedIn);
-    // setSelectedStudents(checkedInStudents);
   };
 
   const handleNextPressed = () => {
@@ -64,8 +48,8 @@ const StudentSelectionScreen = () => {
     }
   };
 
-  const filteredStudents = kids.filter((student) =>
-    student.name.toLowerCase().includes(searchText.toLowerCase())
+  const filteredStudents = taggableKids.filter((student) =>
+    student.name.toLowerCase().includes(searchText.toLowerCase()),
   );
 
   const renderStudentItem = ({ item }) => {
@@ -103,14 +87,9 @@ const StudentSelectionScreen = () => {
         onChangeText={setSearchText}
       />
       <View style={styles.buttonContainer}>
+        {/* The list only has the kids who are checked in, so "all" means all of them */}
         <TouchableOpacity style={styles.selectButton} onPress={handleSelectAll}>
           <Text style={styles.selectButtonText}>Select All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={handleSelectCheckedIn}
-        >
-          <Text style={styles.selectButtonText}>Select Checked In</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -119,6 +98,15 @@ const StudentSelectionScreen = () => {
         renderItem={renderStudentItem}
         numColumns={3} // Display 3 images per row
         contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <Text
+            style={{ textAlign: "center", marginTop: 40, color: "#6c757d" }}
+          >
+            {taggableKids.length === 0
+              ? "Nobody is checked in yet today, so there is nobody to choose."
+              : "No student matches the search."}
+          </Text>
+        }
       />
       <TouchableOpacity
         style={[

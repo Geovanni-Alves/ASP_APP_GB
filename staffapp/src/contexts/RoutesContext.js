@@ -1,6 +1,6 @@
 // src/contexts/RoutesContext.js
 import { createContext, useState, useEffect, useContext } from "react";
-import api from "../lib/api";
+import api, { getActAs } from "../lib/api";
 import { useUsersContext } from "./UsersContext";
 
 const RoutesContext = createContext({});
@@ -24,17 +24,24 @@ export const RoutesContextProvider = ({ children, routeType = null }) => {
     try {
       setLoading(true);
 
+      // Test mode: the super admin, when not acting as somebody, sees every route
+      const seesEverything =
+        (dbUser?.userType || "").toLowerCase() === "superadmin" && !getActAs();
+
       const { data: routes } = await api.get("/my/routes", {
-        params: routeType ? { type: routeType } : {},
+        params: {
+          ...(routeType ? { type: routeType } : {}),
+          ...(seesEverything ? { all: true } : {}),
+        },
       });
 
       setRoutesData(routes);
 
       // check if current user has a route
+      const me = getActAs() || dbUser?.id;
       const mine = routes.find((route) =>
         route.vans.some(
-          (v) =>
-            v.driver_id === dbUser?.id || v.helper_ids?.includes(dbUser?.id),
+          (v) => v.driver_id === me || v.helper_ids?.includes(me),
         ),
       );
 

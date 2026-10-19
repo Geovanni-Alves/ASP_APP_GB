@@ -202,28 +202,10 @@ public class InviteService {
             if (!AppAccess.isKnown(appName)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown app");
             }
-            // if (!AppAccess.canUse(appName, role)) {
-            //     throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed",
-            //         "This account cannot use this app");
-            // }
-            
             if (!AppAccess.canUse(appName, role)) {
-                if ("parent".equalsIgnoreCase(role)
-                        && "dashboard".equalsIgnoreCase(appName)) {
-                    throw new AuthProblem(
-                        HttpStatus.FORBIDDEN,
-                        "parent_app_required",
-                        "Parents must use the User app"
-                    );
-                }
-
-                throw new AuthProblem(
-                    HttpStatus.FORBIDDEN,
-                    "app_not_allowed",
-                    "This account cannot use this app"
-                );
+                throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed",
+                    "This account cannot use this app");
             }
-
         }
 
         // Correct code: save the password, close the invite, mark the contacts as registered.

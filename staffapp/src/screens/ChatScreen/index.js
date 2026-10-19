@@ -1,83 +1,70 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { View, FlatList, Text, TouchableOpacity, Image } from "react-native";
+import {
+  View,
+  SectionList,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
 import { useKidsContext } from "../../contexts/KidsContext";
 import { useMessageContext } from "../../contexts/MessageContext";
+import { useTodayContext } from "../../contexts/TodayContext";
+import RemoteImage from "../../components/RemoteImage";
+import { groupKids } from "../../lib/today";
 import styles from "./styles";
 
 const ChatScreen = ({ navigation }) => {
   const { unreadMessages } = useMessageContext();
   const { kids } = useKidsContext();
-  const [students, setStudents] = useState([]);
-  // const [users, setUsers] = useState([]);
+  const { statusOf } = useTodayContext();
 
-  useEffect(() => {
-    if (kids) {
-      setStudents(kids);
-    }
-    // console.log("unread messages", unreadMessages);
-  }, [kids]);
+  // Unread messages from the families, by kid (the API only sends the unread ones)
+  const unreadByKid = useMemo(() => {
+    const count = {};
+    (unreadMessages || []).forEach((message) => {
+      count[message.student_id] = (count[message.student_id] || 0) + 1;
+    });
+    return count;
+  }, [unreadMessages]);
 
-  const getInitials = (name) => {
-    const nameArray = name.split(" ");
-    return nameArray
-      .map((word) => word[0])
-      .join("")
-      .toUpperCase();
-  };
+  // The same groups as the students list; inside a group the kids with messages come first
+  const sections = useMemo(
+    () =>
+      groupKids(kids || [], statusOf, "all", (a, b) => {
+        const byUnread = (unreadByKid[b.id] || 0) - (unreadByKid[a.id] || 0);
+        return byUnread !== 0
+          ? byUnread
+          : (a.name || "").localeCompare(b.name || "");
+      }),
+    [kids, statusOf, unreadByKid],
+  );
 
   const onStudentPress = (student) => {
     navigation.navigate("ChatUser", { student });
   };
 
   const renderStudentItem = ({ item: student }) => {
-    // Calculate the number of unread messages for each kid
-    const unreadCount =
-      unreadMessages?.filter(
-        (msg) =>
-          msg.student_id === student.id &&
-          msg.sender_contact_id != null &&
-          !msg.isread
-      ).length || 0;
+    const unreadCount = unreadByKid[student.id] || 0;
+    const faded = statusOf(student) === "none"; // not coming today
 
     return (
       <TouchableOpacity onPress={() => onStudentPress(student)}>
-        <View style={{ flex: 1, alignItems: "left", padding: 16 }}>
+        <View style={[local.row, faded && { opacity: 0.45 }]}>
           <View style={{ position: "relative" }}>
-            {student.uriKid ? (
-              <Image
-                source={{ uri: student.uriKid }}
-                style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 30,
-                  marginRight: 10,
-                }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 30,
-                  backgroundColor: "lightgray",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginRight: 10,
-                }}
-              >
-                <Text style={{ color: "white" }}>
-                  {getInitials(student.name)}
-                </Text>
-              </View>
-            )}
-            {unreadCount > 0 && ( // Render the unread count only if it's greater than 0
+            <RemoteImage
+              path={student.photo}
+              name={student.name}
+              style={local.image}
+              bucketName="profilePhotos"
+            />
+            {unreadCount > 0 && (
               <View style={styles.unreadCountContainer}>
                 <Text style={styles.unreadCountText}>{unreadCount}</Text>
               </View>
             )}
           </View>
-          <Text>{student.name}</Text>
+          <Text style={local.name}>{student.name}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -85,13 +72,46 @@ const ChatScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <FlatList
-        data={students}
+      <SectionList
+        sections={sections}
         keyExtractor={(student) => student?.id}
         renderItem={renderStudentItem}
+        renderSectionHeader={({ section }) => (
+          <Text style={[local.sectionTitle, { color: section.color }]}>
+            {section.title} ({section.data.length})
+          </Text>
+        )}
+        stickySectionHeadersEnabled={false}
       />
     </SafeAreaView>
   );
 };
+
+const local = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  image: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 12,
+  },
+  name: {
+    fontSize: 17,
+    fontWeight: "500",
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginTop: 14,
+    marginBottom: 2,
+    paddingHorizontal: 16,
+  },
+});
 
 export default ChatScreen;

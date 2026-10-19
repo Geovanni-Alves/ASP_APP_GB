@@ -8,24 +8,26 @@ import {
   Alert,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import RemoteImage from "../../../components/RemoteImage";
-import { useRoutesContext } from "../../../contexts/RoutesContext";
-import { useUsersContext } from "../../../contexts/UsersContext";
-import { supabase } from "../../../lib/supabase";
-import { usePendingActions } from "../../../contexts/PendingActionsContext";
-import { useFeedContext } from "../../../contexts/FeedContext";
-import OpenCamera from "../../../components/OpenCamera";
-import InfoModal from "../../../components/InfoModal";
+import RemoteImage from "../../components/RemoteImage";
+import { useRoutesContext } from "../../contexts/RoutesContext";
+import { useUsersContext } from "../../contexts/UsersContext";
+import api, { getActAs } from "../../lib/api";
+import { usePendingActions } from "../../contexts/PendingActionsContext";
+import { useFeedContext } from "../../contexts/FeedContext";
+import OpenCamera from "../../components/OpenCamera";
+import InfoModal from "../../components/InfoModal";
 
 import styles from "./styles";
 
-const HelperPickupScreen = () => {
+const PickupCheckInScreen = ({ routeId, onClose }) => {
   const navigation = useNavigation();
-  const route = useRoute();
-  const { routeId } = route.params;
+  // const route = useRoute();
+  // const { routeId } = route.params;
 
   const { routesData, loading } = useRoutesContext();
   const { dbUser } = useUsersContext();
+  // The super admin may open a route AS somebody (test mode): then the routes are that person's
+  const effectiveId = getActAs() || dbUser?.id;
 
   const [kids, setKids] = useState([]);
   const [assignedSchool, setAssignedSchool] = useState(null);
@@ -58,14 +60,17 @@ const HelperPickupScreen = () => {
 
   useEffect(() => {
     const loadKids = async () => {
+      // console.log({ routeId });
       if (!routeId || !routesData.length || !dbUser) return;
 
       const routeData = getRouteById(routeId);
+
       if (!routeData) return;
 
       // find van where this helper or driver is assigned
       const myVan = routeData.vans.find(
-        (v) => v.driver_id === dbUser.id || v.helper_ids?.includes(dbUser.id)
+        (v) =>
+          v.driver_id === effectiveId || v.helper_ids?.includes(effectiveId),
       );
 
       if (!myVan) {
@@ -75,34 +80,14 @@ const HelperPickupScreen = () => {
 
       // Filter only kids assigned to THIS STAFF
       const assignedKids = myVan.kids.filter(
-        (k) => k.responsible_staff_id === dbUser.id
+        (k) => k.responsible_staff_id === effectiveId,
       );
 
       // console.log("assignedKids", assignedKids);
 
-      const routeDate = routeData.date;
-      const vanId = routeData.vans[0].id;
-
-      const kidsWithAttendance = await Promise.all(
-        assignedKids.map(async (kidObj) => {
-          const { data: attendanceRecord } = await supabase
-            .from("student_attendance")
-            .select("*")
-            .eq("student_id", kidObj.kid.id)
-            .eq("date", routeDate)
-            .eq("route_id", routeId)
-            .eq("van_id", vanId)
-            .maybeSingle();
-
-          // console.log("attendanceRecord", attendanceRecord);
-          // console.log("kidObj", kidObj);
-
-          return {
-            ...kidObj,
-            attendance: attendanceRecord || null,
-          };
-        })
-      );
+      // The API already sends the attendance of each kid (check-in / absence) with the route,
+      // so there is nothing else to ask for
+      const kidsWithAttendance = assignedKids;
 
       setKids(kidsWithAttendance);
 
@@ -225,27 +210,23 @@ const HelperPickupScreen = () => {
             onExecute: async ({ payload }) => {
               console.log("⏳ Saving CHECK-IN...", payload);
 
-              const { error } = await supabase
-                .from("student_attendance")
-                .insert({
-                  student_id: payload.kidId,
-                  route_id: payload.routeId,
-                  van_id: payload.vanId,
-                  date: payload.date,
-                  checked_in: true,
-                  checked_in_at: new Date().toISOString(),
-                  checked_in_by: dbUser.id,
+              try {
+                // The API saves the check-in AND the news for the family ("Picked up from school")
+                await api.post(
+                  `/my/routes/${payload.routeId}/kids/${payload.kidId}/check-in`,
+                );
+              } catch (error) {
+                // It was not saved: the card goes back, and the person sees why
+                updateKidState(kidId, {
+                  isChecked: false,
+                  undoEnabled: false,
+                  pendingActionId: null,
                 });
-
-              if (error) throw error;
-
-              // Create new feed check in and send push nots for contacts
-              await createNewFeedForKid(
-                payload.kidId,
-                "", // no media
-                "ATTENDANCE", //attendance type
-                "Picked up from school"
-              );
+                Alert.alert(
+                  "Check-in not saved",
+                  error?.response?.data?.error || "Please try again.",
+                );
+              }
             },
 
             onFinish: () => {
@@ -295,27 +276,23 @@ const HelperPickupScreen = () => {
             onExecute: async ({ payload }) => {
               console.log("⏳ Saving ABSENT...", payload);
 
-              const { error } = await supabase
-                .from("student_attendance")
-                .insert({
-                  student_id: payload.kidId,
-                  route_id: payload.routeId,
-                  van_id: payload.vanId,
-                  date: payload.date,
-                  is_absent: true,
-                  absent_at: new Date().toISOString(),
-                  absent_by: dbUser.id,
+              try {
+                // The API saves the absence AND the news for the family ("Marked as absent")
+                await api.post(
+                  `/my/routes/${payload.routeId}/kids/${payload.kidId}/absent`,
+                );
+              } catch (error) {
+                // It was not saved: the card goes back, and the person sees why
+                updateKidState(kidId, {
+                  isAbsent: false,
+                  undoEnabled: false,
+                  pendingActionId: null,
                 });
-
-              if (error) throw error;
-
-              // 🔔 Create feed + send push
-              await createNewFeedForKid(
-                payload.kidId,
-                "",
-                "ATTENDANCE",
-                "Marked as absent"
-              );
+                Alert.alert(
+                  "Absence not saved",
+                  error?.response?.data?.error || "Please try again.",
+                );
+              }
             },
 
             onFinish: () => {
@@ -547,8 +524,13 @@ const HelperPickupScreen = () => {
         ]}
         labelStyle={{ textAlign: "center" }}
       />
+      {onClose && (
+        <TouchableOpacity onPress={onClose} style={{ padding: 10 }}>
+          <Text style={{ color: "blue" }}>Close</Text>
+        </TouchableOpacity>
+      )}
     </>
   );
 };
 
-export default HelperPickupScreen;
+export default PickupCheckInScreen;

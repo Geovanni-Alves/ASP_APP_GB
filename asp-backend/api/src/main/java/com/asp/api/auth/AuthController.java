@@ -70,28 +70,10 @@ public class AuthController {
             if (!AppAccess.isKnown(app)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown app");
             }
-            // if (!AppAccess.canUse(app, role)) {
-            //     audit.loginFailed(req.email(), app, "app_not_allowed");
-            //     throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed",
-            //         "This account cannot use this app");
-            // }
             if (!AppAccess.canUse(app, role)) {
                 audit.loginFailed(req.email(), app, "app_not_allowed");
-
-                if ("parent".equalsIgnoreCase(role)
-                        && "dashboard".equalsIgnoreCase(app)) {
-                    throw new AuthProblem(
-                        HttpStatus.FORBIDDEN,
-                        "parent_app_required",
-                        "Parents must use the User app"
-                    );
-                }
-
-                throw new AuthProblem(
-                    HttpStatus.FORBIDDEN,
-                    "app_not_allowed",
-                    "This account cannot use this app"
-                );
+                throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed",
+                    "This account cannot use this app");
             }
         }
 

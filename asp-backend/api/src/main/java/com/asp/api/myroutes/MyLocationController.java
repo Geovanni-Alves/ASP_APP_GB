@@ -1,5 +1,6 @@
 package com.asp.api.myroutes;
 
+import com.asp.api.auth.ActAs;
 import com.asp.api.auth.Roles;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,9 +29,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class MyLocationController {
 
     private final JdbcTemplate jdbc;
+    private final ActAs actAs;
 
-    public MyLocationController(JdbcTemplate jdbc) {
+    public MyLocationController(JdbcTemplate jdbc, ActAs actAs) {
         this.jdbc = jdbc;
+        this.actAs = actAs;
     }
 
     public record LocationUpdate(Double lat, Double lng) {}
@@ -40,7 +43,7 @@ public class MyLocationController {
                                       @RequestBody LocationUpdate body,
                                       Authentication auth) {
         Roles.requireStaffApp(auth);
-        UUID me = UUID.fromString(auth.getName());
+        UUID me = actAs.effectiveUser(auth); // the super admin may act as somebody (test mode)
 
         if (body.lat() == null || body.lng() == null
             || body.lat() < -90 || body.lat() > 90 || body.lng() < -180 || body.lng() > 180) {

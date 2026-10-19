@@ -57,18 +57,21 @@ export const setUnauthorizedHandler = (handler) => {
   onUnauthorized = handler;
 };
 
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const status = error.response?.status;
-    const url = error.config?.url || "";
-    // A wrong password also answers 401: only a token that stopped working signs the person out
-    if (status === 401 && memoryToken && !url.startsWith("/auth/")) {
-      onUnauthorized?.();
-    }
-    return Promise.reject(error);
-  },
-);
+/* ---------- test mode of the super admin ---------- */
+// The super admin may open the field routes AS a driver or a helper (to test and to debug). The person
+// goes in a header; the API only listens to it when the signed-in person is a super admin.
+let actAsUserId = null;
+export const setActAs = (userId) => {
+  actAsUserId = userId || null;
+};
+export const getActAs = () => actAsUserId;
+
+// Every request carries the token (and, in test mode, the person to act as)
+api.interceptors.request.use((config) => {
+  if (memoryToken) config.headers.Authorization = `Bearer ${memoryToken}`;
+  if (actAsUserId) config.headers["X-Act-As"] = actAsUserId;
+  return config;
+});
 
 /* ---------- a message a person can understand ---------- */
 export function errorMessage(

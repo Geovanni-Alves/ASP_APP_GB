@@ -47,7 +47,7 @@ public class FilesController {
 
     // Buckets the staff app may upload to and delete from (everything but the vans)
     private static final Set<String> STAFF_APP_BUCKETS = Set.of(
-        "profilePhotos", "schoolexitphotos", "feedPhotos", "feedVideos", "photos", "videos");
+        "profilePhotos", "feedPhotos", "feedVideos", "photos", "videos");
 
     // Buckets where the staff app may DELETE a file (a person changing their own profile photo).
     // Photos of kids, of the dismissal door and of the feed are only removed by managers.

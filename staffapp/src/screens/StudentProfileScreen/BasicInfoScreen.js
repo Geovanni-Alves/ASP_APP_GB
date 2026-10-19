@@ -14,8 +14,10 @@ const BasicInfoScreen = ({
   kidId,
   setKidDetails,
   handleUpdateKid,
+  editableFields = [], // the fields this person may change here (the rest is only shown)
   readOnly,
 }) => {
+  const isEditable = (field) => !readOnly && editableFields.includes(field);
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [isFormChanged, setIsFormChanged] = useState(false);
   const { kids, fetchSelectedKid } = useKidsContext();
@@ -64,13 +66,13 @@ const BasicInfoScreen = ({
   };
 
   const saveChanges = async () => {
-    const updatedFields = {
-      name: kidName,
-      birthDate: localKid.birthDate,
-      notes: localKid.notes,
-      allergies: localKid.allergies,
-      medicine: localKid.medicine,
-    };
+    // Only the fields this person may change are sent
+    const updatedFields = {};
+    if (isEditable("name")) updatedFields.name = kidName;
+    if (isEditable("birthDate")) updatedFields.birthDate = localKid.birthDate;
+    ["notes", "allergies", "medicine"].forEach((field) => {
+      if (isEditable(field)) updatedFields[field] = localKid[field];
+    });
     // Call the save function from the parent and wait for the result.
     const updatedKid = await handleUpdateKid(updatedFields);
     if (updatedKid) {
@@ -95,12 +97,12 @@ const BasicInfoScreen = ({
           style={styles.detailTextInput}
           value={kidName || ""}
           onChangeText={(text) => handleInputChange("name", text)}
-          editable={!readOnly}
+          editable={isEditable("name")}
         />
         <Text style={styles.detailLabel}>Birthday</Text>
         <TouchableOpacity
           onPress={() => {
-            if (!readOnly) setDatePickerVisible(true);
+            if (isEditable("birthDate")) setDatePickerVisible(true);
           }}
         >
           <Text style={styles.detailTextInput}>
@@ -122,21 +124,22 @@ const BasicInfoScreen = ({
         style={styles.detailTextInput}
         value={localKid?.notes || ""}
         onChangeText={(text) => handleInputChange("notes", text)}
-        editable={!readOnly}
+        editable={isEditable("notes")}
+        multiline
       />
       <Text style={styles.detailLabel}>Allergies</Text>
       <TextInput
         style={styles.detailTextInput}
         value={localKid?.allergies || ""}
         onChangeText={(text) => handleInputChange("allergies", text)}
-        editable={!readOnly}
+        editable={isEditable("allergies")}
       />
       <Text style={styles.detailLabel}>Medicine</Text>
       <TextInput
         style={styles.detailTextInput}
         value={localKid?.medicine || ""}
         onChangeText={(text) => handleInputChange("medicine", text)}
-        editable={!readOnly}
+        editable={isEditable("medicine")}
       />
       {isFormChanged && (
         <TouchableOpacity

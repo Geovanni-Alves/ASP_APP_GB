@@ -31,7 +31,7 @@ export const PendingActionsProvider = ({ children }) => {
   }) => {
     if (!type || !entityId || !delay) {
       throw new Error(
-        "Invalid pending action: type, entityId, delay required."
+        "Invalid pending action: type, entityId, delay required.",
       );
     }
 
@@ -124,5 +124,7 @@ export const PendingActionsProvider = ({ children }) => {
     </PendingActionsContext.Provider>
   );
 };
+
+export default PendingActionsProvider;
 
 export const usePendingActions = () => useContext(PendingActionsContext);

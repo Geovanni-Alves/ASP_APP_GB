@@ -16,9 +16,8 @@ import MessageContextProvider from "./src/contexts/MessageContext";
 import StaffContextProvider from "./src/contexts/StaffContext";
 import UsersContextProvider from "./src/contexts/UsersContext";
 import FeedContextProvider from "./src/contexts/FeedContext";
-import PendingActionsContext, {
-  PendingActionsProvider,
-} from "./src/contexts/PendingActionsContext";
+import PendingActionsProvider from "./src/contexts/PendingActionsContext";
+import TodayContextProvider from "./src/contexts/TodayContext";
 
 LogBox.ignoreLogs(["NSLocation*UsageDescription"]);
 // console.log("LOG TEST", new Date().toISOString());
@@ -41,19 +40,21 @@ function App() {
               <PicturesContextProvider>
                 <UsersContextProvider>
                   <KidsContextProvider>
-                    <StaffContextProvider>
-                      <FeedContextProvider>
-                        <MessageContextProvider>
-                          <RoutesContextProvider>
-                            <BackgroundTasksProvider>
-                              <PendingActionsProvider>
-                                <RootNavigator />
-                              </PendingActionsProvider>
-                            </BackgroundTasksProvider>
-                          </RoutesContextProvider>
-                        </MessageContextProvider>
-                      </FeedContextProvider>
-                    </StaffContextProvider>
+                    <TodayContextProvider>
+                      <StaffContextProvider>
+                        <FeedContextProvider>
+                          <MessageContextProvider>
+                            <RoutesContextProvider>
+                              <BackgroundTasksProvider>
+                                <PendingActionsProvider>
+                                  <RootNavigator />
+                                </PendingActionsProvider>
+                              </BackgroundTasksProvider>
+                            </RoutesContextProvider>
+                          </MessageContextProvider>
+                        </FeedContextProvider>
+                      </StaffContextProvider>
+                    </TodayContextProvider>
                   </KidsContextProvider>
                 </UsersContextProvider>
               </PicturesContextProvider>

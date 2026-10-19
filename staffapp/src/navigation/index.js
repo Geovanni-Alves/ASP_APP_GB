@@ -24,8 +24,8 @@ import StudentSelectionScreen from "../screens/StudentSelectionScreen";
 import PromotionScreen from "../screens/PromotionScreen";
 import PickupListScreen from "../screens/PickupListScreen";
 // import HelperPickupScreen from "../screens/PickupListScreen/PickupCheckInScreen";
-import PickupCheckInScreen from "../screens/PickupListScreen/PickupCheckInScreen";
-import DriverPickupScreen from "../screens/PickupListScreen/DriverPickupScreen";
+import PickupCheckInScreen from "../screens//PickupCheckInScreen";
+import DriverPickupScreen from "../screens/DriverPickupScreen";
 
 const Drawer = createDrawerNavigator();
 

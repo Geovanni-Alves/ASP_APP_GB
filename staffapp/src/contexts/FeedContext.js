@@ -69,6 +69,38 @@ const FeedContextProvider = ({ children }) => {
     }
   };
 
+  // ONE request creates the same item for many kids (an incident, a group photo): all or nothing.
+  // Each photo makes one item for each kid, and the note goes on the first one.
+  const createFeedForKids = async (
+    kidIds,
+    mediaPaths = [],
+    mediaType,
+    notes,
+  ) => {
+    try {
+      const { data } = await api.post("/app/feeds/bulk", {
+        studentIds: kidIds,
+        type: mediaType,
+        mediaNames: mediaPaths,
+        notes,
+      });
+      if (data.length) {
+        lastIdRef.current = Math.max(
+          lastIdRef.current,
+          ...data.map((feed) => feed.id),
+        );
+        mergeFeeds(data);
+      }
+      return data;
+    } catch (error) {
+      console.error(
+        "Error creating the feed for the kids:",
+        error?.response?.data || error.message,
+      );
+      return null;
+    }
+  };
+
   useEffect(() => {
     fetchFeeds();
 
@@ -85,7 +117,9 @@ const FeedContextProvider = ({ children }) => {
   }, []);
 
   return (
-    <FeedContext.Provider value={{ feeds, createNewFeedForKid }}>
+    <FeedContext.Provider
+      value={{ feeds, createNewFeedForKid, createFeedForKids }}
+    >
       {children}
     </FeedContext.Provider>
   );

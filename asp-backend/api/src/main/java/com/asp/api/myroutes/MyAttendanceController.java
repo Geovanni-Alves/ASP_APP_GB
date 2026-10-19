@@ -1,7 +1,10 @@
 package com.asp.api.myroutes;
 
+import com.asp.api.auth.ActAs;
 import com.asp.api.auth.Roles;
 import java.util.LinkedHashMap;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,12 +55,15 @@ public class MyAttendanceController {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private final String timezone;
+    private final ActAs actAs;
 
     public MyAttendanceController(JdbcTemplate jdbc, TransactionTemplate transaction,
-                                  @Value("${app.timezone:America/Vancouver}") String timezone) {
+                                  @Value("${app.timezone:America/Vancouver}") String timezone,
+                                  ActAs actAs) {
         this.jdbc = jdbc;
         this.transaction = transaction;
         this.timezone = timezone;
+        this.actAs = actAs;
     }
 
     @PostMapping("/check-in")
@@ -74,7 +80,7 @@ public class MyAttendanceController {
 
     private Map<String, Object> record(UUID routeId, UUID studentId, Authentication auth, boolean checkIn) {
         Roles.requireStaffApp(auth);
-        UUID me = UUID.fromString(auth.getName());
+        UUID me = actAs.effectiveUser(auth); // the super admin may act as somebody (test mode)
 
         return transaction.execute(txStatus -> {
             // Where is this kid on this route, and who is in charge of the kid?
@@ -94,6 +100,12 @@ public class MyAttendanceController {
             if (!OPEN.contains(routeStatus)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "This route is " + routeStatus + ": the attendance cannot be recorded");
+            }
+            // Only on the day of the route (by the clock of the server, in the timezone of the school)
+            LocalDate routeDate = ((java.sql.Date) stop.get("date")).toLocalDate();
+            if (!routeDate.equals(LocalDate.now(ZoneId.of(timezone)))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This route is for " + routeDate + ": the attendance can only be recorded on the day");
             }
             if (!me.equals(stop.get("responsible_staff_id")) && !me.equals(stop.get("driver_id"))) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN,
@@ -125,6 +137,7 @@ public class MyAttendanceController {
                     + "'has a new Attendance', ?, ?)",
                 timezone, studentId, me, checkIn ? "Picked up from school" : "Marked as absent");
 
+            actAs.trace(auth, checkIn ? "act_as.check_in" : "act_as.absent", "students", studentId, me);
             return status(checkIn ? "checked_in" : "absent");
         });
     }

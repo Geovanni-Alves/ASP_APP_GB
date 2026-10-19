@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { View, StyleSheet, Text, Image } from "react-native";
 import { getSignedUrl } from "../lib/api";
 // import { Video, ResizeMode } from "expo-av";
-import { useVideoPlayer, VideoView, VideoSource } from "expo-video";
+// import { useVideoPlayer, VideoView, VideoSource } from "expo-video";
+import { useVideoPlayer, VideoView } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import CustomLoading from "../components/CustomLoading";
 
@@ -35,17 +36,58 @@ const RemoteVideo = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [progress, setProgress] = useState<number>(0); // Track loading progress
   const [error, setError] = useState<string>("");
+  const [videoReady, setVideoReady] = useState(false);
 
-  const player = useVideoPlayer(
-    videoUrl ? ({ uri: videoUrl } as VideoSource) : null,
-    (playerInstance) => {
-      playerInstance.loop = true;
-      if (!onlyThumbnail) playerInstance.play();
-    },
-  );
+  // const player = useVideoPlayer(
+  //   videoUrl ? ({ uri: videoUrl } as VideoSource) : null,
+  //   (playerInstance) => {
+  //     playerInstance.loop = true;
+  //     if (!onlyThumbnail) playerInstance.play();
+  //   },
+  // );
+
+  const player = useVideoPlayer(null);
 
   useEffect(() => {
-    if (!path) return;
+    setVideoReady(false); // Reset video state
+
+    if (onlyThumbnail || !videoUrl) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadVideo = async () => {
+      try {
+        await player.replaceAsync({ uri: videoUrl });
+
+        if (!cancelled) {
+          setVideoReady(true);
+          player.loop = true;
+          player.play();
+        }
+      } catch (err) {
+        console.error("Error loading video:", err);
+      }
+    };
+
+    loadVideo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoUrl, onlyThumbnail, player]);
+
+  // useEffect(() => {
+  //   if (!path) return;
+  useEffect(() => {
+    if (!path) {
+      setVideoUrl("");
+      setThumbnailUrl("");
+      setLoading(false);
+      onLoading(false);
+      return;
+    }
 
     const cachedVideo = videoCache[path];
     const cachedThumbnail = thumbnailCache[path];
@@ -78,6 +120,8 @@ const RemoteVideo = ({
       setLoading(true);
       onLoading(true); // Notify parent component about loading state
       setError("");
+      setVideoUrl("");
+      setThumbnailUrl("");
 
       try {
         // The API gives a temporary link (valid for 1 hour) to the video
@@ -139,7 +183,7 @@ const RemoteVideo = ({
     return <Image source={{ uri: thumbnailUrl }} style={style} />;
   }
 
-  if (videoUrl && player) {
+  if (!onlyThumbnail && videoReady) {
     return <VideoView player={player} style={style} nativeControls />;
   }
 

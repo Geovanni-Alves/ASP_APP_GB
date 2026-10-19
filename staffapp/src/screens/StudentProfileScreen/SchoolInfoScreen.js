@@ -9,6 +9,9 @@ import {
   StyleSheet,
   Dimensions,
   ScrollView,
+  TextInput,
+  Modal,
+  FlatList,
 } from "react-native";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -22,9 +25,28 @@ import { useKidsContext } from "../../contexts/KidsContext";
 
 const { width } = Dimensions.get("window");
 
-// The school of the kid is only SHOWN here (the dashboard is where it is changed).
-// The only thing the team does in this screen is to ADD photos of the dismissal door.
-const SchoolInfoScreen = ({ kid }) => {
+const GRADES = [
+  "Kindergarten",
+  "Grade 1",
+  "Grade 2",
+  "Grade 3",
+  "Grade 4",
+  "Grade 5",
+  "Grade 6",
+  "Grade 7",
+];
+
+// Everybody on the team SEES the school, the teacher, the grade, the division and the dismissal photos.
+// Only the people who run the school ("canEdit": owner, manager, admin) change the teacher, the grade
+// and the division, and add or delete the dismissal photos. The SCHOOL itself is only changed in the dashboard.
+const SchoolInfoScreen = ({ kid, canEdit = false }) => {
+  const [teacherName, setTeacherName] = useState(kid?.schoolTeacherName || "");
+  const [selectedGrade, setSelectedGrade] = useState(kid?.schoolGrade || "");
+  const [gradeDivision, setGradeDivision] = useState(
+    kid?.schoolGradeDivision || "",
+  );
+  const [infoChanged, setInfoChanged] = useState(false);
+  const [gradeModalVisible, setGradeModalVisible] = useState(false);
   const [localPhotos, setLocalPhotos] = useState([null, null, null]); // taken, not sent yet
   const [savedPhotos, setSavedPhotos] = useState([null, null, null]); // already saved for the kid
   const [currentFrame, setCurrentFrame] = useState(null); // the place that opened the camera
@@ -32,7 +54,7 @@ const SchoolInfoScreen = ({ kid }) => {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { savePhotoInBucket } = usePicturesContext();
+  const { savePhotoInBucket, deleteMediaFromBucket } = usePicturesContext();
   const { RefreshKidsData } = useKidsContext();
 
   // The photos that were saved before, in their places (0, 1 and 2)
@@ -47,7 +69,16 @@ const SchoolInfoScreen = ({ kid }) => {
     setSavedPhotos(slots);
   }, [kid]);
 
+  // The teacher, the grade and the division come from the kid (and again after a save)
+  useEffect(() => {
+    setTeacherName(kid?.schoolTeacherName || "");
+    setSelectedGrade(kid?.schoolGrade || "");
+    setGradeDivision(kid?.schoolGradeDivision || "");
+    setInfoChanged(false);
+  }, [kid]);
+
   const hasNewPhotos = localPhotos.some(Boolean);
+  const hasChanges = hasNewPhotos || infoChanged;
 
   const openCameraForFrame = (index) => {
     setCurrentFrame(index);
@@ -71,9 +102,62 @@ const SchoolInfoScreen = ({ kid }) => {
     setLocalPhotos(updated);
   };
 
+  // Deleting a saved photo: first the record of the kid, then the file (if the file fails, an unused
+  // file is left behind, which is harmless)
+  const handleDeleteSaved = (index) => {
+    const photo = savedPhotos[index];
+    if (!photo?.path) return;
+
+    Alert.alert(
+      "Delete photo",
+      "Delete this photo? You can add another one in its place. (This cannot be undone!)",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const remaining = savedPhotos.filter(
+                (item, position) => item?.path && position !== index,
+              );
+              await api.patch(`/students/${kid.id}`, {
+                schoolExitPhotos: remaining,
+              });
+              await deleteMediaFromBucket(photo.path, "schoolExitPhotos");
+
+              const slots = [...savedPhotos];
+              slots[index] = null;
+              setSavedPhotos(slots);
+              await RefreshKidsData();
+            } catch (error) {
+              console.error(
+                "Error deleting the photo:",
+                error?.response?.data || error.message,
+              );
+              Alert.alert("Error", "Failed to delete the photo.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const handleSave = async () => {
     try {
       setSaving(true);
+
+      // 1) the teacher, the grade and the division (the school itself is not changed here)
+      if (infoChanged) {
+        await api.patch(`/students/${kid.id}`, {
+          schoolTeacherName: teacherName.trim() || null,
+          schoolGrade: selectedGrade || null,
+          schoolGradeDivision: gradeDivision.trim() || null,
+        });
+        setInfoChanged(false);
+      }
+
+      // 2) the new dismissal photos
       let latest = savedPhotos.filter(Boolean);
 
       for (let i = 0; i < localPhotos.length; i++) {
@@ -104,7 +188,7 @@ const SchoolInfoScreen = ({ kid }) => {
       setLocalPhotos([null, null, null]);
       await RefreshKidsData();
 
-      Alert.alert("Success", "The photos were added.");
+      Alert.alert("Success", "The changes were saved.");
     } catch (error) {
       console.error(
         "Error adding dismissal photos:",
@@ -112,7 +196,7 @@ const SchoolInfoScreen = ({ kid }) => {
       );
       Alert.alert(
         "Error",
-        error?.response?.data?.error || "Failed to add the photos.",
+        error?.response?.data?.error || "Failed to save the changes.",
       );
     } finally {
       setSaving(false);
@@ -156,17 +240,57 @@ const SchoolInfoScreen = ({ kid }) => {
         {school && (
           <>
             <Text style={styles.detailLabel}>Teacher:</Text>
-            <Text style={styles.detailText}>
-              {kid.schoolTeacherName || "—"}
-            </Text>
+            {canEdit ? (
+              <TextInput
+                style={styles.detailText}
+                value={teacherName}
+                onChangeText={(text) => {
+                  setTeacherName(text);
+                  setInfoChanged(true);
+                }}
+                placeholder="Enter teacher's name"
+              />
+            ) : (
+              <Text style={styles.detailText}>
+                {kid.schoolTeacherName || "—"}
+              </Text>
+            )}
 
             <Text style={styles.detailLabel}>Grade:</Text>
-            <Text style={styles.detailText}>{kid.schoolGrade || "—"}</Text>
+            {canEdit ? (
+              <View style={styles.gradeRow}>
+                <Text style={[styles.detailText, { flex: 1 }]}>
+                  {selectedGrade || "No grade selected"}
+                </Text>
+                <TouchableOpacity
+                  style={styles.changeButton}
+                  onPress={() => setGradeModalVisible(true)}
+                >
+                  <Text style={styles.changeButtonText}>
+                    {selectedGrade ? "Change" : "Select Grade"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <Text style={styles.detailText}>{kid.schoolGrade || "—"}</Text>
+            )}
 
             <Text style={styles.detailLabel}>Division:</Text>
-            <Text style={styles.detailText}>
-              {kid.schoolGradeDivision || "—"}
-            </Text>
+            {canEdit ? (
+              <TextInput
+                style={styles.detailText}
+                value={gradeDivision}
+                onChangeText={(text) => {
+                  setGradeDivision(text);
+                  setInfoChanged(true);
+                }}
+                placeholder="Enter grade division..."
+              />
+            ) : (
+              <Text style={styles.detailText}>
+                {kid.schoolGradeDivision || "—"}
+              </Text>
+            )}
 
             <Text style={styles.pickupDoorHeader}>Dismissal Door Photos</Text>
 
@@ -192,36 +316,92 @@ const SchoolInfoScreen = ({ kid }) => {
                       </TouchableOpacity>
                     </>
                   ) : savedPhotos[index]?.path ? (
-                    // Already saved: it can be seen, not removed
-                    <TouchableOpacity
-                      onPress={() => handleImagePress(savedPhotos[index].path)}
-                    >
-                      <RemoteImage
-                        path={savedPhotos[index].path}
-                        bucketName="schoolexitphotos"
-                        style={styles.slotImage}
-                      />
-                    </TouchableOpacity>
-                  ) : (
+                    // Already saved: everybody can see it, and only who runs the school removes it
+                    <>
+                      <TouchableOpacity
+                        onPress={() =>
+                          handleImagePress(savedPhotos[index].path)
+                        }
+                      >
+                        <RemoteImage
+                          path={savedPhotos[index].path}
+                          bucketName="schoolexitphotos"
+                          style={styles.slotImage}
+                        />
+                      </TouchableOpacity>
+                      {canEdit && (
+                        <TouchableOpacity
+                          style={styles.deleteIcon}
+                          onPress={() => handleDeleteSaved(index)}
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={24}
+                            color="red"
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  ) : canEdit ? (
                     // Empty place: add a photo
                     <TouchableOpacity onPress={() => openCameraForFrame(index)}>
                       <View style={styles.emptySlot}>
                         <MaterialIcons name="add" size={32} color="gray" />
                       </View>
                     </TouchableOpacity>
+                  ) : (
+                    // Empty place, for somebody who only looks
+                    <View
+                      style={[styles.emptySlot, { backgroundColor: "#f2f2f2" }]}
+                    />
                   )}
                 </View>
               ))}
             </View>
 
-            {hasNewPhotos && (
+            {hasChanges && (
               <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-                <Text style={styles.saveButtonText}>Save photos</Text>
+                <Text style={styles.saveButtonText}>Save changes</Text>
               </TouchableOpacity>
             )}
           </>
         )}
       </View>
+
+      {/* The grades (only the people who may change it open this) */}
+      <Modal
+        visible={gradeModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setGradeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalDropdown}>
+            <FlatList
+              data={GRADES}
+              keyExtractor={(item) => item}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.gradeOption}
+                  onPress={() => {
+                    setSelectedGrade(item);
+                    setInfoChanged(true);
+                    setGradeModalVisible(false);
+                  }}
+                >
+                  <Text>{item}</Text>
+                </TouchableOpacity>
+              )}
+            />
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setGradeModalVisible(false)}
+            >
+              <Text style={styles.modalCloseButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <FullScreenImage
         isVisible={fullScreenImageModal}
@@ -316,6 +496,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  gradeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  changeButton: {
+    backgroundColor: "#007BFF",
+    padding: 10,
+    borderRadius: 5,
+    marginRight: 15,
+    marginLeft: 8,
+    marginBottom: 7,
+  },
+  changeButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalDropdown: {
+    width: "80%",
+    maxHeight: 360,
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 10,
+  },
+  gradeOption: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  modalCloseButton: {
+    padding: 10,
+    backgroundColor: "#007BFF",
+    alignItems: "center",
+    marginTop: 10,
+    borderRadius: 5,
+  },
+  modalCloseButtonText: {
     color: "#fff",
     fontWeight: "bold",
   },

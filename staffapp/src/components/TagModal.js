@@ -10,16 +10,20 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useKidsContext } from "../contexts/KidsContext";
+import { useTodayContext } from "../contexts/TodayContext";
 
 const TagModal = ({ isVisible, mediaUri, onTaggingComplete, onClose }) => {
   const { kids } = useKidsContext(); // Assuming you have a KidsContext providing the list of kids
+  // Only the kids who are HERE today (checked in) can be tagged, so nobody is tagged by mistake
+  const { hereKids } = useTodayContext();
+  const taggableKids = hereKids(kids);
   const [selectedKids, setSelectedKids] = useState([]);
 
   const toggleKidSelection = (kidId) => {
     setSelectedKids((prevSelected) =>
       prevSelected.includes(kidId)
         ? prevSelected.filter((id) => id !== kidId)
-        : [...prevSelected, kidId]
+        : [...prevSelected, kidId],
     );
   };
 
@@ -45,12 +49,17 @@ const TagModal = ({ isVisible, mediaUri, onTaggingComplete, onClose }) => {
             resizeMode="contain"
           />
           <FlatList
-            data={kids}
+            data={taggableKids}
             renderItem={renderKidItem}
             keyExtractor={(item) => item.id.toString()}
             horizontal
             style={styles.kidList}
             contentContainerStyle={styles.kidListContainer}
+            ListEmptyComponent={
+              <Text style={styles.kidName}>
+                Nobody is checked in yet today.
+              </Text>
+            }
           />
           <TouchableOpacity
             style={styles.proceedButton}

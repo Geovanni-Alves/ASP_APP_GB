@@ -33,6 +33,7 @@ import { useKidsContext } from "../contexts/KidsContext";
 import RemoteImage from "./RemoteImage";
 import CustomLoading from "./CustomLoading";
 import CustomMessageBox from "./CustomMessageBox";
+import { useTodayContext } from "../contexts/TodayContext";
 
 const OpenCamera = ({
   isVisible,
@@ -72,6 +73,9 @@ const OpenCamera = ({
   const borderColorValue = useRef(new Animated.Value(0)).current;
 
   const { kids } = useKidsContext();
+  // Only the kids who are HERE today (checked in) can be tagged, so nobody is tagged by mistake
+  const { hereKids } = useTodayContext();
+  const taggableKids = hereKids(kids);
   const [searchText, setSearchText] = useState("");
   const [isCustomMessageVisible, setIsCustomMessageVisible] = useState(false);
   const [pickFromGallery, setPickFromGallery] = useState(false);
@@ -87,16 +91,57 @@ const OpenCamera = ({
     }
   }, [isVisible]);
 
-  const player = useVideoPlayer("", (playerInstance) => {
-    playerInstance.loop = false;
-  });
+  // const player = useVideoPlayer("", (playerInstance) => {
+  //   playerInstance.loop = false;
+  // });
+
+  // useEffect(() => {
+  //   if (mode === "video" && mediaUris.length > 0) {
+  //     player.replace(mediaUris[0]);
+  //     player.play();
+  //   }
+  // }, [mediaUris, mode]);
+  const player = useVideoPlayer(null);
+  const [videoReady, setVideoReady] = useState(false);
 
   useEffect(() => {
-    if (mode === "video" && mediaUris.length > 0) {
-      player.replace(mediaUris[0]);
-      player.play();
+    let cancelled = false;
+
+    setVideoReady(false);
+
+    if (!isVisible || mode !== "video" || !mediaUris[0]) {
+      player.pause();
+      return;
     }
-  }, [mediaUris, mode]);
+
+    const loadPreview = async () => {
+      try {
+        console.log("Loading video preview:", mediaUris[0]);
+
+        await player.replaceAsync({
+          uri: mediaUris[0],
+        });
+
+        if (!cancelled) {
+          player.loop = true;
+          player.play();
+          setVideoReady(true);
+
+          console.log("Video preview loaded");
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Error loading video preview:", error);
+        }
+      }
+    };
+
+    loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isVisible, mediaUris, mode, player]);
 
   // Camera / Mic permission
   useEffect(() => {
@@ -133,10 +178,10 @@ const OpenCamera = ({
   }, [isVisible]);
 
   const filteredKids = searchText
-    ? kids.filter((kid) =>
+    ? taggableKids.filter((kid) =>
         kid.name.toLowerCase().includes(searchText.toLowerCase()),
       )
-    : [{ id: "all", name: "All", photo: "barrinha.png" }, ...kids];
+    : [{ id: "all", name: "All", photo: "barrinha.png" }, ...taggableKids];
 
   if (!permission || (mode === "video" && !microphonePermission)) {
     return <ActivityIndicator style={{ padding: 50 }} size={"large"} />;
@@ -429,7 +474,7 @@ const OpenCamera = ({
       if (selectedKids.includes("all")) {
         setSelectedKids([]);
       } else {
-        setSelectedKids(["all", ...kids.map((kid) => kid.id)]);
+        setSelectedKids(["all", ...taggableKids.map((kid) => kid.id)]);
       }
     } else {
       setSelectedKids((prevSelected) =>
@@ -564,6 +609,11 @@ const OpenCamera = ({
               >
                 <View style={styles.tagContainer}>
                   <Text style={styles.tagTitle}>Tag Kids</Text>
+                  {taggableKids.length === 0 && (
+                    <Text style={{ color: "white", paddingVertical: 8 }}>
+                      Nobody is checked in yet today, so there is nobody to tag.
+                    </Text>
+                  )}
                   <TextInput
                     style={styles.searchInput}
                     placeholder="Search Kid"
@@ -1025,5 +1075,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     borderRadius: 50,
     padding: 10,
+  },
+  previewLoading: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "black",
   },
 });
