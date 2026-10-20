@@ -7,9 +7,9 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Modal,
   Linking,
   Pressable,
+  StyleSheet,
 } from "react-native";
 import { FontAwesome, Entypo } from "@expo/vector-icons";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -21,9 +21,25 @@ import { useFeedContext } from "../../contexts/FeedContext";
 import { useKidsContext } from "../../contexts/KidsContext";
 import RemoteImage from "../../components/RemoteImage";
 import RemoteVideo from "../../components/RemoteVideo";
+import PhotoCarousel from "../../components/PhotoCarousel";
 import InfoModal from "../../components/InfoModal";
 import FullScreenImage from "../../components/FullScreenImageModal";
 import FullScreenVideo from "../../components/FullScreenVideoModal";
+
+// The height of the photos in the feed (the one of the style, or 300 when it has none)
+const photoHeight = () => {
+  const height = StyleSheet.flatten(styles.image)?.height;
+  return typeof height === "number" ? height : 300;
+};
+
+// The photos of a feed item: the stacked list, or the single photo of the older items
+const photosOf = (item) => {
+  if (item.type === "VIDEO") return [];
+  if (Array.isArray(item.mediaNames) && item.mediaNames.length > 0) {
+    return item.mediaNames;
+  }
+  return item.mediaName ? [item.mediaName] : [];
+};
 
 const StudentFeedScreen = () => {
   const route = useRoute();
@@ -35,43 +51,20 @@ const StudentFeedScreen = () => {
   const [selectedKidFeeds, setSelectedKidFeeds] = useState([]);
   const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
   const [fullScreenVideoModal, setFullScreenVideoModal] = useState(false);
-  //const [modalVisible, setModalVisible] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [loading, setLoading] = useState(true);
   const [videoLoading, setVideoLoading] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showStudentInfo, setShowStudentInfo] = useState(false);
 
-  const goBack = () => {
-    //navigation.navigate("Home");
-    navigation.navigate("Students");
-  };
-
   useEffect(() => {
-    //console.log("KidID on useEffect", kidID);
     if (kidID) {
       const foundKid = kids.find((kid) => kid.id === kidID);
       if (foundKid) {
         setSelectedKid(foundKid);
       }
-      //console.log("foundKid", foundKid);
     }
   }, [kidID, kids]);
-
-  // useEffect(() => {
-  //   navigation.setOptions({
-  //     headerLeft: () => (
-  //       <TouchableOpacity onPress={goBack}>
-  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-  //       </TouchableOpacity>
-  //     ),
-  //   });
-  //   if (selectedKid) {
-  //     navigation.setOptions({
-  //       title: `${selectedKid?.name}`,
-  //     });
-  //   }
-  // }, [route, selectedKid]);
 
   useEffect(() => {
     const fetchSelectedKidFeeds = async () => {
@@ -80,7 +73,7 @@ const StudentFeedScreen = () => {
 
       // Sort feeds by date in descending order
       const sortedFeeds = selectedKidFeeds.sort(
-        (a, b) => new Date(b.dateTime) - new Date(a.dateTime)
+        (a, b) => new Date(b.dateTime) - new Date(a.dateTime),
       );
 
       // Update state with sorted feeds
@@ -108,6 +101,7 @@ const StudentFeedScreen = () => {
   const renderFeedItem = ({ item, index }) => {
     let iconComponent = null;
     let dateComponent = null;
+    const photos = photosOf(item);
 
     if (index === 0 || item.dateTime !== selectedKidFeeds[index - 1].dateTime) {
       dateComponent = (
@@ -193,17 +187,30 @@ const StudentFeedScreen = () => {
             <Text style={styles.notesText}>{item.notes}</Text>
           </View>
         )}
-        {item.mediaName && item.type !== "VIDEO" && (
+
+        {/* One photo */}
+        {photos.length === 1 && (
           <TouchableOpacity
-            onPress={() => handleMediaPress(item.mediaName, item.type)}
+            onPress={() => handleMediaPress(photos[0], item.type)}
           >
             <RemoteImage
-              path={item.mediaName}
+              path={photos[0]}
               style={styles.image}
               bucketName="feedPhotos"
             />
           </TouchableOpacity>
         )}
+
+        {/* Several photos stacked in the same item: swipe sideways */}
+        {photos.length > 1 && (
+          <PhotoCarousel
+            photos={photos}
+            bucketName="feedPhotos"
+            height={photoHeight()}
+            onPress={(photo) => handleMediaPress(photo, item.type)}
+          />
+        )}
+
         {item.mediaName && item.type === "VIDEO" && (
           <View style={styles.videoContainer}>
             <RemoteVideo
@@ -252,8 +259,20 @@ const StudentFeedScreen = () => {
     return null;
   };
 
+  // The phone to call: the primary contact of the family, or the first contact that has a phone
+  const familyPhone = () => {
+    const family = selectedKid?.student_family || [];
+    const primary = family.find(
+      (entry) => entry.is_primary && entry.contact?.phone,
+    );
+    return (
+      (primary || family.find((entry) => entry.contact?.phone))?.contact
+        ?.phone || null
+    );
+  };
+
   const handleCallPress = () => {
-    const phoneNumber = selectedKid.Parent1?.phoneNumber;
+    const phoneNumber = familyPhone();
     if (!phoneNumber) {
       setShowInfoModal(true);
     } else {
@@ -271,7 +290,7 @@ const StudentFeedScreen = () => {
   };
 
   const handleSMSPress = () => {
-    const phoneNumber = selectedKid.Parent1?.phoneNumber;
+    const phoneNumber = familyPhone();
     if (!phoneNumber) {
       setShowInfoModal(true);
     } else {
@@ -307,15 +326,7 @@ const StudentFeedScreen = () => {
     );
   };
 
-  // const handleImagePress = (image) => {
-  //   if (image) {
-  //     //setSelectedImage(image);
-  //     setFullScreenImageModal(true);
-  //   }
-  // };
-
   const closeFullScreenModal = () => {
-    //setSelectedImage(null);
     setFullScreenImageModal(false);
   };
 
@@ -331,8 +342,6 @@ const StudentFeedScreen = () => {
       setSelectedMedia(mediaName);
       setFullScreenVideoModal(true);
     }
-
-    //setModalVisible(true);
   };
 
   if (!selectedKid) {
@@ -412,8 +421,6 @@ const StudentFeedScreen = () => {
         isVisible={fullScreenImageModal}
         path={selectedMedia}
         onClose={closeFullScreenModal}
-        //targetX={containerPosition.x + 50}
-        //targetY={containerPosition.y + 50}
         bucketName="feedPhotos"
       />
 
@@ -423,36 +430,6 @@ const StudentFeedScreen = () => {
         onClose={closeFullVideoModal}
         bucketName="feedVideos"
       />
-
-      {/* <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalContainer}>
-          {selectedMedia && selectedMedia.includes(".mp4") ? (
-            <RemoteVideo
-              path={selectedMedia}
-              name={selectedKid.name}
-              bucketName="feedVideos"
-              style={styles.fullVideo}
-            />
-          ) : (
-            <RemoteImage
-              path={selectedMedia}
-              style={styles.fullImage}
-              bucketName="feedPhotos"
-            />
-          )}
-          <TouchableOpacity
-            style={styles.closeModalButton}
-            onPress={closeModal}
-          >
-            <Entypo name="cross" size={25} color="white" />
-          </TouchableOpacity>
-        </View>
-      </Modal> */}
 
       {showInfoModal && (
         <InfoModal

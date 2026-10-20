@@ -177,11 +177,16 @@ const OpenCamera = ({
     }
   }, [isVisible]);
 
+  // "All" only makes sense when there is somebody to tag
+  const allOption =
+    taggableKids.length > 1
+      ? [{ id: "all", name: "All", photo: "barrinha.png" }]
+      : [];
   const filteredKids = searchText
     ? taggableKids.filter((kid) =>
         kid.name.toLowerCase().includes(searchText.toLowerCase()),
       )
-    : [{ id: "all", name: "All", photo: "barrinha.png" }, ...taggableKids];
+    : [...allOption, ...taggableKids];
 
   if (!permission || (mode === "video" && !microphonePermission)) {
     return <ActivityIndicator style={{ padding: 50 }} size={"large"} />;
@@ -471,6 +476,7 @@ const OpenCamera = ({
 
   const toggleKidSelection = (kidId: string) => {
     if (kidId === "all") {
+      if (taggableKids.length === 0) return; // nobody to choose
       if (selectedKids.includes("all")) {
         setSelectedKids([]);
       } else {
@@ -614,13 +620,15 @@ const OpenCamera = ({
                       Nobody is checked in yet today, so there is nobody to tag.
                     </Text>
                   )}
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search Kid"
-                    placeholderTextColor="gray"
-                    value={searchText}
-                    onChangeText={setSearchText}
-                  />
+                  {taggableKids.length > 1 && (
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search Kid"
+                      placeholderTextColor="gray"
+                      value={searchText}
+                      onChangeText={setSearchText}
+                    />
+                  )}
                   <FlatList
                     data={filteredKids}
                     renderItem={renderKidItem}
@@ -628,7 +636,7 @@ const OpenCamera = ({
                     horizontal
                     showsHorizontalScrollIndicator={false}
                   />
-                  {selectedKids?.length > 0 && (
+                  {selectedKids.some((id) => id !== "all") && (
                     <TouchableOpacity
                       style={styles.doneButton}
                       onPress={handleAskForNote}

@@ -1,6 +1,7 @@
 package com.asp.api.appdata;
 
 import com.asp.api.auth.Roles;
+import com.asp.api.audit.AuditService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,12 +37,16 @@ import org.springframework.web.server.ResponseStatusException;
  *   GET  /app/settings                    the start of the routes and the name of the program
  *   GET  /app/today                       who is at the school today (checked in, absent, expected, not today)
  *   POST /app/students/{id}/here          a kid arrived without a route (a parent brought the kid): marks the kid as here
+ *   POST /app/students/{id}/checkout      a parent picked the kid up at the ASP: the kid went home
+ *   GET  /app/students/{id}/day           who registered the check-in, check-out and absence today (owner, manager, programmer)
+ *   POST /app/students/{id}/revert        undo a check-in, check-out or absence made by mistake today (owner, manager, programmer)
  *   GET  /app/students                    the kids that are not archived, with school, family, address
  *   GET  /app/students/{id}               one kid
  *   POST /app/students/{id}/dismissal-photos   add a photo of the dismissal door (owner, manager, admin)
  *   GET  /app/feeds?days=30&afterId=      the feed (news about the kids)
  *   POST /app/feeds                       a new feed item (photo, video, activity...)
- *   POST /app/feeds/bulk                  the same item for many kids at once, with several photos (all or nothing)
+ *   POST /app/feeds/bulk                  the same item for many kids at once, one item per kid with all the photos
+ *                                         stacked in it (all or nothing)
  *   GET  /app/messages/unread             messages from the families that nobody read yet
  *   GET  /app/messages?studentId=&limit=  the conversation about a kid (newest first)
  *   POST /app/messages                    a new message to the family
@@ -92,10 +97,13 @@ public class AppDataController {
 
     private final JdbcTemplate jdbc;
     private final String timezone;
+    private final AuditService audit;
 
-    public AppDataController(JdbcTemplate jdbc, @Value("${app.timezone:America/Vancouver}") String timezone) {
+    public AppDataController(JdbcTemplate jdbc, @Value("${app.timezone:America/Vancouver}") String timezone,
+                             AuditService audit) {
         this.jdbc = jdbc;
         this.timezone = timezone;
+        this.audit = audit;
     }
 
     // ------------------------------------------------------------------ team
@@ -113,7 +121,8 @@ public class AppDataController {
 
     // Who is at the school today. For every kid that is not archived: is the kid expected today (the
     // weekly schedule, or a route that was sent for today) and what happened: "checked_in" (picked up),
-    // "absent", "waiting" (expected and not registered yet) or "none" (not coming today).
+    // "checked_out" (went home: a parent picked the kid up), "absent", "waiting" (expected and not
+    // registered yet) or "none" (not coming today).
     @GetMapping("/today")
     public ResponseEntity<String> today(Authentication auth) {
         Roles.requireStaffApp(auth);
@@ -121,16 +130,19 @@ public class AppDataController {
             with t as (select (now() at time zone CAST(? AS text))::date as d)
             select coalesce(jsonb_agg(jsonb_build_object(
                      'id', x.id,
+                     'date', x.day,
                      'scheduled', x.scheduled,
                      'in_route', x.in_route,
-                     'status', case when x.checked_in then 'checked_in'
+                     'status', case when x.checked_in and x.checked_out then 'checked_out'
+                                    when x.checked_in then 'checked_in'
                                     when x.is_absent then 'absent'
                                     when x.scheduled or x.in_route then 'waiting'
                                     else 'none' end,
                      'checked_in_at', x.checked_in_at,
+                     'checked_out_at', x.checked_out_at,
                      'absent_at', x.absent_at)), '[]'::jsonb)::text
             from (
-              select s.id,
+              select s.id, t.d as day,
                 coalesce((select case extract(isodow from t.d)
                                  when 1 then ss.monday when 2 then ss.tuesday when 3 then ss.wednesday
                                  when 4 then ss.thursday when 5 then ss.friday else false end
@@ -141,10 +153,11 @@ public class AppDataController {
                         where rs.student_id = s.id and r.date = t.d and r.type = 'pickup'
                           and r.status in ('waiting_to_start', 'in_progress', 'paused', 'finished')) as in_route,
                 coalesce(a.checked_in, false) as checked_in, a.checked_in_at,
+                coalesce(a.checked_out, false) as checked_out, a.checked_out_at,
                 coalesce(a.is_absent, false) as is_absent, a.absent_at
               from students s cross join t
               left join lateral (
-                select checked_in, checked_in_at, is_absent, absent_at
+                select checked_in, checked_in_at, checked_out, checked_out_at, is_absent, absent_at
                 from student_attendance
                 where student_id = s.id and date = t.d
                 order by coalesce(checked_in, false) desc, id limit 1) a on true
@@ -200,6 +213,149 @@ public class AppDataController {
 
         answer.put("status", "checked_in");
         return answer;
+    }
+
+    // ------------------------------------------------------------------ check-out
+
+    // The kid goes home (a parent picks the kid up at the ASP). The kid must be checked in today. It is
+    // recorded when and by whom (the staff member who confirmed it), exactly like the check-in, and the
+    // family gets the news in the feed ("Checked out from the ASP"). Who takes the kid is the school's
+    // matter: the app does not ask.
+    @PostMapping("/students/{id}/checkout")
+    @Transactional
+    public Map<String, Object> checkOut(@PathVariable UUID id, Authentication auth) {
+        Roles.requireStaffApp(auth);
+        UUID me = UUID.fromString(auth.getName());
+        requireActiveKid(id);
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "select id, checked_out from student_attendance where student_id = ? "
+                + "and date = (now() at time zone CAST(? AS text))::date and checked_in = true "
+                + "order by coalesce(checked_out, false), id limit 1 for update",
+            id, timezone);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This kid is not checked in today");
+        }
+
+        Map<String, Object> answer = new LinkedHashMap<>();
+        if (Boolean.TRUE.equals(rows.get(0).get("checked_out"))) {
+            answer.put("status", "unchanged"); // already went home
+            return answer;
+        }
+
+        jdbc.update(
+            "update student_attendance set checked_out = true, checked_out_at = now(), checked_out_by = ? where id = ?",
+            me, rows.get(0).get("id"));
+
+        // The news for the family
+        jdbc.update(
+            "insert into \"kidFeeds\" (type, \"dateTime\", \"studentId\", text, \"creatorId\", notes) "
+                + "values (CAST('ATTENDANCE' AS feed_type), (now() at time zone CAST(? AS text)), ?, "
+                + "'has a new Attendance', ?, 'Checked out from the ASP')",
+            timezone, id, me);
+
+        answer.put("status", "checked_out");
+        return answer;
+    }
+
+    // People make mistakes: somebody checked a kid out (or in, or marked absent) by mistake and the 5 seconds
+    // of "Undo" in the app were gone. The owner, the managers and the programmer can undo it, for TODAY.
+    // The state goes back to what it was, the family gets a correction in the feed, and the activity log
+    // keeps who corrected what.
+    //   action: "checkout" (back to the ASP), "checkin" (not checked in; this also clears a check-out)
+    //           or "absent" (not absent any more)
+    public record Revert(String action) {}
+
+    @PostMapping("/students/{id}/revert")
+    @Transactional
+    public Map<String, Object> revert(@PathVariable UUID id, @RequestBody Revert body, Authentication auth) {
+        Roles.requirePeopleManager(auth);
+        UUID me = UUID.fromString(auth.getName());
+        requireActiveKid(id);
+
+        String action = body.action() == null ? "" : body.action().trim().toLowerCase();
+        if (!Set.of("checkout", "checkin", "absent").contains(action)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "action must be checkout, checkin or absent");
+        }
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "select id, checked_in, checked_out, is_absent from student_attendance where student_id = ? "
+                + "and date = (now() at time zone CAST(? AS text))::date "
+                + "order by coalesce(checked_in, false) desc, id limit 1 for update",
+            id, timezone);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nothing is registered for this kid today");
+        }
+        Map<String, Object> row = rows.get(0);
+
+        String note;
+        switch (action) {
+            case "checkout" -> {
+                if (!Boolean.TRUE.equals(row.get("checked_out"))) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This kid was not checked out");
+                }
+                jdbc.update("update student_attendance set checked_out = false, checked_out_at = null, "
+                    + "checked_out_by = null where id = ?", row.get("id"));
+                note = "Correction: still at the ASP";
+            }
+            case "checkin" -> {
+                if (!Boolean.TRUE.equals(row.get("checked_in"))) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This kid was not checked in");
+                }
+                jdbc.update("update student_attendance set checked_in = false, checked_in_at = null, "
+                    + "checked_in_by = null, checked_out = false, checked_out_at = null, checked_out_by = null "
+                    + "where id = ?", row.get("id"));
+                note = "Correction: the check-in was a mistake";
+            }
+            default -> {
+                if (!Boolean.TRUE.equals(row.get("is_absent"))) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This kid was not marked absent");
+                }
+                jdbc.update("update student_attendance set is_absent = false, absent_at = null, absent_by = null "
+                    + "where id = ?", row.get("id"));
+                note = "Correction: not absent";
+            }
+        }
+
+        // The family was told the first thing: it is told the correction too
+        jdbc.update(
+            "insert into \"kidFeeds\" (type, \"dateTime\", \"studentId\", text, \"creatorId\", notes) "
+                + "values (CAST('ATTENDANCE' AS feed_type), (now() at time zone CAST(? AS text)), ?, "
+                + "'has a new Attendance', ?, ?)",
+            timezone, id, me, note);
+
+        List<String> names = jdbc.queryForList("select name from students where id = ?", String.class, id);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("action", action);
+        audit.log(auth, "attendance.revert", "students", id, names.isEmpty() ? null : names.get(0), details);
+
+        Map<String, Object> answer = new LinkedHashMap<>();
+        answer.put("status", "reverted");
+        answer.put("action", action);
+        return answer;
+    }
+
+    // Who registered the day of a kid: the check-in, the check-out and the absence, with the name of the
+    // staff member and the time. The names only go to the people who run the school (the owner, the
+    // managers and the programmer): for anybody else the answer is 403, so the names never leave the API.
+    @GetMapping("/students/{id}/day")
+    public ResponseEntity<String> dayOf(@PathVariable UUID id, Authentication auth) {
+        Roles.requirePeopleManager(auth);
+        List<String> rows = jdbc.queryForList("""
+            select to_jsonb(x)::text from (
+              select a.checked_in, a.checked_in_at, a.route_id, a.checked_out, a.checked_out_at,
+                     a.is_absent, a.absent_at,
+                     ui.name as checked_in_by, uo.name as checked_out_by, ua.name as absent_by, v.name as van
+              from student_attendance a
+              left join users ui on ui.id = a.checked_in_by
+              left join users uo on uo.id = a.checked_out_by
+              left join users ua on ua.id = a.absent_by
+              left join vans v on v.id = a.van_id
+              where a.student_id = ? and a.date = (now() at time zone CAST(? AS text))::date
+              order by coalesce(a.checked_in, false) desc, a.id
+              limit 1) x
+            """, String.class, id, timezone);
+        return json(rows.isEmpty() ? "{}" : rows.get(0));
     }
 
     // ------------------------------------------------------------------ settings
@@ -306,6 +462,15 @@ public class AppDataController {
         }
     }
 
+    // ["a.jpg", "b.jpg"] as JSON text
+    private static String asJsonArray(List<String> names) {
+        try {
+            return new ObjectMapper().writeValueAsString(names);
+        } catch (JsonProcessingException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid photos");
+        }
+    }
+
     private static Map<String, Object> photosAnswer(List<Map<String, Object>> photos) {
         Map<String, Object> answer = new LinkedHashMap<>();
         answer.put("schoolExitPhotos", photos);
@@ -357,17 +522,20 @@ public class AppDataController {
         String text = "has a new " + type.charAt(0) + type.substring(1).toLowerCase();
 
         String json = jdbc.queryForObject(
-            "insert into \"kidFeeds\" (type, \"dateTime\", \"studentId\", text, \"creatorId\", \"mediaName\", notes) "
-                + "values (CAST(? AS feed_type), (now() at time zone CAST(? AS text)), ?, ?, ?, ?, ?) "
+            "insert into \"kidFeeds\" (type, \"dateTime\", \"studentId\", text, \"creatorId\", \"mediaName\", "
+                + "\"mediaNames\", notes) "
+                + "values (CAST(? AS feed_type), (now() at time zone CAST(? AS text)), ?, ?, ?, ?, CAST(? AS jsonb), ?) "
                 + "returning to_jsonb(\"kidFeeds\")::text",
             String.class, type, timezone, body.studentId(), text, me,
-            body.mediaName() == null ? "" : body.mediaName(), body.notes());
+            body.mediaName() == null ? "" : body.mediaName(),
+            body.mediaName() == null || body.mediaName().isBlank() ? null : asJsonArray(List.of(body.mediaName())),
+            body.notes());
         return json(json);
     }
 
     // The same news for MANY kids in ONE request (an incident, a group photo). All or nothing: if
     // something is wrong, nothing is posted, so trying again never leaves half of the kids with it.
-    // Each photo makes one item for each kid; the note goes on the first one only.
+    // Each kid gets ONE item, with all the photos stacked in it ("mediaNames"; "mediaName" is the first).
     public record BulkFeed(List<UUID> studentIds, String type, List<String> mediaNames, String notes) {}
 
     @PostMapping("/feeds/bulk")
@@ -401,17 +569,17 @@ public class AppDataController {
         String text = "has a new " + type.charAt(0) + type.substring(1).toLowerCase();
         String note = body.notes() == null || body.notes().isBlank() ? null : body.notes().trim();
 
+        String names = media.isEmpty() ? null : asJsonArray(media);
+        String first = media.isEmpty() ? "" : media.get(0);
+
         List<String> created = new ArrayList<>();
         for (UUID kid : kids) {
-            int items = Math.max(media.size(), 1); // no photo: one item with the note
-            for (int i = 0; i < items; i++) {
-                created.add(jdbc.queryForObject(
-                    "insert into \"kidFeeds\" (type, \"dateTime\", \"studentId\", text, \"creatorId\", \"mediaName\", notes) "
-                        + "values (CAST(? AS feed_type), (now() at time zone CAST(? AS text)), ?, ?, ?, ?, ?) "
-                        + "returning to_jsonb(\"kidFeeds\")::text",
-                    String.class, type, timezone, kid, text, me,
-                    media.isEmpty() ? "" : media.get(i), i == 0 ? note : null));
-            }
+            created.add(jdbc.queryForObject(
+                "insert into \"kidFeeds\" (type, \"dateTime\", \"studentId\", text, \"creatorId\", \"mediaName\", "
+                    + "\"mediaNames\", notes) "
+                    + "values (CAST(? AS feed_type), (now() at time zone CAST(? AS text)), ?, ?, ?, ?, CAST(? AS jsonb), ?) "
+                    + "returning to_jsonb(\"kidFeeds\")::text",
+                String.class, type, timezone, kid, text, me, first, names, note));
         }
         return json("[" + String.join(",", created) + "]");
     }

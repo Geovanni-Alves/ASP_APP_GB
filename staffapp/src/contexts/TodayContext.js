@@ -21,6 +21,7 @@ const REFRESH_MS = 30000;
 export const TodayContextProvider = ({ children }) => {
   const [today, setToday] = useState({}); // by kid id
   const [loaded, setLoaded] = useState(false);
+  const [day, setDay] = useState(null); // the day of the school ("2026-10-19"), as the API says it
 
   const refreshToday = useCallback(async () => {
     try {
@@ -30,6 +31,7 @@ export const TodayContextProvider = ({ children }) => {
         byKid[row.id] = row;
       });
       setToday(byKid);
+      setDay(data[0]?.date || null);
       setLoaded(true);
     } catch (error) {
       console.error(
@@ -62,13 +64,14 @@ export const TodayContextProvider = ({ children }) => {
 
   // Only the kids who are HERE (checked in today): the ones that can be tagged
   const hereKids = useCallback(
-    (kids) => (kids || []).filter((kid) => today[kid.id]?.status === "checked_in"),
+    (kids) =>
+      (kids || []).filter((kid) => today[kid.id]?.status === "checked_in"),
     [today],
   );
 
   return (
     <TodayContext.Provider
-      value={{ today, loaded, refreshToday, statusOf, hereKids }}
+      value={{ today, loaded, day, refreshToday, statusOf, hereKids }}
     >
       {children}
     </TodayContext.Provider>

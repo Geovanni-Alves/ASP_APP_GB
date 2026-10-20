@@ -1,6 +1,6 @@
 import styles from "./styles";
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Alert, StyleSheet } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import Fontisto from "@expo/vector-icons/Fontisto";
 import { FontAwesome, Entypo } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import OpenCamera from "../../components/OpenCamera";
 import { useKidsContext } from "../../contexts/KidsContext";
 import { useFeedContext } from "../../contexts/FeedContext";
+import { useTodayContext } from "../../contexts/TodayContext";
 import InfoModal from "../../components/InfoModal";
 
 const NewActivityScreen = () => {
@@ -21,17 +22,37 @@ const NewActivityScreen = () => {
   const from = route.params?.from;
   const { id: kidId } = route.params || {};
   const { kids } = useKidsContext();
-  const { createNewFeedForKid } = useFeedContext();
+  const { createFeedForKids } = useFeedContext();
+  const { loaded, statusOf, hereKids } = useTodayContext();
 
-  // const goBack = () => {
-  //   if (from === "home") {
-  //     navigation.navigate("Home");
-  //   } else if (from === "feed") {
-  //     navigation.navigate("StudentFeed", { id: kidId });
-  //   } else {
-  //     navigation.navigate("Home");
-  //   }
-  // };
+  // From the home (no kid chosen): somebody has to be checked in, or there is nobody to tag
+  const nobodyHere = !selectedKid && loaded && hereKids(kids).length === 0;
+  // From the page of a kid: posting for a kid who is not checked in today asks first
+  const kidNotHere =
+    !!selectedKid && loaded && statusOf(selectedKid) !== "checked_in";
+
+  // Photo, video and incident all go through here, BEFORE the camera opens
+  const guarded = (action) => () => {
+    if (nobodyHere) {
+      Alert.alert(
+        "Nobody is checked in yet today",
+        "There is nobody to tag. Mark the kids who arrived in the Students list. To post for a kid anyway, open the kid there and use New Activity.",
+      );
+      return;
+    }
+    if (kidNotHere) {
+      Alert.alert(
+        "Not checked in today",
+        `${selectedKid.name} is not checked in today. Post anyway?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Post anyway", onPress: action },
+        ],
+      );
+      return;
+    }
+    action();
+  };
 
   useEffect(() => {
     if (kidId && from === "feed") {
@@ -43,18 +64,6 @@ const NewActivityScreen = () => {
       setSelectedKid(null);
     }
   }, [kidId, kids]);
-
-  // useEffect(() => {
-  //   navigation.setOptions({
-  //     headerLeft: () => (
-  //       <TouchableOpacity onPress={goBack}>
-  //         <FontAwesome name="arrow-left" size={23} color="#fff" left={13} />
-  //       </TouchableOpacity>
-  //     ),
-
-  //     title: selectedKid ? `${selectedKid.name} Activities` : "Activities",
-  //   });
-  // }, [route, selectedKid]);
 
   const handlePhotoPress = () => {
     setCameraMode("photo");
@@ -82,45 +91,54 @@ const NewActivityScreen = () => {
   };
 
   const handlePromotionPress = () => {
-    console.log("selectedKid", selectedKid);
     if (selectedKid) {
-      // If a kid is already selected, navigate directly to the IncidentsScreen
       navigation.navigate("Promotions", {
         selectedStudents: [selectedKid],
         from: "Students",
       });
     } else {
-      // Otherwise, navigate to the StudentSelection screen
       navigation.navigate("Promotions");
     }
   };
 
-  const handleSelectPhotoVideo = (paths, selectedKids, notes) => {
+  const handleSelectPhotoVideo = async (paths, selectedKids, notes) => {
     const mediaType = cameraMode === "photo" ? "PHOTO" : "VIDEO";
 
-    if (selectedKids.length > 0) {
-      // For each selected kid, create a new feed with the media and notes
-      selectedKids.forEach((kidId) => {
-        paths.forEach((path) => {
-          createNewFeedForKid(kidId, path, mediaType, notes);
-        });
-      });
-    } else if (selectedKid) {
-      // If no kids are selected but we have a selectedKid (from route params), use that
-      paths.forEach((path) => {
-        createNewFeedForKid(selectedKid.id, path, mediaType, notes);
-      });
-    }
+    // The kids of the post: the ones that were tagged, or the kid whose feed this is
+    const kidIds =
+      selectedKids.length > 0
+        ? selectedKids
+        : selectedKid
+          ? [selectedKid.id]
+          : [];
+    if (kidIds.length === 0 || !paths?.length) return;
 
-    setShowPostConfirmation(true); // Show confirmation
+    // ONE item for each kid, with all the photos stacked in it
+    const created = await createFeedForKids(kidIds, paths, mediaType, notes);
+    if (created) {
+      setShowPostConfirmation(true); // Show confirmation
+    } else {
+      Alert.alert("Not posted", "Nothing was posted. Please try again.");
+    }
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.activityIcons}>
+      {nobodyHere && (
+        <View style={local.notice}>
+          <Text style={local.noticeTitle}>Nobody is checked in yet today</Text>
+          <Text style={local.noticeText}>
+            There is nobody to tag. Mark the kids who arrived in the Students
+            list. To post for a kid anyway, open the kid there and use New
+            Activity.
+          </Text>
+        </View>
+      )}
+
+      <View style={[styles.activityIcons, nobodyHere && { opacity: 0.35 }]}>
         <View style={styles.iconContainer}>
           <TouchableOpacity
-            onPress={handlePhotoPress}
+            onPress={guarded(handlePhotoPress)}
             style={styles.cameraIcon}
           >
             <Entypo name="camera" size={45} color="black" />
@@ -128,33 +146,26 @@ const NewActivityScreen = () => {
           <Text style={styles.textIcon}>Photo</Text>
         </View>
         <View style={styles.iconContainer}>
-          <TouchableOpacity onPress={handleVideoPress} style={styles.videoIcon}>
+          <TouchableOpacity
+            onPress={guarded(handleVideoPress)}
+            style={styles.videoIcon}
+          >
             <Entypo name="video-camera" size={45} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.textIcon}>Video</Text>
         </View>
         <View style={styles.iconContainer}>
           <TouchableOpacity
-            onPress={handleIncidentPress}
+            onPress={guarded(handleIncidentPress)}
             style={styles.patchIcon}
           >
             <Fontisto name="bandage" size={45} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.textIcon}>Incident</Text>
         </View>
-        {/* <View style={styles.iconContainer}>
-          <TouchableOpacity
-            onPress={handlePromotionPress}
-            style={styles.trophyIcon}
-          >
-            <MaterialIcons name="workspace-premium" size={45} color="#000080" />
-          </TouchableOpacity>
-          <Text style={styles.textIcon}>Promotions</Text>
-        </View> */}
       </View>
       <OpenCamera
         isVisible={callOpenCamera}
-        //onPhotoTaken={handlePhotoTaken}
         onSelectOption={handleSelectPhotoVideo}
         onClose={() => setCallOpenCamera(false)}
         mode={cameraMode}
@@ -172,5 +183,26 @@ const NewActivityScreen = () => {
     </View>
   );
 };
+
+const local = StyleSheet.create({
+  notice: {
+    backgroundColor: "#fff7e6",
+    borderColor: "#ffd591",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    margin: 16,
+  },
+  noticeTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#ad6800",
+  },
+  noticeText: {
+    fontSize: 13,
+    color: "#ad6800",
+    marginTop: 4,
+  },
+});
 
 export default NewActivityScreen;

@@ -6,3 +6,11 @@ const EDITORS = ["owner", "manager", "admin", "superadmin"];
 
 export const canEditStudents = (user) =>
   EDITORS.includes((user?.userType || "").toLowerCase());
+
+// The names of the people who registered the check-in, the check-out and the absence of a kid are only
+// for the people who run the school: the owner, the managers and the programmer (the API refuses the
+// rest: this only decides if the button is shown)
+const SUPERVISORS = ["owner", "manager", "superadmin"];
+
+export const canSeeWhoRegistered = (user) =>
+  SUPERVISORS.includes((user?.userType || "").toLowerCase());

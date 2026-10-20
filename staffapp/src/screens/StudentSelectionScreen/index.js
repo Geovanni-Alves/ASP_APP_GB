@@ -80,18 +80,26 @@ const StudentSelectionScreen = () => {
 
   return (
     <View style={styles.container}>
-      <TextInput
-        style={styles.searchBox}
-        placeholder="Search Students..."
-        value={searchText}
-        onChangeText={setSearchText}
-      />
-      <View style={styles.buttonContainer}>
-        {/* The list only has the kids who are checked in, so "all" means all of them */}
-        <TouchableOpacity style={styles.selectButton} onPress={handleSelectAll}>
-          <Text style={styles.selectButtonText}>Select All</Text>
-        </TouchableOpacity>
-      </View>
+      {/* The search and "Select All" only make sense when there is somebody to choose */}
+      {taggableKids.length > 1 && (
+        <>
+          <TextInput
+            style={styles.searchBox}
+            placeholder="Search Students..."
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+          <View style={styles.buttonContainer}>
+            {/* The list only has the kids who are checked in, so "all" means all of them */}
+            <TouchableOpacity
+              style={styles.selectButton}
+              onPress={handleSelectAll}
+            >
+              <Text style={styles.selectButtonText}>Select All</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
       <FlatList
         data={filteredStudents}
         keyExtractor={(item) => item.id}
@@ -99,25 +107,41 @@ const StudentSelectionScreen = () => {
         numColumns={3} // Display 3 images per row
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <Text
-            style={{ textAlign: "center", marginTop: 40, color: "#6c757d" }}
-          >
-            {taggableKids.length === 0
-              ? "Nobody is checked in yet today, so there is nobody to choose."
-              : "No student matches the search."}
-          </Text>
+          taggableKids.length === 0 ? (
+            <View style={{ alignItems: "center", marginTop: 40, padding: 20 }}>
+              <Text style={{ textAlign: "center", color: "#6c757d" }}>
+                Nobody is checked in yet today, so there is nobody to choose. To
+                post for a kid anyway, open the kid in the Students list and use
+                New Activity there.
+              </Text>
+              <TouchableOpacity
+                style={[styles.selectButton, { marginTop: 16 }]}
+                onPress={() => navigation.navigate("Students")}
+              >
+                <Text style={styles.selectButtonText}>Go to Students</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text
+              style={{ textAlign: "center", marginTop: 40, color: "#6c757d" }}
+            >
+              No student matches the search.
+            </Text>
+          )
         }
       />
-      <TouchableOpacity
-        style={[
-          styles.nextButton,
-          selectedStudents.length === 0 && styles.disabledButton,
-        ]}
-        onPress={handleNextPressed}
-        disabled={selectedStudents.length === 0} // Disable the button if no students are selected
-      >
-        <Text style={styles.nextButtonText}>Next</Text>
-      </TouchableOpacity>
+      {taggableKids.length > 0 && (
+        <TouchableOpacity
+          style={[
+            styles.nextButton,
+            selectedStudents.length === 0 && styles.disabledButton,
+          ]}
+          onPress={handleNextPressed}
+          disabled={selectedStudents.length === 0} // Disable the button if no students are selected
+        >
+          <Text style={styles.nextButtonText}>Next</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
