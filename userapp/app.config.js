@@ -6,7 +6,7 @@ export default {
   scheme: "your-app-scheme",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/icon.png",
+  icon: "./assets/icon-v2.png",
   userInterfaceStyle: "automatic",
   splash: {
     image: "./assets/splash.png",
