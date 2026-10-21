@@ -77,11 +77,44 @@ public class AuthController {
             }
         }
 
-        String token = jwt.generate(id, (String) u.get("email"), role);
+        String token = jwt.generate(id, (String) u.get("email"), role, app);
         audit.loginOk(id, (String) u.get("name"), role, app, "login");
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("token", token);
+        out.put("user", publicUser(u));
+        return out;
+    }
+
+    public record RefreshRequest(String app) {}
+
+    /**
+     * Renews the session. The app calls it when it opens: a token that still works is exchanged for a new
+     * one (30 days for the phones' apps), so a person who uses the app does not type the password again.
+     * The person is checked again (still active, still allowed in this app) and the role is read again.
+     * A token that already expired cannot be renewed: the person signs in again.
+     */
+    @PostMapping("/refresh")
+    public Map<String, Object> refresh(@RequestBody(required = false) RefreshRequest req, Authentication auth) {
+        UUID id = UUID.fromString(auth.getName());
+        String app = req == null || req.app() == null ? "" : req.app().trim().toLowerCase();
+        if (!AppAccess.isKnown(app)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown app");
+        }
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+            "select id, name, email, \"userType\", active from users where id = ?", id);
+        if (rows.isEmpty() || !Boolean.TRUE.equals(rows.get(0).get("active"))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User no longer active");
+        }
+        Map<String, Object> u = rows.get(0);
+        String role = (String) u.get("userType");
+        if (!AppAccess.canUse(app, role)) {
+            throw new AuthProblem(HttpStatus.FORBIDDEN, "app_not_allowed", "This account cannot use this app");
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("token", jwt.generate(id, (String) u.get("email"), role, app));
         out.put("user", publicUser(u));
         return out;
     }

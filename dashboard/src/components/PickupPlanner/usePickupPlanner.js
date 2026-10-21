@@ -587,6 +587,7 @@ export function usePickupPlanner({ closeMenu }) {
       return {
         ...prev,
         kids: { ...prev.kids, [vanId]: finalList },
+        absents: (prev.absents || []).filter((a) => a.id !== kid.id), // a kid in a van is not absent
         vanEta: isFirstTime ? { ...prev.vanEta, [vanId]: null } : prev.vanEta,
         schoolOrder: {
           ...prev.schoolOrder,
@@ -1186,11 +1187,117 @@ export function usePickupPlanner({ closeMenu }) {
     return { staffId, instanceId };
   }
 
+  // A person from the Staff List dropped on the "Driver:" of a van: he becomes ONLY the driver of
+  // the route (no kids to pick up)
+  function dropOnDriver(vanId, source, draggableId) {
+    if (isRouteLocked)
+      return message.warning(
+        "❌ Route closed. If you want to change, you need to re-open.",
+      );
+    if (source.droppableId !== "staffPool") {
+      return message.info("Drag the person from the Staff List.");
+    }
+
+    const { staffId } = parseStaffDragId(draggableId);
+    const person = staff.find((s) => s.id === staffId);
+    const van = route.vans.find((v) => v.id === vanId);
+    if (!person || !van) return;
+
+    const sameStaff = (a, b) =>
+      !!a &&
+      !!b &&
+      (a.id === b.id ||
+        a.originalId === b.id ||
+        a.id === b.originalId ||
+        (a.originalId && a.originalId === b.originalId));
+
+    // The driver that is there now (if any) goes back to the Staff List, unless he has kids
+    const currentDriver = van.driver;
+    if (currentDriver) {
+      const driverHasKids = (route.kids[vanId] || []).some((e) =>
+        sameStaff(e.staff, currentDriver),
+      );
+      if (driverHasKids) {
+        return message.warning(
+          `${currentDriver.name} is the driver and has kids in this van. Use the car button to demote ${currentDriver.name} first.`,
+        );
+      }
+    }
+
+    const ok = window.confirm(
+      `${person.name} will only be the driver of this route (no kids to pick up).` +
+        (currentDriver
+          ? `\n\n${currentDriver.name} will go back to the Staff List.`
+          : "") +
+        "\n\nContinue?",
+    );
+    if (!ok) return;
+
+    setIsDirty(true);
+
+    const newDriver = {
+      ...person,
+      originalId: person.originalId ?? person.id,
+      instanceId: crypto.randomUUID(),
+      isDriver: true,
+    };
+
+    setStaff((prev) => {
+      const withoutPerson = prev.filter((s) => s.id !== person.id);
+      if (currentDriver) {
+        const realId = currentDriver.originalId ?? currentDriver.id;
+        if (!withoutPerson.some((s) => s.id === realId)) {
+          const fromRoster = staffRosterRef.current.find(
+            (s) => s.id === realId,
+          );
+          return [
+            ...withoutPerson,
+            fromRoster || { id: realId, name: currentDriver.name },
+          ];
+        }
+      }
+      return withoutPerson;
+    });
+
+    setRoute((prev) => ({
+      ...prev,
+      vans: prev.vans.map((v) =>
+        v.id === vanId
+          ? {
+              ...v,
+              driver: newDriver,
+              helpers: (v.helpers || []).filter(
+                (h) => !sameStaff(h, newDriver),
+              ),
+            }
+          : v,
+      ),
+      staffInVan: {
+        ...prev.staffInVan,
+        [vanId]: [
+          ...(prev.staffInVan?.[vanId] || []).filter(
+            (s) => !sameStaff(s, currentDriver) && !sameStaff(s, newDriver),
+          ),
+          newDriver,
+        ],
+      },
+    }));
+  }
+
   const handleDragEnd = ({ source, destination, draggableId, type }) => {
     // console.log("type", type);
     // console.log("destination droppableId ", destination?.droppableId);
     // console.log("source ", source);
     if (!destination) return;
+    // Dropped on the "Driver:" of a van: ONLY the driver (no kids)
+    if (type === "staff" && destination.droppableId.startsWith("driver-")) {
+      dropOnDriver(
+        destination.droppableId.replace("driver-", ""),
+        source,
+        draggableId,
+      );
+      return;
+    }
     if (type === "staff" && !destination.droppableId.startsWith("resp-"))
       return;
 
@@ -1327,9 +1434,11 @@ export function usePickupPlanner({ closeMenu }) {
     // moving school group from pool
     if (type === "school" && source.droppableId === "schools") {
       const schoolName = draggableId.replace("school-", "");
-      const kidsToMove = studentsToday.filter(
-        (k) => (k.schools?.name || "— No School —") === schoolName,
-      );
+      // const kidsToMove = studentsToday.filter(
+      //   (k) => (k.schools?.name || "— No School —") === schoolName,
+      // );
+      // Only the kids still in the pile: not the ones already in a van or absent
+      const kidsToMove = groupedBySchool[schoolName] || [];
       if (destination.droppableId === "absents") {
         setRoute((prev) => {
           const existing = prev.absents || [];

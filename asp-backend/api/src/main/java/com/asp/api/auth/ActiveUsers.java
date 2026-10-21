@@ -17,7 +17,7 @@ public class ActiveUsers {
 
     private static final long CACHE_MILLIS = 15_000;
 
-    private record Entry(boolean active, long checkedAt) {}
+    private record Entry(boolean active, String role, long checkedAt) {}
 
     private final Map<UUID, Entry> cache = new ConcurrentHashMap<>();
     private final JdbcTemplate jdbc;
@@ -27,16 +27,27 @@ public class ActiveUsers {
     }
 
     public boolean isActive(UUID userId) {
+        return activeRole(userId) != null;
+    }
+
+    /**
+     * The role the person has NOW (read from the database, cached for a few seconds), or null when the
+     * person is not active. The role of the token is not trusted: with a long session (days), a person
+     * that was promoted or demoted must have the new role at once, not when the token expires.
+     */
+    public String activeRole(UUID userId) {
         long now = System.currentTimeMillis();
         Entry cached = cache.get(userId);
-        if (cached != null && now - cached.checkedAt() < CACHE_MILLIS) {
-            return cached.active();
+        if (cached == null || now - cached.checkedAt() >= CACHE_MILLIS) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                "select active, \"userType\" from users where id = ?", userId);
+            // A user that no longer exists is not active either
+            boolean active = !rows.isEmpty() && Boolean.TRUE.equals(rows.get(0).get("active"));
+            String role = rows.isEmpty() ? null : (String) rows.get(0).get("userType");
+            cached = new Entry(active, role, now);
+            cache.put(userId, cached);
         }
-        List<Boolean> rows = jdbc.queryForList("select active from users where id = ?", Boolean.class, userId);
-        // A user that no longer exists is not active either
-        boolean active = !rows.isEmpty() && Boolean.TRUE.equals(rows.get(0));
-        cache.put(userId, new Entry(active, now));
-        return active;
+        return cached.active() ? (cached.role() == null ? "NONE" : cached.role()) : null;
     }
 
     /** Called when a user is deactivated or reactivated, so the change takes effect at once. */

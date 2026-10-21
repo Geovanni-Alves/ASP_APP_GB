@@ -35,6 +35,9 @@ import CustomLoading from "./CustomLoading";
 import CustomMessageBox from "./CustomMessageBox";
 import { useTodayContext } from "../contexts/TodayContext";
 
+// The most photos in a post
+const MAX_PHOTOS = 5;
+
 const OpenCamera = ({
   isVisible,
   onSelectOption,
@@ -80,6 +83,24 @@ const OpenCamera = ({
   const [isCustomMessageVisible, setIsCustomMessageVisible] = useState(false);
   const [pickFromGallery, setPickFromGallery] = useState(false);
   const [showSaveOrDiscard, setShowSaveOrDiscard] = useState(false);
+
+  // Photos: up to MAX_PHOTOS in a post. After the first ones the person can come back to the camera
+  // and add more (the first ones stay), and can remove the photo that is showing.
+  const [addingMore, setAddingMore] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0); // the photo showing in the review
+  const sessionMax =
+    !allowMultipleImages || mode !== "photo" || bucketName === "profilePhotos"
+      ? 1
+      : Math.min(
+          imagesSelectionLimit > 0 ? imagesSelectionLimit : MAX_PHOTOS,
+          MAX_PHOTOS,
+        );
+  const canAddMore = mediaUris.length < sessionMax; // (sessionMax is 1 for a video and for a profile photo)
+
+  const removeCurrentPhoto = () => {
+    setMediaUris((previous) => previous.filter((_, i) => i !== currentIndex));
+    setCurrentIndex(0);
+  };
 
   const [mediaLibraryPermission, requestMediaLibraryPermission] =
     MediaLibrary.usePermissions();
@@ -174,6 +195,8 @@ const OpenCamera = ({
       setPickFromGallery(false);
       setShowSaveOrDiscard(false);
       setConfirmMedia(false);
+      setAddingMore(false);
+      setCurrentIndex(0);
     }
   }, [isVisible]);
 
@@ -230,7 +253,9 @@ const OpenCamera = ({
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.5,
       });
-      setMediaUris([photo.uri]);
+      // One more photo of the post (the first ones stay), up to the limit
+      setMediaUris((previous) => [...previous, photo.uri].slice(0, sessionMax));
+      setAddingMore(false);
       setConfirmMedia(true);
     } catch (error) {
       console.error("Error taking picture:", error);
@@ -331,7 +356,7 @@ const OpenCamera = ({
         allowsEditing: false,
         quality: 0.5,
         allowsMultipleSelection: allowMultipleImages,
-        selectionLimit: imagesSelectionLimit,
+        selectionLimit: mode === "video" ? 0 : Math.max(sessionMax - mediaUris.length, 1),
         preferredAssetRepresentationMode: "current",
         videoMaxDuration: 60 * 1000,
       });
@@ -347,7 +372,13 @@ const OpenCamera = ({
         }
 
         const uris = result.assets.map((asset) => asset.uri);
-        setMediaUris(uris);
+        // Photos are added to the ones already taken (up to the limit); a video replaces
+        setMediaUris(
+          mode === "photo"
+            ? [...mediaUris, ...uris].slice(0, sessionMax)
+            : uris,
+        );
+        setAddingMore(false);
         setConfirmMedia(true);
       }
     } catch (error) {
@@ -499,11 +530,13 @@ const OpenCamera = ({
     );
   }
 
-  if (mediaUris?.length > 0) {
+  if (mediaUris?.length > 0 && !addingMore) {
     return (
       <Modal visible={isVisible} animationType="slide" transparent={false}>
         <View style={{ flex: 1, backgroundColor: "black" }}>
           <Swiper
+            key={mediaUris.length}
+            onIndexChanged={setCurrentIndex}
             loop={false}
             showsPagination={true}
             activeDotStyle={styles.activeDot}
@@ -536,6 +569,21 @@ const OpenCamera = ({
                   />
                 ))}
           </Swiper>
+
+          {/* Which photo it is, and a way to remove it */}
+          {confirmMedia && mode === "photo" && (
+            <View style={styles.photoTools}>
+              <Text style={styles.countText}>
+                {currentIndex + 1}/{mediaUris.length}
+              </Text>
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={removeCurrentPhoto}
+              >
+                <Ionicons name="trash-outline" size={22} color="white" />
+              </TouchableOpacity>
+            </View>
+          )}
 
           {confirmMedia && (
             <>
@@ -571,6 +619,20 @@ const OpenCamera = ({
                 >
                   <Text style={styles.bottomText}>Retake</Text>
                 </TouchableOpacity>
+
+                {canAddMore && (
+                  <TouchableOpacity
+                    style={styles.bottomButton}
+                    onPress={() => setAddingMore(true)}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons name="camera-outline" size={18} color="white" />
+                      <Text style={styles.bottomText}>
+                        Add ({mediaUris.length}/{sessionMax})
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                   style={styles.bottomButton}
@@ -713,9 +775,18 @@ const OpenCamera = ({
             <Text style={styles.timerText}>{formatTime(recordedTime)}</Text>
           )}
 
+          {mode === "photo" && mediaUris.length > 0 && (
+            <Text style={styles.countText}>
+              {mediaUris.length}/{sessionMax} photos
+            </Text>
+          )}
+
           {!isRecording && (
             <>
-              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={addingMore ? () => setAddingMore(false) : onClose}
+              >
                 <Ionicons name="close" size={29} color="white" />
               </TouchableOpacity>
 
@@ -815,6 +886,33 @@ function formatTime(seconds: number) {
 export default OpenCamera;
 
 const styles = StyleSheet.create({
+  countText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  photoTools: {
+    position: "absolute",
+    top: 80,
+    right: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    zIndex: 9999,
+  },
+  removeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   container: {
     flex: 1,
     backgroundColor: "black",

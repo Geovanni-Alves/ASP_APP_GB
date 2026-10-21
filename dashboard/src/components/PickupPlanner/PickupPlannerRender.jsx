@@ -643,6 +643,51 @@ export default function PickupPlannerRender(props) {
                       >
                         <div className="staffs-row">
                           <span className="driver-label">Driver:</span>
+                          <Droppable
+                            droppableId={`driver-${van.id}`}
+                            type="staff"
+                          >
+                            {(driverProvided, driverSnap) => (
+                              <span
+                                ref={driverProvided.innerRef}
+                                {...driverProvided.droppableProps}
+                                className={`staff-chip driver-name ${
+                                  driverSnap.isDraggingOver
+                                    ? "dragging-over"
+                                    : ""
+                                }`}
+                                title="Drop a person from the Staff List here: he will only be the driver"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  minWidth: 40,
+                                }}
+                              >
+                                {van.driver ? van.driver.name : "—"}
+                                {van.driver && (
+                                  <button
+                                    className="back-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      returnStaff(
+                                        {
+                                          ...van.driver,
+                                          id:
+                                            van.driver.originalId ??
+                                            van.driver.id,
+                                        },
+                                        van.id,
+                                      );
+                                    }}
+                                  >
+                                    ↩
+                                  </button>
+                                )}
+                                {driverProvided.placeholder}
+                              </span>
+                            )}
+                          </Droppable>
                           <span className="staff-chip driver-name">
                             {van.driver ? van.driver.name : "—"}
                           </span>

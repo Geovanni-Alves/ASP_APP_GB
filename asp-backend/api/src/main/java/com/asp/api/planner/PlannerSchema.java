@@ -35,6 +35,8 @@ public class PlannerSchema implements ApplicationRunner {
         jdbc.execute("alter table route_vans add column if not exists location_at timestamptz");
         // When the driver finished the route with this van (the route closes when every van is finished)
         jdbc.execute("alter table route_vans add column if not exists finished_at timestamptz");
+        // The schools the van already reached on the way BACK to the ASP (ids, in the order of arrival)
+        jdbc.execute("alter table route_vans add column if not exists return_arrived jsonb not null default '[]'::jsonb");
 
         // Staff who cannot work on that day (the manager marks them in the planner)
         jdbc.execute("alter table routes add column if not exists staff_absents uuid[] not null default '{}'");

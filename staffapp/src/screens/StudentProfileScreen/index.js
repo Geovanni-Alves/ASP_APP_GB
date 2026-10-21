@@ -27,7 +27,7 @@ import BasicInfoScreen from "./BasicInfoScreen";
 import SchoolInfoScreen from "./SchoolInfoScreen";
 import ContactsScreen from "./ContactsScreen";
 import AddressInfoScreen from "./AddressInfoScreen";
-import JiuJitsuInfoScreen from "./JiuJitsuInfoScreen";
+// import JiuJitsuInfoScreen from "./JiuJitsuInfoScreen";
 import { useKidsContext } from "../../contexts/KidsContext";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { usePicturesContext } from "../../contexts/PicturesContext";

@@ -50,6 +50,14 @@ export default {
     "@react-native-community/datetimepicker",
     "expo-splash-screen",
     "expo-status-bar",
+    "expo-secure-store",
+    [
+      "expo-local-authentication",
+      {
+        faceIDPermission:
+          "Allow $(PRODUCT_NAME) to use Face ID for secure sign in.",
+      },
+    ],
   ],
 
   ios: {

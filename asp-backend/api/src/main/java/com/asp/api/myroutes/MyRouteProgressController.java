@@ -29,6 +29,8 @@ import org.springframework.web.server.ResponseStatusException;
  *                                      (the manager sees it in the dashboard, and the route is locked)
  *   PUT  /my/routes/{routeId}/leg      the driver arrived at a school: saves the number of the
  *                                      current leg, so the progress survives closing the app
+ *   POST /my/routes/{routeId}/return-arrived   the driver reached a school on the way BACK to the ASP
+ *                                      (any order): the counter goes on after the schools of the way out
  *   POST /my/routes/{routeId}/finish   the driver finished the route with their van (only after the
  *                                      last school). When every van is finished, the route is
  *                                      finished: in_progress -> finished
@@ -172,6 +174,73 @@ public class MyRouteProgressController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("current_leg_index", body.index());
         return result;
+    }
+
+    public record ReturnArrival(String schoolId) {}
+
+    // The driver reached a school on the way BACK to the ASP. The schools can be reached in any order
+    // (if something happens, the driver goes to another one first): the ids are kept, and
+    // current_leg_index becomes "schools of the way out + schools already reached on the way back".
+    // Doing it twice for the same school changes nothing.
+    @PostMapping("/return-arrived")
+    public Map<String, Object> returnArrived(@PathVariable UUID routeId, @RequestBody ReturnArrival body,
+                                             Authentication auth) {
+        Roles.requireStaffApp(auth);
+        UUID me = actAs.effectiveUser(auth); // the super admin may act as somebody (test mode)
+
+        if (body.schoolId() == null || body.schoolId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "schoolId is required");
+        }
+
+        return transaction.execute(txStatus -> {
+            requireDriver(routeId, me);
+
+            Map<String, Object> van = jdbc.queryForList(
+                "select rv.id, coalesce(rv.current_leg_index, 0) as leg, "
+                    + "coalesce(array_length(rv.school_order, 1), 0) as schools, "
+                    + "(CAST(? AS text) = any(rv.school_order::text[])) as in_order, "
+                    + "(rv.return_arrived @> jsonb_build_array(CAST(? AS text))) as done, "
+                    + "r.status, r.date "
+                    + "from route_vans rv join routes r on r.id = rv.route_id "
+                    + "where rv.route_id = ? and rv.driver_id = ? for update of rv",
+                body.schoolId(), body.schoolId(), routeId, me).get(0);
+
+            LocalDate routeDate = ((java.sql.Date) van.get("date")).toLocalDate();
+            if (!routeDate.equals(LocalDate.now(ZoneId.of(timezone)))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This route is for " + routeDate + ": it can only be changed on the day");
+            }
+            if (!"in_progress".equals(String.valueOf(van.get("status")))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "The route has not started");
+            }
+            if (!Boolean.TRUE.equals(van.get("in_order"))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "That school is not in this route");
+            }
+            int leg = ((Number) van.get("leg")).intValue();
+            if (leg < ((Number) van.get("schools")).intValue()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "You have not arrived at every school of the way out yet");
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            if (Boolean.TRUE.equals(van.get("done"))) {
+                result.put("current_leg_index", leg); // already marked: nothing to repeat
+                return result;
+            }
+
+            Integer newLeg = jdbc.queryForObject(
+                "update route_vans set return_arrived = return_arrived || jsonb_build_array(CAST(? AS text)), "
+                    + "current_leg_index = coalesce(array_length(school_order, 1), 0) + jsonb_array_length(return_arrived) + 1 "
+                    + "where id = ? returning current_leg_index",
+                Integer.class, body.schoolId(), van.get("id"));
+
+            Map<String, Object> details = new LinkedHashMap<>();
+            details.put("school_id", body.schoolId());
+            audit.log(auth, "route.arrived_back", "routes", routeId, String.valueOf(routeDate), details);
+
+            result.put("current_leg_index", newLeg);
+            return result;
+        });
     }
 
     private void requireDriver(UUID routeId, UUID userId) {

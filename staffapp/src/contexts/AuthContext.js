@@ -62,6 +62,18 @@ const AuthContextProvider = ({ children }) => {
         if (!token) return;
         const { data } = await api.get("/auth/me");
         setSession({ access_token: token, user: data });
+
+        // Renews the session: another 30 days from today. The person only types the password again after
+        // 30 days without opening the app. If it fails (no connection, an older API), the token that works stays.
+        try {
+          const { data: renewed } = await api.post("/auth/refresh", {
+            app: "staff",
+          });
+          await saveToken(renewed.token);
+          setSession({ access_token: renewed.token, user: renewed.user });
+        } catch (error) {
+          console.log("Could not renew the session:", error.message);
+        }
       } catch (error) {
         console.log("Could not restore the session:", error.message);
         // Only a rejected token is thrown away; with no connection it stays for the next try

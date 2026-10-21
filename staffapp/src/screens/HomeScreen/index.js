@@ -10,9 +10,62 @@ import { useKidsContext } from "../../contexts/KidsContext";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { useTodayContext } from "../../contexts/TodayContext";
 import { useNavigation } from "@react-navigation/native";
+// import * as LocalAuthentication from "expo-local-authentication";
+import { Alert } from "react-native";
 
 const HomeScreen = () => {
   const navigation = useNavigation();
+
+  // const testBiometrics = async () => {
+  //   try {
+  //     const hasHardware = await LocalAuthentication.hasHardwareAsync();
+
+  //     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+  //     const supportedTypes =
+  //       await LocalAuthentication.supportedAuthenticationTypesAsync();
+
+  //     console.log("Hardware:", hasHardware);
+  //     console.log("Enrolled:", isEnrolled);
+  //     console.log("Supported types:", supportedTypes);
+
+  //     if (!hasHardware) {
+  //       Alert.alert(
+  //         "Biometrics",
+  //         "This device does not support biometric authentication.",
+  //       );
+  //       return;
+  //     }
+
+  //     if (!isEnrolled) {
+  //       Alert.alert(
+  //         "Biometrics",
+  //         "No Face ID or fingerprint is configured on this device.",
+  //       );
+  //       return;
+  //     }
+
+  //     const result = await LocalAuthentication.authenticateAsync({
+  //       promptMessage: "Authenticate to access ASP Staff",
+  //       cancelLabel: "Cancel",
+  //       disableDeviceFallback: false,
+  //     });
+
+  //     if (result.success) {
+  //       Alert.alert("Success", "Biometric authentication successful!");
+  //     } else {
+  //       Alert.alert(
+  //         "Authentication failed",
+  //         result.error || "Authentication was cancelled.",
+  //       );
+  //     }
+  //   } catch (error) {
+  //     console.error("Biometric error:", error);
+
+  //     Alert.alert("Error", "Unable to perform biometric authentication.");
+  //   }
+  // };
+
   const { unreadMessages } = useMessageContext();
   const { kids } = useKidsContext();
   const { currentUserData } = useUsersContext();
@@ -43,6 +96,13 @@ const HomeScreen = () => {
           )}
         </View>
         <View style={styles.headerButtons}>
+          {/* <TouchableOpacity
+            style={[styles.pickUpButton, { backgroundColor: "#343a40" }]}
+            onPress={testBiometrics}
+          >
+            <FontAwesome5 name="fingerprint" size={24} color="white" />
+            <Text style={styles.buttonText}>Test Biometrics</Text>
+          </TouchableOpacity> */}
           <TouchableOpacity
             style={styles.chatButton}
             onPress={() => navigation.navigate("Chat")}

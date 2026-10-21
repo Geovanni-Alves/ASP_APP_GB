@@ -229,7 +229,7 @@ public class InviteService {
         publicUser.put("userType", role);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("token", jwt.generate(userId, text(user.get("email")), role));
+        result.put("token", jwt.generate(userId, text(user.get("email")), role, appName));
         result.put("user", publicUser);
         return result;
     }

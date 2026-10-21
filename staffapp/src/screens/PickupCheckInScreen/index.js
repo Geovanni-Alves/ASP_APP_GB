@@ -6,6 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Pressable,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import RemoteImage from "../../components/RemoteImage";
@@ -16,13 +17,15 @@ import { usePendingActions } from "../../contexts/PendingActionsContext";
 import { useFeedContext } from "../../contexts/FeedContext";
 import OpenCamera from "../../components/OpenCamera";
 import InfoModal from "../../components/InfoModal";
+import FullScreenImage from "../../components/FullScreenImageModal";
 
 import styles from "./styles";
 
-const PickupCheckInScreen = ({ routeId, onClose }) => {
+const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
   const navigation = useNavigation();
-  // const route = useRoute();
-  // const { routeId } = route.params;
+  // Opened as a screen, the id comes in the route; it can also be given as a prop
+  const route = useRoute();
+  const routeId = routeIdFromProps ?? route.params?.routeId;
 
   const { routesData, loading } = useRoutesContext();
   const { dbUser } = useUsersContext();
@@ -40,6 +43,8 @@ const PickupCheckInScreen = ({ routeId, onClose }) => {
   const [pickupPhotoKidId, setPickupPhotoKidId] = useState([]);
   const [showPostConfirmation, setShowPostConfirmation] = useState(false);
   const [pickupPictureDone, setPickupPictureDone] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [fullScreenImageModal, setFullScreenImageModal] = useState(false);
 
   const kidsStateRef = useRef({});
   // const [fullscreenVisible, setFullscreenVisible] = useState(false);
@@ -309,6 +314,18 @@ const PickupCheckInScreen = ({ routeId, onClose }) => {
     ]);
   };
 
+  const handleImagePress = (image) => {
+    if (!image) return;
+
+    setSelectedImage(image);
+    setFullScreenImageModal(true);
+  };
+
+  const closeFullScreenModal = () => {
+    setFullScreenImageModal(false);
+    setSelectedImage(null);
+  };
+
   const handlePickupPhotoPress = (kidId) => {
     // console.log({ kidId });
     setCameraMode("photo");
@@ -402,12 +419,18 @@ const PickupCheckInScreen = ({ routeId, onClose }) => {
             <Text style={styles.absentBannerText}>ABSENT</Text>
           </View>
         )}
-        <RemoteImage
-          bucketName="profilePhotos"
-          path={item.kid.photo}
-          name={item.kid.name}
-          style={styles.avatar}
-        />
+        <Pressable
+          onPress={() => {
+            handleImagePress(item.kid.photo);
+          }}
+        >
+          <RemoteImage
+            bucketName="profilePhotos"
+            path={item.kid.photo}
+            name={item.kid.name}
+            style={styles.avatar}
+          />
+        </Pressable>
 
         <View style={styles.infoContainer}>
           <Text style={styles.kidName}>{item.kid.name}</Text>
@@ -506,6 +529,12 @@ const PickupCheckInScreen = ({ routeId, onClose }) => {
           </View>
         }
         ListHeaderComponent={<ListHeader />}
+      />
+      <FullScreenImage
+        isVisible={fullScreenImageModal}
+        path={selectedImage}
+        onClose={closeFullScreenModal}
+        bucketName="profilePhotos"
       />
       <OpenCamera
         isVisible={callOpenCamera}

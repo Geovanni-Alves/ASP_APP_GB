@@ -1,510 +1,389 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
-  View,
   Text,
+  View,
   TouchableOpacity,
-  FlatList,
   ActivityIndicator,
-  Alert,
+  ScrollView,
+  RefreshControl,
+  Modal,
+  StyleSheet,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import RemoteImage from "../../components/RemoteImage";
+import React, { useCallback, useMemo, useState } from "react";
 import { useRoutesContext } from "../../contexts/RoutesContext";
 import { useUsersContext } from "../../contexts/UsersContext";
-import api, { getActAs } from "../../lib/api";
-import { usePendingActions } from "../../contexts/PendingActionsContext";
-import { useFeedContext } from "../../contexts/FeedContext";
-import OpenCamera from "../../components/OpenCamera";
-import InfoModal from "../../components/InfoModal";
-
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import RemoteImage from "../../components/RemoteImage";
+import { setActAs, getActAs } from "../../lib/api";
 import styles from "./styles";
 
-const PickupCheckInScreen = ({ routeId, onClose }) => {
+// The routes that are sent (waiting) or already going
+const OPEN_STATUSES = ["waiting_to_start", "in_progress"];
+
+// "2026-10-19" -> "Monday, Oct 19" (noon, so the day never moves with the timezone)
+const formatDay = (isoDate) =>
+  new Date(`${isoDate}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
+const PickupListScreen = () => {
+  const defaultVanImage = require("../../../assets/defaultVan.png");
+
   const navigation = useNavigation();
-
-  const { routesData, loading } = useRoutesContext();
+  const { routesData, loading, refreshing, refreshRoutes } = useRoutesContext();
   const { dbUser } = useUsersContext();
-  // The super admin may open a route AS somebody (test mode): then the routes are that person's
-  const effectiveId = getActAs() || dbUser?.id;
 
-  const [kids, setKids] = useState([]);
-  const [assignedSchool, setAssignedSchool] = useState(null);
-  const [localKidsState, setLocalKidsState] = useState({});
-  const { addPendingAction, cancelPendingAction } = usePendingActions();
-  const { createFeedForKids } = useFeedContext();
-  const [callOpenCamera, setCallOpenCamera] = useState(false);
-  const [cameraMode, setCameraMode] = useState("photo");
-  const [bucketName, setBucketName] = useState(null);
-  const [pickupPhotoKidId, setPickupPhotoKidId] = useState([]);
-  const [showPostConfirmation, setShowPostConfirmation] = useState(false);
-  const [pickupPictureDone, setPickupPictureDone] = useState(false);
+  // Test mode: the super admin (the programmer) sees every route and chooses who to open it as
+  const isSuperAdmin = (dbUser?.userType || "").toLowerCase() === "superadmin";
+  const [chooserRoute, setChooserRoute] = useState(null); // the route waiting for the choice
 
-  const kidsStateRef = useRef({});
-
-  const getRouteById = (id) => {
-    return routesData.find((r) => r.id === id) || null;
-  };
-
-  useEffect(() => {
-    kidsStateRef.current = localKidsState;
-  }, [localKidsState]);
-
-  useEffect(() => {
-    const loadKids = async () => {
-      if (!routeId || !routesData.length || !dbUser) return;
-
-      const routeData = getRouteById(routeId);
-
-      if (!routeData) return;
-
-      // find van where this helper or driver is assigned
-      const myVan = routeData.vans.find(
-        (v) =>
-          v.driver_id === effectiveId || v.helper_ids?.includes(effectiveId),
-      );
-
-      if (!myVan) {
-        setKids([]);
-        return;
+  // Back on this list: the test mode ends, and the super admin sees every route again
+  useFocusEffect(
+    useCallback(() => {
+      if (getActAs()) {
+        setActAs(null);
+        refreshRoutes();
       }
+    }, []),
+  );
 
-      // Filter only kids assigned to THIS STAFF
-      const assignedKids = myVan.kids.filter(
-        (k) => k.responsible_staff_id === effectiveId,
-      );
+  // ----------------------------------------------------
+  // My pickup routes (for the super admin: every route). The API says when each one is ("today",
+  // "upcoming"), by the clock of the server, so a wrong clock on the phone changes nothing.
+  // ----------------------------------------------------
+  const { todayRoute, upcomingRoutes } = useMemo(() => {
+    if (!dbUser || !routesData?.length) {
+      return { todayRoute: null, upcomingRoutes: [] };
+    }
 
-      // The API already sends the attendance of each kid (check-in / absence) with the route,
-      // so there is nothing else to ask for
-      const kidsWithAttendance = assignedKids;
+    const open = routesData.filter(
+      (route) =>
+        route.type === "pickup" && OPEN_STATUSES.includes(route.status),
+    );
+    const mine = isSuperAdmin
+      ? open
+      : open.filter((route) =>
+          route.vans.some(
+            (van) =>
+              van.driverUser?.id === dbUser.id ||
+              van.helperUsers?.some((h) => h.id === dbUser.id),
+          ),
+        );
 
-      setKids(kidsWithAttendance);
-
-      if (kidsWithAttendance.length > 0) {
-        setAssignedSchool(kidsWithAttendance[0].school?.name || null);
-      }
+    return {
+      todayRoute: mine.find((route) => route.when === "today") || null,
+      upcomingRoutes: mine
+        .filter((route) => route.when === "upcoming")
+        .sort((a, b) => a.date.localeCompare(b.date)),
     };
-    loadKids();
-  }, [routeId, routesData, dbUser]);
+  }, [routesData, dbUser, isSuperAdmin]);
 
-  useEffect(() => {
-    if (kids.length > 0) {
-      const initial = {};
-
-      kids.forEach((k) => {
-        initial[k.kid.id] = {
-          isChecked: k.attendance?.checked_in || false,
-          isAbsent: k.attendance?.is_absent || false,
-          undoEnabled: false,
-          timer: null,
-          pendingAction: null,
-          attendanceId: k.attendanceId?.id || null,
-          saved: false,
-        };
-      });
-
-      setLocalKidsState(initial);
-    }
-  }, [kids]);
-
-  const pickupCompleted = useMemo(() => {
-    if (!kids.length) return false;
-
-    return kids.every((item) => {
-      const state = localKidsState[item.kid.id];
-      if (!state) return false;
-
-      return (
-        (state.isChecked || state.isAbsent) &&
-        !state.pendingActionId &&
-        !state.undoEnabled
-      );
-    });
-  }, [kids, localKidsState]);
-
-  const ListHeader = () => {
-    if (!pickupCompleted) return null;
-
-    return (
-      <View style={styles.pickupDoneHeader}>
-        <Text style={styles.pickupDoneText}>Pickup completed</Text>
-        <Text style={styles.pickupDoneSubtext}>Waiting for driver arrival</Text>
-      </View>
+  // My van in a route, and my role in it
+  const myVanIn = (route) =>
+    route.vans.find(
+      (van) =>
+        van.driverUser?.id === dbUser.id ||
+        van.helperUsers?.some((h) => h.id === dbUser.id),
     );
-  };
+  const roleIn = (route) =>
+    myVanIn(route)?.driverUser?.id === dbUser.id ? "Driver" : "Helper";
 
-  const updateKidState = (kidId, newState) => {
-    setLocalKidsState((prev) => ({
-      ...prev,
-      [kidId]: {
-        ...prev[kidId],
-        ...newState,
-      },
-    }));
-  };
-
-  const goToStudentFeed = (kidId) => {
-    navigation.navigate("StudentProfile", { id: kidId, readOnly: true });
-  };
-
-  const handleCheckIn = (item) => {
-    Alert.alert("Confirm Check-in", `Check in ${item.kid.name}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Confirm",
-        onPress: () => {
-          const kidId = item.kid.id;
-
-          // Immediate UI update
-          updateKidState(kidId, {
-            isChecked: true,
-            isAbsent: false,
-            undoEnabled: true,
-            pendingActionId: null, // will set soon
-          });
-
-          const routeData = getRouteById(routeId);
-
-          // Create a pending action
-          const id = addPendingAction({
-            type: "checkin",
-            entityId: kidId,
-            delay: 5000,
-            payload: {
-              kidId,
-              routeId,
-              vanId: routeData.vans[0].id,
-              date: routeData.date,
-            },
-
-            onExecute: async ({ payload }) => {
-              console.log("⏳ Saving CHECK-IN...", payload);
-
-              try {
-                // The API saves the check-in AND the news for the family ("Picked up from school")
-                await api.post(
-                  `/my/routes/${payload.routeId}/kids/${payload.kidId}/check-in`,
-                );
-              } catch (error) {
-                // It was not saved: the card goes back, and the person sees why
-                updateKidState(kidId, {
-                  isChecked: false,
-                  undoEnabled: false,
-                  pendingActionId: null,
-                });
-                Alert.alert(
-                  "Check-in not saved",
-                  error?.response?.data?.error || "Please try again.",
-                );
-              }
-            },
-
-            onFinish: () => {
-              updateKidState(kidId, {
-                undoEnabled: false,
-                pendingActionId: null,
-              });
-            },
-          });
-
-          // Save the pending action ID in local state
-          updateKidState(kidId, { pendingActionId: id });
-        },
-      },
-    ]);
-  };
-
-  const handleAbsent = (item) => {
-    Alert.alert("Mark Absent", `Mark ${item.kid.name} as absent?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Confirm",
-        onPress: () => {
-          const kidId = item.kid.id;
-
-          // Immediate UI update
-          updateKidState(kidId, {
-            isAbsent: true,
-            isChecked: false,
-            undoEnabled: true,
-            pendingActionId: null,
-          });
-
-          const routeData = getRouteById(routeId);
-
-          const id = addPendingAction({
-            type: "absent",
-            entityId: kidId,
-            delay: 5000,
-            payload: {
-              kidId,
-              routeId,
-              vanId: routeData.vans[0].id,
-              date: routeData.date,
-            },
-
-            onExecute: async ({ payload }) => {
-              console.log("⏳ Saving ABSENT...", payload);
-
-              try {
-                // The API saves the absence AND the news for the family ("Marked as absent")
-                await api.post(
-                  `/my/routes/${payload.routeId}/kids/${payload.kidId}/absent`,
-                );
-              } catch (error) {
-                // It was not saved: the card goes back, and the person sees why
-                updateKidState(kidId, {
-                  isAbsent: false,
-                  undoEnabled: false,
-                  pendingActionId: null,
-                });
-                Alert.alert(
-                  "Absence not saved",
-                  error?.response?.data?.error || "Please try again.",
-                );
-              }
-            },
-
-            onFinish: () => {
-              updateKidState(kidId, {
-                undoEnabled: false,
-                pendingActionId: null,
-              });
-            },
-          });
-
-          updateKidState(kidId, { pendingActionId: id });
-        },
-      },
-    ]);
-  };
-
-  const handlePickupPhotoPress = (kidId) => {
-    setCameraMode("photo");
-    setBucketName("feedPhotos");
-    setPickupPhotoKidId(kidId);
-    setCallOpenCamera(true);
-  };
-
-  const handleSelectPhotoVideo = async (paths, selectedKids, notes) => {
-    const mediaType = cameraMode === "photo" ? "PHOTO" : "VIDEO";
-
-    if (pickupPhotoKidId && paths?.length) {
-      // ONE item with all the photos
-      const created = await createFeedForKids(
-        [pickupPhotoKidId],
-        paths,
-        mediaType,
-        notes,
-      );
-      if (!created) {
-        Alert.alert("Not posted", "Nothing was posted. Please try again.");
-        return;
+  // The people of a route, for the super admin to choose from
+  const peopleOf = (route) => {
+    const people = [];
+    route.vans.forEach((van) => {
+      const vanName = van.van?.name || "Van";
+      if (van.driverUser) {
+        people.push({
+          key: `${van.id}-driver`,
+          id: van.driverUser.id,
+          name: van.driverUser.name,
+          role: "Driver",
+          vanName,
+        });
       }
-    }
-
-    setShowPostConfirmation(true); // Show confirmation
-    setPickupPictureDone(true);
-  };
-
-  const handleUndoCheckIn = (item) => {
-    const kidId = item.kid.id;
-    const state = localKidsState[kidId];
-
-    if (!state?.undoEnabled) return;
-
-    // 1️⃣ cancel pending FIRST
-    if (state.pendingActionId) {
-      cancelPendingAction(state.pendingActionId);
-    }
-
-    // 2️⃣ revert UI
-    updateKidState(kidId, {
-      isChecked: false,
-      undoEnabled: false,
-      pendingActionId: null,
-      pendingAction: null,
-      timer: null,
+      (van.helperUsers || []).forEach((helper) =>
+        people.push({
+          key: `${van.id}-${helper.id}`,
+          id: helper.id,
+          name: helper.name,
+          role: "Helper",
+          vanName,
+        }),
+      );
     });
+    return people;
   };
 
-  const handleUndoAbsent = (item) => {
-    const kidId = item.kid.id;
-    const state = localKidsState[kidId];
-
-    if (!state?.undoEnabled) return;
-
-    if (state.pendingActionId) {
-      cancelPendingAction(state.pendingActionId);
-    }
-
-    updateKidState(kidId, {
-      isAbsent: false,
-      undoEnabled: false,
-      pendingActionId: null,
-      pendingAction: null,
-      timer: null,
-    });
-  };
-
-  const renderKidItem = ({ item }) => {
-    const kidId = item.kid.id;
-    const kidState = localKidsState[kidId] || {};
-
-    const isChecked = kidState.isChecked;
-    const isAbsent = kidState.isAbsent;
-    const undoEnabled = kidState.undoEnabled;
-
-    const cardStyles = [
-      styles.stopCard,
-      isChecked && styles.stopCardChecked,
-      isAbsent && styles.stopCardAbsent,
-    ];
-
-    return (
-      <TouchableOpacity
-        style={cardStyles}
-        onPress={() => goToStudentFeed(item.kid.id)}
-        activeOpacity={0.85}
-      >
-        {isChecked && (
-          <View style={styles.checkedIconContainer}>
-            <Text style={styles.checkedIcon}>✔</Text>
-          </View>
-        )}
-
-        {isAbsent && (
-          <View style={styles.absentBanner}>
-            <Text style={styles.absentBannerText}>ABSENT</Text>
-          </View>
-        )}
-        <RemoteImage
-          bucketName="profilePhotos"
-          path={item.kid.photo}
-          name={item.kid.name}
-          style={styles.avatar}
-        />
-
-        <View style={styles.infoContainer}>
-          <Text style={styles.kidName}>{item.kid.name}</Text>
-
-          {item.school.name && (
-            <Text style={styles.infoLine}>{item.school.name}</Text>
-          )}
-
-          <View style={styles.actionButtons}>
-            {!isChecked && !isAbsent && (
-              <>
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.actionGreen]}
-                  onPress={() => handleCheckIn(item)}
-                >
-                  <Text style={styles.btnText}>Check-in</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.actionRed]}
-                  onPress={() => handleAbsent(item)}
-                >
-                  <Text style={styles.btnText}>Absent</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            {isChecked && undoEnabled && (
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionRed]}
-                onPress={() => handleUndoCheckIn(item)}
-              >
-                <Text style={styles.btnText}>Undo</Text>
-              </TouchableOpacity>
-            )}
-            {isChecked && !undoEnabled && (
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#007bff" }]}
-                onPress={() => handlePickupPhotoPress(item.kid.id)}
-              >
-                <Text style={styles.btnText}>Pickup Photo</Text>
-              </TouchableOpacity>
-            )}
-            {isAbsent && undoEnabled && (
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.actionRed]}
-                onPress={() => handleUndoAbsent(item)}
-              >
-                <Text style={styles.btnText}>Undo Absent</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+  // Opens the route AS that person: from now on the API answers as them
+  const openAs = async (person) => {
+    const routeId = chooserRoute.id;
+    setActAs(person.id);
+    await refreshRoutes(); // the routes the way this person sees them
+    setChooserRoute(null);
+    navigation.navigate(
+      person.role === "Driver" ? "DriverPickupScreen" : "PickupCheckInScreen",
+      { routeId },
     );
   };
 
+  // ----------------------------------------------------
+  // Loading indicator
+  // ----------------------------------------------------
   if (loading) {
     return (
-      <View style={{ marginTop: 50, alignItems: "center" }}>
-        <ActivityIndicator size="large" />
-        <Text>Loading route...</Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#000" />
+        <Text style={{ marginTop: 10 }}>Loading routes...</Text>
       </View>
     );
   }
 
-  return (
-    <>
-      <View style={styles.header}>
-        {kids.length > 0 && (
-          <View>
-            {assignedSchool && (
-              <>
-                <Text style={styles.headerText}>School for pickup</Text>
-                <Text
-                  style={[styles.headerText, { fontWeight: 600, marginTop: 5 }]}
-                >
-                  {assignedSchool}
-                </Text>
-              </>
-            )}
-            <Text style={[styles.headerText, { marginTop: 10 }]}>
-              Kid{kids.length > 1 ? "s" : ""} at this school
+  // ----------------------------------------------------
+  // Render each van
+  // ----------------------------------------------------
+  const renderVan = (van) => {
+    const vanData = van.van;
+
+    return (
+      <View key={van.id} style={styles.vanWrapper}>
+        <RemoteImage
+          path={vanData?.image}
+          bucketName="vans"
+          fallback={defaultVanImage}
+          name={vanData?.name || "Van"}
+          style={styles.vanImage}
+        />
+
+        <View style={styles.vanInfo}>
+          <Text style={styles.vanTitle}>{vanData?.name || "Van"}</Text>
+
+          <View style={styles.userRow}>
+            <Text style={styles.userName}>
+              Driver: {van.driverUser?.name || "No Driver"}
             </Text>
           </View>
-        )}
-      </View>
 
-      <FlatList
-        data={kids}
-        renderItem={renderKidItem}
-        keyExtractor={(item) => item.kid.id}
-        contentContainerStyle={{ padding: 10 }}
-        ListEmptyComponent={
-          <View style={{ alignItems: "center", marginTop: 50 }}>
-            <Text>There is no routes for today.</Text>
-          </View>
-        }
-        ListHeaderComponent={<ListHeader />}
-      />
-      <OpenCamera
-        isVisible={callOpenCamera}
-        onSelectOption={handleSelectPhotoVideo}
-        onClose={() => setCallOpenCamera(false)}
-        mode={cameraMode}
-        bucketName={bucketName}
-        tag={false}
-      />
-      <InfoModal
-        isVisible={showPostConfirmation}
-        onClose={() => setShowPostConfirmation(false)}
-        infoItems={[
-          { label: "Success!", value: "New activity successfully created" },
-        ]}
-        labelStyle={{ textAlign: "center" }}
-      />
-      {onClose && (
-        <TouchableOpacity onPress={onClose} style={{ padding: 10 }}>
-          <Text style={{ color: "blue" }}>Close</Text>
+          {van.helperUsers?.length ? (
+            van.helperUsers.map((h) => (
+              <Text key={h.id} style={styles.userName}>
+                Helper: {h.name}
+              </Text>
+            ))
+          ) : (
+            <Text style={{ marginLeft: 5 }}>Helpers: None</Text>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  // ----------------------------------------------------
+  // Today's route: the only one that opens
+  // ----------------------------------------------------
+  const renderTodayRoute = () => {
+    if (!todayRoute) {
+      return (
+        <View style={styles.center}>
+          <Text>No pickup route for today.</Text>
+        </View>
+      );
+    }
+
+    const role = isSuperAdmin ? null : roleIn(todayRoute);
+
+    return (
+      <View>
+        <Text style={styles.containerTitle}>
+          {isSuperAdmin
+            ? "Today's route (test mode)"
+            : `You have a route today as ${role}`}
+        </Text>
+
+        <TouchableOpacity
+          style={styles.routeContainer}
+          onPress={() => {
+            if (isSuperAdmin) {
+              setChooserRoute(todayRoute); // asks: as the driver or as a helper?
+              return;
+            }
+            navigation.navigate(
+              role === "Driver" ? "DriverPickupScreen" : "PickupCheckInScreen",
+              { routeId: todayRoute.id },
+            );
+          }}
+        >
+          <Text style={styles.routeTitle}>Route</Text>
+          <Text>Date: {todayRoute.date}</Text>
+          {todayRoute.vans.map(renderVan)}
         </TouchableOpacity>
-      )}
+      </View>
+    );
+  };
+
+  // ----------------------------------------------------
+  // The next days: only to know what is coming (nothing can be done until the day)
+  // ----------------------------------------------------
+  const renderUpcoming = () => {
+    if (upcomingRoutes.length === 0) return null;
+
+    return (
+      <View style={{ marginTop: 24 }}>
+        <Text style={styles.containerTitle}>Coming up</Text>
+
+        {upcomingRoutes.map((route) => (
+          <TouchableOpacity
+            key={route.id}
+            activeOpacity={isSuperAdmin ? 0.7 : 1}
+            style={[
+              styles.routeContainer,
+              { opacity: isSuperAdmin ? 0.85 : 0.6 },
+            ]}
+            onPress={() => {
+              // Only the super admin (test mode) opens a route before its day
+              if (isSuperAdmin) setChooserRoute(route);
+            }}
+          >
+            <Text style={styles.routeTitle}>{formatDay(route.date)}</Text>
+            {isSuperAdmin ? (
+              <Text style={{ marginBottom: 6 }}>
+                Test mode: tap to open it as a driver or a helper.
+              </Text>
+            ) : (
+              <>
+                <Text>You are the {roleIn(route)} on this route.</Text>
+                <Text style={{ marginBottom: 6 }}>It opens on the day.</Text>
+              </>
+            )}
+            {route.vans.map(renderVan)}
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  return (
+    <>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refreshRoutes} />
+        }
+      >
+        {renderTodayRoute()}
+        {renderUpcoming()}
+      </ScrollView>
+
+      {/* Test mode (super admin): who to open this route as */}
+      <Modal
+        visible={!!chooserRoute}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setChooserRoute(null)}
+      >
+        <View style={chooser.overlay}>
+          <View style={chooser.sheet}>
+            <Text style={chooser.title}>Open this route as...</Text>
+            <Text style={chooser.sub}>
+              Test mode (super admin): the app will act as the person you
+              choose.
+            </Text>
+
+            {chooserRoute && peopleOf(chooserRoute).length === 0 && (
+              <Text style={chooser.empty}>
+                Nobody is assigned to this route yet.
+              </Text>
+            )}
+
+            {chooserRoute &&
+              peopleOf(chooserRoute).map((person) => (
+                <TouchableOpacity
+                  key={person.key}
+                  style={chooser.option}
+                  onPress={() => openAs(person)}
+                >
+                  <Text style={chooser.optionRole}>{person.role}</Text>
+                  <Text style={chooser.optionName}>{person.name}</Text>
+                  <Text style={chooser.optionVan}>{person.vanName}</Text>
+                </TouchableOpacity>
+              ))}
+
+            <TouchableOpacity
+              style={chooser.cancel}
+              onPress={() => setChooserRoute(null)}
+            >
+              <Text style={chooser.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 };
 
-export default PickupCheckInScreen;
+// The sheet of the test mode
+const chooser = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  sheet: {
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#212529",
+  },
+  sub: {
+    fontSize: 13,
+    color: "#6c757d",
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  empty: {
+    color: "#6c757d",
+    marginVertical: 12,
+  },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e9ecef",
+  },
+  optionRole: {
+    width: 64,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0d6efd",
+  },
+  optionName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#212529",
+  },
+  optionVan: {
+    fontSize: 12,
+    color: "#6c757d",
+  },
+  cancel: {
+    marginTop: 12,
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  cancelText: {
+    color: "#dc3545",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+});
+
+export default PickupListScreen;

@@ -32,12 +32,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             try {
                 Claims claims = jwt.parse(header.substring(7));
-                String role = claims.get("role", String.class);
-                // A deactivated or deleted user is treated as not logged in, even with a valid token
-                if (activeUsers.isActive(UUID.fromString(claims.getSubject()))) {
+                // A deactivated or deleted user is treated as not logged in, even with a valid token.
+                // The role is the one the person has NOW (not the one the token was made with).
+                String role = activeUsers.activeRole(UUID.fromString(claims.getSubject()));
+                if (role != null) {
                     var auth = new UsernamePasswordAuthenticationToken(
                         claims.getSubject(), null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + (role == null ? "NONE" : role))));
+                        List.of(new SimpleGrantedAuthority("ROLE_" + role)));
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
             } catch (JwtException | IllegalArgumentException e) {

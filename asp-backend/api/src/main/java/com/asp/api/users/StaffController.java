@@ -153,6 +153,7 @@ public class StaffController {
             sets.add("updated_at = now()");
             args.add(id);
             jdbc.update("update users set " + String.join(", ", sets) + " where id = ?", args.toArray());
+            activeUsers.forget(id); // a new role (or e-mail) takes effect at once, not when the cache expires
         }
         Map<String, Object> after =
             jdbc.queryForMap("select " + UsersController.COLUMNS + " from users where id = ?", id);
