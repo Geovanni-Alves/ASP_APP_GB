@@ -36,7 +36,7 @@ const NewActivityScreen = () => {
     if (nobodyHere) {
       Alert.alert(
         "Nobody is checked in yet today",
-        "There is nobody to tag. Mark the kids who arrived in the Students list. To post for a kid anyway, open the kid there and use New Activity.",
+        "There is nobody to tag. Mark the children who arrived in the Students list. To post for a child anyway, open the child there and use New Activity.",
       );
       return;
     }
@@ -128,8 +128,8 @@ const NewActivityScreen = () => {
         <View style={local.notice}>
           <Text style={local.noticeTitle}>Nobody is checked in yet today</Text>
           <Text style={local.noticeText}>
-            There is nobody to tag. Mark the kids who arrived in the Students
-            list. To post for a kid anyway, open the kid there and use New
+            There is nobody to tag. Mark the children who arrived in the Students
+            list. To post for a child anyway, open the child there and use New
             Activity.
           </Text>
         </View>

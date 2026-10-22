@@ -234,7 +234,7 @@ public class AppDataController {
                 + "order by coalesce(checked_out, false), id limit 1 for update",
             id, timezone);
         if (rows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "This kid is not checked in today");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This child is not checked in today");
         }
 
         Map<String, Object> answer = new LinkedHashMap<>();
@@ -284,7 +284,7 @@ public class AppDataController {
                 + "order by coalesce(checked_in, false) desc, id limit 1 for update",
             id, timezone);
         if (rows.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nothing is registered for this kid today");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nothing is registered for this child today");
         }
         Map<String, Object> row = rows.get(0);
 
@@ -292,7 +292,7 @@ public class AppDataController {
         switch (action) {
             case "checkout" -> {
                 if (!Boolean.TRUE.equals(row.get("checked_out"))) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This kid was not checked out");
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This child was not checked out");
                 }
                 jdbc.update("update student_attendance set checked_out = false, checked_out_at = null, "
                     + "checked_out_by = null where id = ?", row.get("id"));
@@ -300,7 +300,7 @@ public class AppDataController {
             }
             case "checkin" -> {
                 if (!Boolean.TRUE.equals(row.get("checked_in"))) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This kid was not checked in");
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This child was not checked in");
                 }
                 jdbc.update("update student_attendance set checked_in = false, checked_in_at = null, "
                     + "checked_in_by = null, checked_out = false, checked_out_at = null, checked_out_by = null "
@@ -309,7 +309,7 @@ public class AppDataController {
             }
             default -> {
                 if (!Boolean.TRUE.equals(row.get("is_absent"))) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This kid was not marked absent");
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This child was not marked absent");
                 }
                 jdbc.update("update student_attendance set is_absent = false, absent_at = null, absent_by = null "
                     + "where id = ?", row.get("id"));
@@ -551,7 +551,7 @@ public class AppDataController {
 
         List<UUID> kids = body.studentIds() == null ? List.of() : body.studentIds().stream().distinct().toList();
         if (kids.isEmpty() || kids.size() > 200) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose between 1 and 200 kids");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose between 1 and 200 children");
         }
         List<String> media = body.mediaNames() == null ? List.of() : body.mediaNames();
         if (media.size() > 10) {

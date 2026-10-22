@@ -1,17 +1,11 @@
 // src/contexts/AuthContext.js
-import {
-  createContext,
-  useState,
-  useEffect,
-  useContext,
-  useCallback,
-} from "react";
+import { useState, useEffect, useCallback } from "react";
 import { View } from "react-native";
 import api, { loadToken, saveToken, setUnauthorizedHandler } from "../lib/api";
 import Auth from "../components/Auth";
+import { AuthContext, useAuthContext } from "./AuthState";
+import { getPushToken } from "../lib/pushToken";
 import CustomLoading from "../components/CustomLoading";
-
-const AuthContext = createContext({});
 
 const AuthContextProvider = ({ children }) => {
   // "session" keeps the shape the other contexts already use: session.user.id, session.user.email...
@@ -19,6 +13,15 @@ const AuthContextProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(async () => {
+    // This phone stops receiving the pushes of this person (before the session ends)
+    try {
+      const pushToken = getPushToken();
+      if (pushToken) {
+        await api.delete("/push/register", { data: { token: pushToken } });
+      }
+    } catch (error) {
+      // no connection, or the session is already invalid: signing out goes on
+    }
     await saveToken(null);
     setSession(null);
   }, []);
@@ -111,4 +114,6 @@ const AuthContextProvider = ({ children }) => {
 
 export default AuthContextProvider;
 
-export const useAuthContext = () => useContext(AuthContext);
+// The hook lives in AuthState.js; it is also exported from here, so the files that already import it
+// from this file keep working
+export { useAuthContext };

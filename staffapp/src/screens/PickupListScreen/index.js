@@ -7,8 +7,9 @@ import {
   RefreshControl,
   Modal,
   StyleSheet,
+  AppState,
 } from "react-native";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useRoutesContext } from "../../contexts/RoutesContext";
 import { useUsersContext } from "../../contexts/UsersContext";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -31,20 +32,34 @@ const PickupListScreen = () => {
   const defaultVanImage = require("../../../assets/defaultVan.png");
 
   const navigation = useNavigation();
-  const { routesData, loading, refreshing, refreshRoutes } = useRoutesContext();
+  const { routesData, loading, refreshing, refreshRoutes, reloadRoutes } =
+    useRoutesContext();
+  const reloadRef = useRef(reloadRoutes);
+  reloadRef.current = reloadRoutes; // always the latest one, for the timer below
   const { dbUser } = useUsersContext();
 
   // Test mode: the super admin (the programmer) sees every route and chooses who to open it as
   const isSuperAdmin = (dbUser?.userType || "").toLowerCase() === "superadmin";
   const [chooserRoute, setChooserRoute] = useState(null); // the route waiting for the choice
 
-  // Back on this list: the test mode ends, and the super admin sees every route again
+  // While this list is open it keeps looking by itself: when it opens (for example from the push), every
+  // 30 seconds (the push makes it immediate), and when the app comes back from the background. A route the manager sends shows up
+  // without anybody pulling the list.
+  // Back on this list the test mode also ends, and the super admin sees every route again.
   useFocusEffect(
     useCallback(() => {
-      if (getActAs()) {
-        setActAs(null);
-        refreshRoutes();
-      }
+      if (getActAs()) setActAs(null);
+      reloadRef.current();
+
+      const timer = setInterval(() => reloadRef.current(), 30000); // safety net: the push makes it immediate
+      const subscription = AppState.addEventListener("change", (state) => {
+        if (state === "active") reloadRef.current();
+      });
+
+      return () => {
+        clearInterval(timer);
+        subscription.remove();
+      };
     }, []),
   );
 
@@ -187,6 +202,22 @@ const PickupListScreen = () => {
       return (
         <View style={styles.center}>
           <Text>No pickup route for today.</Text>
+          {/* Pulling the list down also works, but a button is easier to find */}
+          <TouchableOpacity
+            onPress={refreshRoutes}
+            style={{
+              marginTop: 16,
+              paddingVertical: 10,
+              paddingHorizontal: 22,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: "#0d6efd",
+            }}
+          >
+            <Text style={{ color: "#0d6efd", fontWeight: "600" }}>
+              {refreshing ? "Looking..." : "Refresh"}
+            </Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -267,6 +298,8 @@ const PickupListScreen = () => {
     <>
       <ScrollView
         style={styles.container}
+        contentContainerStyle={{ flexGrow: 1 }} // the whole screen answers to the pull, even with no route
+        alwaysBounceVertical
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={refreshRoutes} />
         }

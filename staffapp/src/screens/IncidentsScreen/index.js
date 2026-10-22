@@ -120,7 +120,7 @@ const IncidentsScreen = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.headerContainer}>
-            <Text style={styles.title}>Kids on the Incident</Text>
+            <Text style={styles.title}>Children on the Incident</Text>
             {from !== "Students" && (
               <TouchableOpacity
                 onPress={() => navigation.navigate("StudentSelection")}

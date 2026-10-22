@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -11,10 +11,17 @@ import {
   StyleSheet,
   AppState,
 } from "react-native";
-import { useRoute, useNavigation } from "@react-navigation/native";
+import {
+  useRoute,
+  useNavigation,
+  useFocusEffect,
+} from "@react-navigation/native";
 import * as Location from "expo-location";
 import api, { getActAs } from "../../lib/api";
 import { useRoutesContext } from "../../contexts/RoutesContext";
+import useKeepRoutesFresh, {
+  useGoBackWhenRouteGone,
+} from "../../lib/useKeepRoutesFresh";
 import { useUsersContext } from "../../contexts/UsersContext";
 import styles from "./styles";
 import RemoteImage from "../../components/RemoteImage";
@@ -38,6 +45,10 @@ const DriverPickupScreen = () => {
   const routeId = route.params?.routeId;
   const navigation = useNavigation();
 
+  // The routes are looked at again while this screen is open; if the manager re-opens the route, it says so
+  useKeepRoutesFresh();
+  const routeGone = useGoBackWhenRouteGone(routeId);
+
   const { dbUser } = useUsersContext();
   const { routesData, refreshRoutes } = useRoutesContext();
   // The super admin may open a route AS a driver (test mode): then the routes are that person's
@@ -58,6 +69,8 @@ const DriverPickupScreen = () => {
   // The way back to the ASP: the schools where a helper was left (from the last to the first)
   const [returnStops, setReturnStops] = useState([]);
   const [ownKidsCount, setOwnKidsCount] = useState(0); // the kids the driver picks up himself
+  const [ownSchoolIds, setOwnSchoolIds] = useState([]); // the schools where the driver picks up kids himself
+  const pendingNextLeg = useRef(null); // after the check-in of a school, the route goes on to this leg
   const [myPosition, setMyPosition] = useState(null); // where the van is, on the way back
   const [returnArrived, setReturnArrived] = useState([]); // ids of the schools already reached on the way back
   const askedAtAsp = useRef(false); // it asks to finish the route once per arrival
@@ -91,8 +104,9 @@ const DriverPickupScreen = () => {
 
   // The check-in of the driver's own kids is a screen (not a modal): what it opens, like the profile of a
   // student, would stay HIDDEN behind a modal
-  const openCheckIn = () =>
-    navigation.navigate("PickupCheckInScreen", { routeId });
+  // With a schoolId it shows only the kids of that school (a driver can do two schools in a tight route)
+  const openCheckIn = (schoolId) =>
+    navigation.navigate("PickupCheckInScreen", { routeId, schoolId });
 
   // While the phone switches to Google Maps (it can take a few seconds) a spinner shows that it is
   // working. It goes away when the person comes back to the app, or after 10 seconds.
@@ -169,7 +183,7 @@ const DriverPickupScreen = () => {
   // Route building (outbound only)
   // --------------------------------------------------
 
-  const buildRouteLegs = (base, schools, kidsBySchool) => {
+  const buildRouteLegs = (base, schools, kidsBySchool, responsibleBySchool) => {
     const legs = [];
     let from = base;
 
@@ -179,6 +193,7 @@ const DriverPickupScreen = () => {
         from,
         to: school,
         kids: kidsBySchool[school.id] || [], // who the driver picks up at this school
+        responsible: responsibleBySchool[school.id] || [], // the helper left there (or "You")
       });
       from = school;
     });
@@ -288,8 +303,41 @@ const DriverPickupScreen = () => {
       (myVan.kids || []).filter((k) => k.responsible_staff_id === driverId)
         .length,
     );
+    setOwnSchoolIds([
+      ...new Set(
+        (myVan.kids || [])
+          .filter((k) => k.responsible_staff_id === driverId && k.school)
+          .map((k) => k.school.id),
+      ),
+    ]);
 
-    setLegs(buildRouteLegs(baseLocation, orderedSchools, kidsBySchool));
+    // Who is responsible at each school: the helper that stays there, or the driver himself ("You")
+    const nameOf = {};
+    (myVan.helperUsers || []).forEach((h) => {
+      nameOf[h.id] = h.name;
+    });
+    const responsibleBySchool = {};
+    (myVan.kids || []).forEach((k) => {
+      if (!k.school || !k.responsible_staff_id) return;
+      const label =
+        k.responsible_staff_id === myVan.driver_id
+          ? "You"
+          : nameOf[k.responsible_staff_id] || "Helper";
+      if (!responsibleBySchool[k.school.id])
+        responsibleBySchool[k.school.id] = [];
+      if (!responsibleBySchool[k.school.id].includes(label)) {
+        responsibleBySchool[k.school.id].push(label);
+      }
+    });
+
+    setLegs(
+      buildRouteLegs(
+        baseLocation,
+        orderedSchools,
+        kidsBySchool,
+        responsibleBySchool,
+      ),
+    );
     setCurrentLegIndex(myVan.current_leg_index || 0);
 
     setLoading(false);
@@ -435,6 +483,7 @@ const DriverPickupScreen = () => {
   const markArrived = async () => {
     const nextIndex = currentLegIndex + 1;
     const hasNextLeg = nextIndex < legs.length;
+    const arrivedSchoolId = legs[currentLegIndex]?.to?.id;
 
     try {
       // The API keeps the number of the current leg, so the progress survives closing the app
@@ -451,11 +500,15 @@ const DriverPickupScreen = () => {
     setCurrentLegIndex(nextIndex);
     setNearDestination(false);
 
-    if (!hasNextLeg) {
-      // The last school: the driver checks in his own kids (when he has some). The way back shows below.
-      if (ownKidsCount > 0) openCheckIn();
+    // The driver picks up kids himself at THIS school: the check-in of its kids opens now, and only
+    // after it the route goes on to the next school
+    if (arrivedSchoolId && ownSchoolIds.includes(arrivedSchoolId)) {
+      if (hasNextLeg) pendingNextLeg.current = nextIndex;
+      openCheckIn(arrivedSchoolId);
       return;
     }
+
+    if (!hasNextLeg) return; // the last school: the way back shows below
 
     Alert.alert("Arrived", "Do you want to navigate to the next school?", [
       { text: "Later", style: "cancel" },
@@ -466,15 +519,26 @@ const DriverPickupScreen = () => {
     ]);
   };
 
+  // Back from the check-in of the kids of a school: now the route goes on to the next school
+  useFocusEffect(
+    useCallback(() => {
+      const next = pendingNextLeg.current;
+      if (next == null) return;
+      pendingNextLeg.current = null;
+
+      Alert.alert(
+        "Children checked in",
+        "Do you want to navigate to the next school?",
+        [
+          { text: "Later", style: "cancel" },
+          { text: "Navigate", onPress: () => navigateToLeg(legs[next]) },
+        ],
+      );
+    }, [legs]),
+  );
+
   // After the last school: check in my own kids, and finish the route
   const allLegsDone = legs.length > 0 && currentLegIndex >= legs.length;
-
-  // On the way back the list looks again every 20 seconds (to see who the helpers already checked in)
-  useEffect(() => {
-    if (!allLegsDone) return;
-    const timer = setInterval(() => refreshRoutes(), 20000);
-    return () => clearInterval(timer);
-  }, [allLegsDone]);
 
   // On the way back: where is the van? (how far each school is, and the ASP). At the ASP it asks ONCE if
   // the route should be finished (the driver still confirms); when the van goes away it can ask again.
@@ -633,6 +697,13 @@ const DriverPickupScreen = () => {
   // Render route leg card
   // --------------------------------------------------
 
+  // "Helper: Ana" / "You pick up here" / "Helper: Ana · and you"
+  const responsibleText = (list) => {
+    const helpers = list.filter((name) => name !== "You");
+    if (helpers.length === 0) return "You pick up here";
+    return `Helper: ${helpers.join(", ")}${list.includes("You") ? " · and you" : ""}`;
+  };
+
   // What the phone knows about the school of the current leg
   const proximityText = () => {
     if (nearDestination) return "You are at the school ✔";
@@ -670,6 +741,13 @@ const DriverPickupScreen = () => {
         <Text style={styles.legTitle}>
           {item.from.name} → {item.to.name}
         </Text>
+
+        {/* Who stays (or picks up) at this school */}
+        {item.responsible.length > 0 && (
+          <Text style={[styles.routeSubValue, { fontWeight: "600" }]}>
+            {responsibleText(item.responsible)}
+          </Text>
+        )}
 
         {/* Who is picked up here: one line when it is not the current school */}
         {status !== "current" && item.kids.length > 0 && (
@@ -778,9 +856,9 @@ const DriverPickupScreen = () => {
             <Text style={styles.legTitle}>You arrived at the last school</Text>
             <TouchableOpacity
               style={[styles.navigateBtn, { marginTop: 8 }]}
-              onPress={openCheckIn}
+              onPress={() => openCheckIn()}
             >
-              <Text style={styles.navigateText}>Check in my kids</Text>
+              <Text style={styles.navigateText}>Check in my children</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -816,7 +894,7 @@ const DriverPickupScreen = () => {
               <Text style={styles.routeSubValue}>
                 {stop.helpers.length > 0
                   ? `Pick up the helper: ${stop.helpers.join(", ")}`
-                  : "Pick up the kids"}
+                  : "Pick up the children"}
               </Text>
 
               <View style={local.kidChips}>
@@ -924,6 +1002,34 @@ const DriverPickupScreen = () => {
   // --------------------------------------------------
   // UI
   // --------------------------------------------------
+
+  // The manager re-opened the route (or it was removed): nothing to do here until it is sent again
+  if (routeGone) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 24,
+        }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: "700", textAlign: "center" }}>
+          This route was re-opened
+        </Text>
+        <Text style={{ marginTop: 8, textAlign: "center", color: "#6c757d" }}>
+          The manager is changing it. You will get a notification when the new
+          one is ready.
+        </Text>
+        <TouchableOpacity
+          style={[styles.navigateBtn, { marginTop: 20, alignSelf: "stretch" }]}
+          onPress={() => navigation.navigate("PickupList")}
+        >
+          <Text style={styles.navigateText}>Back to the list</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (loading) {
     return (

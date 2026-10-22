@@ -251,7 +251,7 @@ const StudentFeedScreen = () => {
           }}
         >
           <Text style={{ letterSpacing: 1.1, fontSize: 20, fontWeight: "600" }}>
-            No updates for your kid yet!
+            No updates for your child yet!
           </Text>
         </View>
       );

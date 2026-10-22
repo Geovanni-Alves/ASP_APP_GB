@@ -81,7 +81,7 @@ const BasicInfoScreen = ({
       setKidName(updatedKid.name);
       setIsFormChanged(false);
     } else {
-      console.log("Error", "Failed to update the kid's information.");
+      console.log("Error", "Failed to update the child's information.");
     }
   };
 

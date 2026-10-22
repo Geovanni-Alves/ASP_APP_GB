@@ -1,13 +1,16 @@
 package com.asp.api.planner;
 
 import com.asp.api.auth.Roles;
+import com.asp.api.push.PushService;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -108,10 +111,12 @@ public class PlannerController {
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
+    private final PushService push;
 
-    public PlannerController(JdbcTemplate jdbc, TransactionTemplate transaction) {
+    public PlannerController(JdbcTemplate jdbc, TransactionTemplate transaction, PushService push) {
         this.jdbc = jdbc;
         this.transaction = transaction;
+        this.push = push;
     }
 
     // ------------------------------------------------------------------ roster
@@ -292,7 +297,12 @@ public class PlannerController {
     public ResponseEntity<Map<String, Object>> send(@PathVariable String date, Authentication auth) {
         Roles.requireManager(auth);
         LocalDate day = parseDate(date);
-        return transaction.execute(status -> doSend(day));
+        ResponseEntity<Map<String, Object>> response = transaction.execute(status -> doSend(day));
+        // It is saved: now the driver and the helpers are told (a push never breaks the sending)
+        if (response != null && response.getStatusCode().is2xxSuccessful()) {
+            notifyTeam(day, true);
+        }
+        return response;
     }
 
     private ResponseEntity<Map<String, Object>> doSend(LocalDate day) {
@@ -331,7 +341,8 @@ public class PlannerController {
             if (!remaining.isEmpty()) {
                 String shown = remaining.stream().limit(8).collect(Collectors.joining(", "));
                 String more = remaining.size() > 8 ? " and " + (remaining.size() - 8) + " more" : "";
-                reasons.add(remaining.size() + " kid(s) are not on a van or absent: " + shown + more + ".");
+                reasons.add(remaining.size() + (remaining.size() == 1 ? " child is" : " children are")
+                    + " not on a van or absent: " + shown + more + ".");
             }
         }
 
@@ -379,7 +390,8 @@ public class PlannerController {
         Roles.requireManager(auth);
         LocalDate day = parseDate(date);
 
-        return transaction.execute(txStatus -> {
+        boolean[] wasSent = {false};
+        Map<String, Object> answer = transaction.execute(txStatus -> {
             List<Map<String, Object>> rows = jdbc.queryForList(
                 "select id, status from routes where date = CAST(? AS date) and type = 'pickup' for update",
                 day.toString());
@@ -388,6 +400,7 @@ public class PlannerController {
             }
             String status = String.valueOf(rows.get(0).get("status"));
             if (status.equals("waiting_to_start")) {
+                wasSent[0] = true;
                 jdbc.update("update routes set status = 'planning' where id = ?", rows.get(0).get("id"));
             } else if (!status.equals("planning")) {
                 // in progress, finished...: the vans may already be on the road
@@ -398,6 +411,53 @@ public class PlannerController {
             ok.put("status", "planning");
             return ok;
         });
+        if (wasSent[0]) {
+            notifyTeam(day, false); // the team had received it: it is being changed
+        }
+        return answer;
+    }
+
+    // Tells the driver and the helpers of the route: it was sent (ready = true), or it was taken back to be
+    // changed (ready = false). It runs AFTER the change was saved, and a failure here never breaks it.
+    private void notifyTeam(LocalDate day, boolean ready) {
+        try {
+            String when = day.format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.ENGLISH));
+            String title = ready ? "Pickup route ready" : "Pickup route changed";
+
+            List<Map<String, Object>> vans = jdbc.queryForList(
+                "select r.id as route_id, rv.driver_id, rv.helper_ids, coalesce(v.name, 'a van') as van "
+                    + "from route_vans rv join routes r on r.id = rv.route_id join vans v on v.id = rv.van_id "
+                    + "where r.date = CAST(? AS date) and r.type = 'pickup'",
+                day.toString());
+
+            for (Map<String, Object> van : vans) {
+                String vanName = String.valueOf(van.get("van"));
+                Map<String, Object> data = new LinkedHashMap<>();
+                data.put("type", "route");
+                data.put("routeId", String.valueOf(van.get("route_id")));
+                data.put("date", day.toString());
+
+                UUID driver = (UUID) van.get("driver_id");
+                if (driver != null) {
+                    String body = ready
+                        ? when + ": you are the driver of " + vanName + "."
+                        : "The route for " + when + " was re-opened for changes. Wait for the new one.";
+                    push.sendToUsers(List.of(driver), title, body, data);
+                }
+
+                java.sql.Array helpers = (java.sql.Array) van.get("helper_ids");
+                if (helpers != null) {
+                    for (Object id : (Object[]) helpers.getArray()) {
+                        String body = ready
+                            ? when + ": you are a helper on " + vanName + "."
+                            : "The route for " + when + " was re-opened for changes. Wait for the new one.";
+                        push.sendToUsers(List.of((UUID) id), title, body, data);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // a push never breaks the route
+        }
     }
 
     // ------------------------------------------------------------------ helpers

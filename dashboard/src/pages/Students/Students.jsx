@@ -557,7 +557,7 @@ function Students({ closeMenu }) {
       setSelectedStudent(null);
       await fetchKidsData();
       setMode("list");
-      alert(`Kid - ${nameDeleted}, successful deleted! `);
+      alert(`Child - ${nameDeleted}, successfully deleted! `);
     } catch (error) {
       console.error("Error deleting student:", error);
       if (error.response?.status === 409) {
@@ -637,7 +637,7 @@ function Students({ closeMenu }) {
       }
 
       await fetchKidsData(); // refresh the list with the saved values
-      alert(`Kid - ${nameUpdated}, updated successfully!`);
+      alert(`Child - ${nameUpdated}, updated successfully!`);
 
       setSelectedStudent(null);
       setMode("list");

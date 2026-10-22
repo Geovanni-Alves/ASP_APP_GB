@@ -35,8 +35,8 @@ function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <NavigationContainer>
-          <PushNotificationsContextProvider>
-            <AuthContextProvider>
+          <AuthContextProvider>
+            <PushNotificationsContextProvider>
               <PicturesContextProvider>
                 <UsersContextProvider>
                   <KidsContextProvider>
@@ -58,8 +58,8 @@ function App() {
                   </KidsContextProvider>
                 </UsersContextProvider>
               </PicturesContextProvider>
-            </AuthContextProvider>
-          </PushNotificationsContextProvider>
+            </PushNotificationsContextProvider>
+          </AuthContextProvider>
         </NavigationContainer>
       </SafeAreaProvider>
     </GestureHandlerRootView>

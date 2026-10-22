@@ -407,7 +407,7 @@ const StudentProfileScreen = () => {
             isVisible={true}
             onClose={() => setShowConfirmationModal(false)}
             infoItems={[
-              { label: "All Done ✅", value: "Kid Updated successfully!" },
+              { label: "All Done ✅", value: "Child updated successfully!" },
             ]}
           />
         )} */}

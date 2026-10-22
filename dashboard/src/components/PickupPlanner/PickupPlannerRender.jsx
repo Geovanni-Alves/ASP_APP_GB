@@ -286,13 +286,13 @@ export default function PickupPlannerRender(props) {
         />
 
         <span> — {dayLabel}</span>
-        <span> Kids for today {totalKidsToday - absentsCount}</span>
+        <span> Children for today {totalKidsToday - absentsCount}</span>
         <span>
           {" "}
-          Kids on route {kidsOnRoute}{" "}
+          Children on route {kidsOnRoute}{" "}
           {kidsRemaining === 0 && (
             <span style={{ color: "green", marginLeft: 8 }}>
-              — All kids are on route
+              — All children are on route
             </span>
           )}
         </span>
@@ -305,7 +305,7 @@ export default function PickupPlannerRender(props) {
             title={
               <div className="kids-card-header">
                 <span className="kids-title">
-                  Kids of the Day ({kidsRemaining} kids • {totalSchoolsToday}{" "}
+                  Children of the Day ({kidsRemaining} children • {totalSchoolsToday}{" "}
                   schools)
                 </span>
                 {restoringRoute && (

@@ -18,6 +18,9 @@ import { useFeedContext } from "../../contexts/FeedContext";
 import OpenCamera from "../../components/OpenCamera";
 import InfoModal from "../../components/InfoModal";
 import FullScreenImage from "../../components/FullScreenImageModal";
+import useKeepRoutesFresh, {
+  useGoBackWhenRouteGone,
+} from "../../lib/useKeepRoutesFresh";
 
 import styles from "./styles";
 
@@ -26,6 +29,11 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
   // Opened as a screen, the id comes in the route; it can also be given as a prop
   const route = useRoute();
   const routeId = routeIdFromProps ?? route.params?.routeId;
+  // When the driver arrives at a school where he picks up kids, only the kids of that school show
+  // The routes are looked at again while this screen is open; if the manager re-opens the route, it says so
+  useKeepRoutesFresh();
+  const routeGone = useGoBackWhenRouteGone(routeId);
+  const schoolId = route.params?.schoolId;
 
   const { routesData, loading } = useRoutesContext();
   const { dbUser } = useUsersContext();
@@ -70,7 +78,10 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
 
       const routeData = getRouteById(routeId);
 
-      if (!routeData) return;
+      if (!routeData) {
+        setKids([]); // the route is gone: no stale kids to tap
+        return;
+      }
 
       // find van where this helper or driver is assigned
       const myVan = routeData.vans.find(
@@ -85,7 +96,9 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
 
       // Filter only kids assigned to THIS STAFF
       const assignedKids = myVan.kids.filter(
-        (k) => k.responsible_staff_id === effectiveId,
+        (k) =>
+          k.responsible_staff_id === effectiveId &&
+          (!schoolId || k.school?.id === schoolId),
       );
 
       // console.log("assignedKids", assignedKids);
@@ -105,27 +118,32 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
       // console.log(routeId);
     };
     loadKids();
-  }, [routeId, routesData, dbUser]);
+  }, [routeId, routesData, dbUser, schoolId]);
 
   useEffect(() => {
-    // console.log("Local Kids", kids);
-    if (kids.length > 0) {
-      const initial = {};
+    if (kids.length === 0) return;
 
+    // The screen looks again every few seconds: what is still waiting to be saved (the 5 seconds of
+    // "Undo") is kept, and the rest is read again from the server
+    setLocalKidsState((previous) => {
+      const next = {};
       kids.forEach((k) => {
-        initial[k.kid.id] = {
-          isChecked: k.attendance?.checked_in || false,
-          isAbsent: k.attendance?.is_absent || false,
-          undoEnabled: false,
-          timer: null,
-          pendingAction: null,
-          attendanceId: k.attendanceId?.id || null,
-          saved: false,
-        };
+        const old = previous[k.kid.id];
+        next[k.kid.id] =
+          old && (old.pendingActionId || old.undoEnabled)
+            ? old
+            : {
+                isChecked: k.attendance?.checked_in || false,
+                isAbsent: k.attendance?.is_absent || false,
+                undoEnabled: false,
+                timer: null,
+                pendingAction: null,
+                attendanceId: k.attendanceId?.id || null,
+                saved: false,
+              };
       });
-
-      setLocalKidsState(initial);
-    }
+      return next;
+    });
   }, [kids]);
 
   const isKidFinalized = (state) => {
@@ -198,7 +216,7 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
             pendingActionId: null, // will set soon
           });
 
-          const routeData = getRouteById(routeId);
+          // const routeData = getRouteById(routeId);
 
           // Create a pending action
           const id = addPendingAction({
@@ -208,8 +226,8 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
             payload: {
               kidId,
               routeId,
-              vanId: routeData.vans[0].id,
-              date: routeData.date,
+              // vanId: routeData.vans[0].id,
+              // date: routeData.date,
             },
 
             onExecute: async ({ payload }) => {
@@ -265,7 +283,7 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
             pendingActionId: null,
           });
 
-          const routeData = getRouteById(routeId);
+          // const routeData = getRouteById(routeId);
 
           const id = addPendingAction({
             type: "absent",
@@ -274,8 +292,8 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
             payload: {
               kidId,
               routeId,
-              vanId: routeData.vans[0].id,
-              date: routeData.date,
+              // vanId: routeData.vans[0].id,
+              // date: routeData.date,
             },
 
             onExecute: async ({ payload }) => {
@@ -487,6 +505,42 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
     );
   };
 
+  // The manager re-opened the route (or it was removed): nothing to check in here until it is sent again
+  if (routeGone) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          padding: 24,
+        }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: "700", textAlign: "center" }}>
+          This route was re-opened
+        </Text>
+        <Text style={{ marginTop: 8, textAlign: "center", color: "#6c757d" }}>
+          The manager is changing it. You will get a notification when the new
+          one is ready.
+        </Text>
+        <TouchableOpacity
+          style={{
+            marginTop: 20,
+            paddingVertical: 12,
+            paddingHorizontal: 24,
+            borderRadius: 10,
+            backgroundColor: "#007bff",
+          }}
+          onPress={() => navigation.navigate("PickupList")}
+        >
+          <Text style={{ color: "#ffffff", fontWeight: "700" }}>
+            Back to the list
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (loading) {
     return (
       <View style={{ marginTop: 50, alignItems: "center" }}>
@@ -512,7 +566,7 @@ const PickupCheckInScreen = ({ routeId: routeIdFromProps, onClose }) => {
               </>
             )}
             <Text style={[styles.headerText, { marginTop: 10 }]}>
-              Kid{kids.length > 1 ? "s" : ""} at this school
+              {kids.length > 1 ? "Children" : "Child"} at this school
             </Text>
           </View>
         )}

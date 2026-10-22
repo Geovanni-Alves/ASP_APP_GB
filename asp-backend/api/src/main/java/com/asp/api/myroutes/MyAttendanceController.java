@@ -92,7 +92,7 @@ public class MyAttendanceController {
                     + "where r.id = ? and rs.student_id = ?",
                 routeId, studentId);
             if (stops.isEmpty()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This kid is not on this route");
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "This child is not on this route");
             }
             Map<String, Object> stop = stops.get(0);
 
@@ -109,7 +109,7 @@ public class MyAttendanceController {
             }
             if (!me.equals(stop.get("responsible_staff_id")) && !me.equals(stop.get("driver_id"))) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Only the person responsible for this kid, or the driver, can record the attendance");
+                    "Only the person responsible for this child, or the driver, can record the attendance");
             }
 
             // One attendance row per kid and route

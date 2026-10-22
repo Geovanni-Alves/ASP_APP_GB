@@ -676,7 +676,7 @@ const OpenCamera = ({
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
               >
                 <View style={styles.tagContainer}>
-                  <Text style={styles.tagTitle}>Tag Kids</Text>
+                  <Text style={styles.tagTitle}>Tag Children</Text>
                   {taggableKids.length === 0 && (
                     <Text style={{ color: "white", paddingVertical: 8 }}>
                       Nobody is checked in yet today, so there is nobody to tag.
@@ -685,7 +685,7 @@ const OpenCamera = ({
                   {taggableKids.length > 1 && (
                     <TextInput
                       style={styles.searchInput}
-                      placeholder="Search Kid"
+                      placeholder="Search Child"
                       placeholderTextColor="gray"
                       value={searchText}
                       onChangeText={setSearchText}

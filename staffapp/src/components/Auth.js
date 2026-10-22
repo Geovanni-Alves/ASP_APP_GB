@@ -16,7 +16,7 @@ import {
   Paragraph,
   HelperText,
 } from "react-native-paper";
-import { useAuthContext } from "../contexts/AuthContext";
+import { useAuthContext } from "../contexts/AuthState";
 import { errorMessage } from "../lib/api";
 
 export default function Auth() {

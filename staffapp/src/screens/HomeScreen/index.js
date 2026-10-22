@@ -12,6 +12,7 @@ import { useTodayContext } from "../../contexts/TodayContext";
 import { useNavigation } from "@react-navigation/native";
 // import * as LocalAuthentication from "expo-local-authentication";
 import { Alert } from "react-native";
+import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -70,6 +71,7 @@ const HomeScreen = () => {
   const { kids } = useKidsContext();
   const { currentUserData } = useUsersContext();
   const { loaded, statusOf } = useTodayContext();
+  const { sendTestPush } = usePushNotificationsContext();
 
   // The API only sends the messages from the families that nobody read yet
   const msgsCount = unreadMessages?.length || 0;
@@ -90,7 +92,7 @@ const HomeScreen = () => {
           {loaded && (
             <Text style={{ fontSize: 15, color: "#198754", fontWeight: "600" }}>
               {hereCount === 0 && expectedCount === 0
-                ? "No kids at the ASP yet today"
+                ? "No children at the ASP yet today"
                 : `Today: ${hereCount} here · ${expectedCount} still expected`}
             </Text>
           )}
@@ -103,6 +105,23 @@ const HomeScreen = () => {
             <FontAwesome5 name="fingerprint" size={24} color="white" />
             <Text style={styles.buttonText}>Test Biometrics</Text>
           </TouchableOpacity> */}
+          <TouchableOpacity
+            style={[styles.pickUpButton, { backgroundColor: "#343a40" }]}
+            onPress={() =>
+              Alert.alert(
+                "Test push",
+                "Send it now, or in 10 seconds so you can lock the phone?",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Now", onPress: () => sendTestPush(0) },
+                  { text: "In 10 s", onPress: () => sendTestPush(10) },
+                ],
+              )
+            }
+          >
+            <FontAwesome5 name="bell" size={24} color="white" />
+            <Text style={styles.buttonText}>Test Push</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.chatButton}
             onPress={() => navigation.navigate("Chat")}

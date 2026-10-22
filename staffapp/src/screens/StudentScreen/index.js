@@ -442,7 +442,7 @@ const StudentScreen = () => {
           </View>
           <Text style={styles.bannerText}>
             {expected === 0
-              ? "No kids scheduled for today."
+              ? "No children scheduled for today."
               : `${totals.checked_in} here · ${totals.waiting} still expected${
                   totals.checked_out ? ` · ${totals.checked_out} went home` : ""
                 } · ${totals.absent} absent`}

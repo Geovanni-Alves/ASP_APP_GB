@@ -291,7 +291,7 @@ function Vans({ closeMenu }) {
                 <strong>Total of seats:</strong> {van.seats ?? "-"}
               </div>
               <div>
-                <strong>Seats for kids:</strong>{" "}
+                <strong>Seats for children:</strong>{" "}
                 {van.seats != null ? Math.max(van.seats - 2, 0) : "-"}
               </div>
               <div>

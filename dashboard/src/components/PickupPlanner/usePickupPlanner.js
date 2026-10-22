@@ -1081,7 +1081,7 @@ export function usePickupPlanner({ closeMenu }) {
 
   //   const { kids = {}, vans = [], date } = route;
   //   if (kidsRemaining > 0) {
-  //     message.warning("All the kids must be on the route or absent!");
+  //     message.warning("All the children must be on the route or absent!");
   //     return;
   //   }
 

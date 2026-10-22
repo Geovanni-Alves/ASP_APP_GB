@@ -1,21 +1,23 @@
+// src/contexts/PushNotificationsContext.js
+// The phone asks Expo for its "address" (the push token) and gives it to the API; the API is the one that
+// sends the pushes (a new route, a check-in...). This provider must be INSIDE the login (AuthContext): it
+// registers the phone for the person who is signed in.
 import { createContext, useState, useEffect, useRef, useContext } from "react";
 import { Platform, Linking, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-// import * as Device from "expo-device";
-// import * as Notifications from "expo-notifications";
-// import Constants from "expo-constants";
-// import { supabase } from "../lib/supabase";
 import * as Device from "expo-device";
 import Constants, { ExecutionEnvironment } from "expo-constants";
-import { supabase } from "../lib/supabase";
+import api from "../lib/api";
+import { setPushToken } from "../lib/pushToken";
+import { emitRoutePush } from "../lib/pushEvents";
 
-// Expo Go cannot load the native notification modules (loading them crashes the app), so there the
-// package is not loaded and the push features do nothing. Development builds and the production
-// app load it normally.
+// Expo Go on Android has no remote push since SDK 53 (loading the package there fails): there the push
+// does nothing. On the iPhone, Expo Go still receives them. Development builds and the real app: always.
 const isExpoGo =
   Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const pushUnavailable = isExpoGo && Platform.OS === "android";
 
-const Notifications = isExpoGo
+const Notifications = pushUnavailable
   ? {
       setNotificationHandler: () => {},
       addNotificationReceivedListener: () => ({ remove() {} }),
@@ -23,287 +25,142 @@ const Notifications = isExpoGo
     }
   : require("expo-notifications");
 
-const SUPABASE_PUSH_URL = process.env.EXPO_PUBLIC_SUPABASE_PUSH_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_KEY;
+// How a push looks when it arrives with the app open
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const PushNotificationsContext = createContext({});
 
 const PushNotificationsContextProvider = ({ children }) => {
-  // Handle foreground notifications
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
-
-  const [expoToken, setExpoToken] = useState(null); // iOS
-  const [fcmToken, setFcmToken] = useState(null); // Android
-  const [deviceType, setDeviceType] = useState(null); // "ios" | "android"
+  const [expoToken, setExpoToken] = useState(null);
   const [permissionMessage, setPermissionMessage] = useState(false);
 
   const notificationListener = useRef();
   const responseListener = useRef();
   const navigation = useNavigation();
 
-  // ----------------------------------------------------------
-  //  SEND NOTIFICATION → iOS (Expo) | Android (Supabase Edge)
-  // ----------------------------------------------------------
-
-  async function sendNotification({ token, device, title, body }) {
-    console.log("🔔 Sending push to:", token, "device:", device);
-
-    // ---------------------- iOS (Expo Push)
-    if (device === "ios") {
-      return fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Accept-Encoding": "gzip, deflate",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          to: token,
-          sound: "default",
-          title,
-          body,
-        }),
-      });
-    }
-
-    // ---------------------- Android (Supabase Edge Function)
-    const { data, error } = await supabase.functions.invoke("sendPushV2", {
-      body: {
-        token,
-        title,
-        body,
-      },
-    });
-
-    if (error) {
-      console.log("❌ invoke error:", error);
-      throw error;
-    }
-
-    console.log("✅ Push sent successfully:", data);
-    return data; // ✅ NÃO res
-  }
-
-  // async function sendNotification({ token, device, title, body, data }) {
-  //   console.log("🔔 Sending push to:", token, "device:", device);
-
-  //   // ---------------------- iOS (Expo Push API)
-  //   if (device === "ios") {
-  //     const message = {
-  //       to: token,
-  //       sound: "default",
-  //       title,
-  //       body,
-  //       data,
-  //     };
-
-  //     return fetch("https://exp.host/--/api/v2/push/send", {
-  //       method: "POST",
-  //       headers: {
-  //         Accept: "application/json",
-  //         "Accept-Encoding": "gzip, deflate",
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify(message),
-  //     });
-  //   }
-  //   // ANDROID → Supabase Edge Function
-  //   // const { data: res, error } = await supabase.functions.invoke("sendPush", {
-  //   //   body: {
-  //   //     token,
-  //   //     title,
-  //   //     body,
-  //   //     data,
-  //   //   },
-  //   // });
-
-  //   // if (error) {
-  //   //   console.log("❌ error:", error);
-  //   //   console.log("❌ error context:", error.context);
-  //   //   console.log("❌ error message:", error.message);
-  //   //   throw error;
-  //   // }
-
-  //   const { data: payLoad, error } = await supabase.functions.invoke(
-  //     "sendPushV2",
-  //     {
-  //       body: {
-  //         token: fcmToken,
-  //         title: "Test",
-  //         body: "Test",
-  //       },
-  //     }
-  //   );
-
-  //   if (error) {
-  //     console.log("❌ invoke error:", error);
-
-  //     // 👇 ISSO É A CHAVE
-  //     const response = error.context?.response;
-  //     if (response) {
-  //       const text = await response.text();
-  //       console.log("❌ Edge Function raw response:", text);
-  //     }
-
-  //     throw error;
-  //   }
-
-  //   console.log("✅ success:", data);
-
-  //   return res;
-  // }
-
-  // ----------------------------------------------------------
-  //  SEND NOTIFICATION → Works for BOTH iOS and Android
-  // ----------------------------------------------------------
-  // async function sendNotification({ token, device, title, body, data }) {
-  //   console.log("🔔 Sending push to:", token, "device:", device);
-
-  //   if (device === "ios") {
-  //     // ---------------------- iOS (Expo Push API)
-  //     const message = {
-  //       to: token,
-  //       sound: "default",
-  //       title,
-  //       body,
-  //       data,
-  //     };
-
-  //     return fetch("https://exp.host/--/api/v2/push/send", {
-  //       method: "POST",
-  //       headers: {
-  //         Accept: "application/json",
-  //         "Accept-encoding": "gzip, deflate",
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify(message),
-  //     });
-  //   }
-
-  //   // ---------------------- Android (FCM HTTP v1 API)
-  //   const FIREBASE_SERVER_KEY = process.env.EXPO_PUBLIC_FCM_SERVER_KEY;
-
-  //   if (!FIREBASE_SERVER_KEY) {
-  //     console.warn("❌ Missing FCM server key");
-  //     return;
-  //   }
-
-  //   const androidMessage = {
-  //     message: {
-  //       token: token,
-  //       notification: { title, body },
-  //       data: data || {},
-  //     },
-  //   };
-
-  //   return fetch(
-  //     "https://fcm.googleapis.com/v1/projects/YOUR_FIREBASE_PROJECT_ID/messages:send",
-  //     {
-  //       method: "POST",
-  //       headers: {
-  //         Authorization: `Bearer ${FIREBASE_SERVER_KEY}`,
-  //         "Content-Type": "application/json",
-  //       },
-  //       body: JSON.stringify(androidMessage),
-  //     }
-  //   );
-  // }
-
-  // ----------------------------------------------------------
-  //  REGISTER DEVICE FOR PUSH TOKENS
-  // ----------------------------------------------------------
+  // Asks for the permission, gets the token of this phone and gives it to the API
   async function registerForPushNotificationsAsync() {
-    if (isExpoGo) return null;
-    if (!Device.isDevice) {
-      alert("Must use a physical device for push notifications");
-      return null;
-    }
+    if (pushUnavailable) return null;
+    if (!Device.isDevice) return null; // an emulator has no push
 
-    // Ask permission
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
+    try {
+      const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
 
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
 
-    if (finalStatus !== "granted") {
-      setPermissionMessage(true);
-      Alert.alert(
-        "Permission Required",
-        "Please enable notifications in device settings.",
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-            onPress: () => setPermissionMessage(false),
-          },
-          {
-            text: "Open Settings",
-            onPress: async () => {
-              await Linking.openSettings();
-              setPermissionMessage(false);
+      if (finalStatus !== "granted") {
+        setPermissionMessage(true);
+        Alert.alert(
+          "Permission Required",
+          "Please enable notifications in the settings of the phone.",
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => setPermissionMessage(false),
             },
-          },
-        ],
+            {
+              text: "Open Settings",
+              onPress: async () => {
+                await Linking.openSettings();
+                setPermissionMessage(false);
+              },
+            },
+          ],
+        );
+        return null;
+      }
+
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+        });
+      }
+
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.easConfig?.projectId;
+      const { data: token } = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
+      console.log("Push token:", token);
+
+      await api.post("/push/register", { token, platform: Platform.OS });
+      setPushToken(token);
+      setExpoToken(token);
+      return token;
+    } catch (error) {
+      console.log(
+        "Could not register for push:",
+        error?.response?.data || error.message,
       );
       return null;
     }
-
-    // PLATFORM-SPECIFIC TOKEN
-    let tokenValue = null;
-
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "default",
-        importance: Notifications.AndroidImportance.MAX,
-      });
-
-      const { data: fcmToken } = await Notifications.getDevicePushTokenAsync();
-      console.log("📱 ANDROID FCM TOKEN:", fcmToken);
-
-      tokenValue = fcmToken;
-      setDeviceType("android");
-      setFcmToken(tokenValue);
-    } else {
-      const { data: expoToken } = await Notifications.getExpoPushTokenAsync({
-        projectId: Constants.expoConfig.extra.eas.projectId,
-      });
-      console.log("🍎 IOS EXPO TOKEN:", expoToken);
-
-      tokenValue = expoToken;
-      setExpoToken(tokenValue);
-      setDeviceType("ios");
-    }
-
-    return tokenValue;
   }
 
-  // ----------------------------------------------------------
-  //  LISTENERS (foreground + tap/open)
-  // ----------------------------------------------------------
+  // A test push to the phones of the person who is signed in (now, or later to lock the phone first)
+  async function sendTestPush(delaySeconds = 0) {
+    try {
+      const { data } = await api.post("/push/test", { delaySeconds });
+      if (!data.tokens) {
+        Alert.alert(
+          "Test push",
+          "This phone has no push address yet. Allow the notifications and open the app again.",
+        );
+        return;
+      }
+      if (data.scheduled_in_seconds) {
+        Alert.alert(
+          "Test push",
+          `It will arrive in ${data.scheduled_in_seconds} seconds. Lock the phone now.`,
+        );
+        return;
+      }
+      Alert.alert(
+        "Test push",
+        `Sent to ${data.sent} of ${data.tokens} phone(s).` +
+          (data.problems?.length ? `\n\n${data.problems.join("\n")}` : ""),
+      );
+    } catch (error) {
+      Alert.alert(
+        "Test push failed",
+        error?.response?.data?.error || error.message,
+      );
+    }
+  }
+
   useEffect(() => {
     registerForPushNotificationsAsync();
 
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
-        console.log("📩 NOTIFICATION RECEIVED:", notification);
+        console.log("Push received:", notification.request.content.title);
+        // A push about a route (sent, changed, re-opened): the routes are looked at again right now
+        if (notification.request.content.data?.type === "route") {
+          emitRoutePush();
+        }
       });
 
+    // The person taps the push: the app goes to the right place
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
-        const { data } = response.notification.request.content;
-        if (data?.kidID) {
-          navigation.navigate("ChatUser", { id: data.kidID });
+        const data = response.notification.request.content.data;
+        if (data?.type === "route") {
+          emitRoutePush();
+          navigation.navigate("PickupList");
         }
       });
 
@@ -313,39 +170,13 @@ const PushNotificationsContextProvider = ({ children }) => {
     };
   }, []);
 
-  // useEffect(() => {
-  //   if (!fcmToken) return;
-  //   if (deviceType !== "android") return;
-
-  //   console.log("🧪 TEST PUSH (context)");
-  //   console.log("🔑 FCM Token:", fcmToken);
-  //   console.log("🌐 Push URL:", SUPABASE_PUSH_URL);
-
-  //   sendNotification({
-  //     token: fcmToken,
-  //     device: "android",
-  //     title: "🚀 Push Test",
-  //     body: "Push sended from PushNotificationsContext",
-  //     data: { source: "context_test" },
-  //   })
-  //     .then((data) => {
-  //       console.log("✅ Push response data:", data);
-  //     })
-
-  //     .catch((err) => {
-  //       console.error("❌ Push test error:", err);
-  //     });
-  // }, [fcmToken, deviceType]);
-
   return (
     <PushNotificationsContext.Provider
       value={{
         expoToken,
-        fcmToken,
-        deviceType,
         permissionMessage,
-        sendNotification, // Now supports BOTH platforms
         registerForPushNotificationsAsync,
+        sendTestPush,
       }}
     >
       {children}
