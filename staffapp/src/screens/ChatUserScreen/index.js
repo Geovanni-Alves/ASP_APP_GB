@@ -1,5 +1,15 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
+// src/screens/ChatUserScreen/index.js
+// The chat uses @kesha-antonov/react-native-chat: the maintained fork of the old gifted chat library
+// (the same props and the same message format; the component is called "Chat").
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useContext,
+  useMemo,
+  useLayoutEffect,
+} from "react";
+// import { SafeAreaView } from "react-native-safe-area-context";
 import {
   TouchableOpacity,
   Keyboard,
@@ -7,446 +17,217 @@ import {
   View,
   Text,
   ActivityIndicator,
+  Alert,
+  AppState,
 } from "react-native";
 
-import { GiftedChat, Send, Bubble } from "react-native-gifted-chat";
-import { supabase } from "../../lib/supabase";
-//import { API, graphqlOperation } from "aws-amplify";
-//import { createMessage, updateMessage } from "../../graphql/mutations";
-//import { listMessages } from "../../graphql/queries";
-//import { useAuthContext } from "../../contexts/AuthContext";
+import { Chat, Bubble } from "@kesha-antonov/react-native-chat";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import { useRoute } from "@react-navigation/native";
+import FontAwesome from "react-native-vector-icons/FontAwesome";
+import {
+  useRoute,
+  useNavigation,
+  useFocusEffect,
+} from "@react-navigation/native";
+import { HeaderHeightContext } from "@react-navigation/elements";
+import RemoteImage from "../../components/RemoteImage";
 import { useMessageContext } from "../../contexts/MessageContext";
 import { useKidsContext } from "../../contexts/KidsContext";
-import { useStaffContext } from "../../contexts/StaffContext";
-import { usePushNotificationsContext } from "../../contexts/PushNotificationsContext";
-import FontAwesome from "react-native-vector-icons/FontAwesome";
 import { useUsersContext } from "../../contexts/UsersContext";
+
+// While the chat is open it looks for new messages by itself (there is no live connection)
+const REFRESH_MS = 8000;
+
+// Fixed objects (not created again on every render): each row of the chat skips re-rendering when
+// nothing it receives has changed
+const BUBBLE_WRAPPER_STYLE = { right: { backgroundColor: "#FF7276" } };
+const BUBBLE_TEXT_STYLE = { right: { color: "#fff" } };
+const AVATAR_STYLE = { width: 36, height: 36, borderRadius: 18 };
 
 const ChatUserScreen = () => {
   const route = useRoute();
+  const navigation = useNavigation();
   const student = route.params?.student;
-  const kidID = student.id;
-  const { newMessages, setNewMessages, unreadMessages, setUnreadMessages } =
+  const kidID = student?.id;
+  const headerHeight = useContext(HeaderHeightContext) || 0;
+  const keyboardAvoidingViewProps = useMemo(
+    () =>
+      headerHeight > 0 ? { keyboardVerticalOffset: headerHeight } : undefined,
+    [headerHeight],
+  );
+
+  const { getMessagesByStudent, sendAndNotifyMsg, markThreadAsRead } =
     useMessageContext();
   const { currentUserData } = useUsersContext();
-  const { staff } = useStaffContext();
   const { kids } = useKidsContext();
-  const { sendPushNotification } = usePushNotificationsContext();
+
   const [messages, setMessages] = useState([]);
-  const [allMessages, setAllMessages] = useState(null);
-  const [currentKidData, setCurrentKidData] = useState(null);
-  const [unreadOthersMessages, setUnreadOthersMessages] = useState([]);
-  const [isMarkedAsRead, setIsMarkedAsRead] = useState(false);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const sending = useRef(false);
 
-  useEffect(() => {
-    // Set current kid
-    // Check if kids array and kidID are defined
-    if (kids && kidID) {
-      try {
-        setIsLoading(true);
-        const actualKid = kids.find((kid) => kid.id === kidID);
+  // The kid of this conversation (the list of the app has the latest; the one that was tapped is the fallback)
+  const currentKidData =
+    (kids || []).find((kid) => kid.id === kidID) || student;
 
-        // Check if actualKid is found
-        if (actualKid) {
-          setCurrentKidData(actualKid);
-        }
-      } finally {
-        setIsLoading(false);
-      }
+  // The name of the kid is the title of the header. That way the chat starts exactly where the header
+  // ends, which is what the keyboard needs to know to lift the input.
+  useLayoutEffect(() => {
+    if (currentKidData?.name) {
+      navigation.setOptions({ title: currentKidData.name });
     }
-  }, [kids, kidID]);
+  }, [navigation, currentKidData?.name]);
+  // The API answers with the newest message first, and each message says who wrote it:
+  //   sender: { name, photo, isTeam }  (isTeam = somebody of the team, otherwise it is the family)
+  const formatMessage = useCallback(
+    (message) => {
+      const mine = message.sender_user_id === currentUserData?.id;
+      const fromTeam = !!message.sender?.isTeam;
 
-  // fetch all messages (filter by student)
-  useEffect(() => {
-    // console.log(staff);
-    const fetchMessagesByUser = async () => {
-      try {
-        setIsLoading(true);
-        const { data, error } = await supabase
-          .from("message")
-          .select("*")
-          .eq("student_id", currentKidData.id)
-          .order("created_at", { ascending: false });
+      return {
+        _id: message.id,
+        text: message.content,
+        // A number, not a Date: the chat runs on the animation engine, which cannot copy a Date
+        createdAt: new Date(message.created_at).getTime(),
+        user: {
+          _id: mine
+            ? currentUserData.id
+            : message.sender_user_id || message.sender_contact_id || "family",
+          // A message from the family without a name shows as the family of the kid
+          name:
+            message.sender?.name ||
+            (fromTeam
+              ? "Staff"
+              : `Family of ${currentKidData?.name || "the kid"}`),
+          // The picture: the one of the sender, or the kid when the family has none
+          photoPath:
+            message.sender?.photo || (fromTeam ? null : currentKidData?.photo),
+        },
+        sent: mine,
+        // The family read it (the ticks turn green)
+        received: mine && !!message.isread,
+      };
+    },
+    [currentUserData?.id, currentKidData?.name, currentKidData?.photo],
+  );
 
-        if (error) throw error;
+  // Reads the conversation from the API. Every message the family wrote is marked as read, because the
+  // team is looking at it now.
+  const loadMessages = useCallback(async () => {
+    if (!kidID || !currentUserData) return;
 
-        setAllMessages(data);
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    const data = await getMessagesByStudent(kidID);
+    setMessages(data.map(formatMessage));
+    setIsLoading(false);
 
-    if (currentKidData) {
-      fetchMessagesByUser();
-    }
-  }, [currentKidData]);
-
-  useEffect(() => {
-    if (unreadMessages.length === 0) return;
-
-    setMessages((prevMessages) =>
-      prevMessages.map((message) => {
-        const updated = unreadMessages.find(
-          (unread) => unread.id === message._id
-        );
-
-        if (updated) {
-          return {
-            ...message,
-            received: updated.isread,
-          };
-        }
-
-        return message;
-      })
+    const unreadFromFamily = data.some(
+      (message) => !message.sender?.isTeam && !message.isread,
     );
-  }, [unreadMessages]);
+    if (unreadFromFamily) markThreadAsRead(kidID);
+  }, [
+    kidID,
+    currentUserData,
+    getMessagesByStudent,
+    formatMessage,
+    markThreadAsRead,
+  ]);
 
-  const formatMessages = async () => {
-    try {
-      const formattedMessages = allMessages.map((message) => {
-        // Identify if the sender is the staff
-        const foundStaff = staff.find((s) => s.id === message.sender_user_id);
+  // Opens, then looks again every few seconds while the screen is in front (and when the app comes back)
+  useFocusEffect(
+    useCallback(() => {
+      loadMessages();
 
-        // Avatar and name — if is a staff, use it, if not use the kid
-        const avatar = foundStaff?.uriStaff || currentKidData?.uriKid;
-        const name = foundStaff?.name || currentKidData?.name;
-
-        const isSentByCurrentUser =
-          message.sender_user_id === currentUserData.id;
-
-        return {
-          _id: message.id,
-          text: message.content,
-          createdAt: new Date(message.created_at),
-          user: {
-            _id:
-              message.sender_user_id || message.sender_contact_id || "unknown",
-            name,
-            avatar,
-          },
-          sent: isSentByCurrentUser,
-          received: isSentByCurrentUser && message.isread,
-        };
+      const timer = setInterval(() => {
+        if (!sending.current) loadMessages();
+      }, REFRESH_MS);
+      const subscription = AppState.addEventListener("change", (state) => {
+        if (state === "active") loadMessages();
       });
 
-      // sort the messages from new to old
-      const sortedMessages = formattedMessages.sort(
-        (a, b) => b.createdAt - a.createdAt
-      );
-
-      setMessages(sortedMessages);
-    } catch (error) {
-      console.error("Error formatting messages:", error);
-    }
-  };
-
-  //fetch the initial messages when open the chat screen
-  useEffect(() => {
-    if (allMessages) {
-      formatMessages();
-    }
-  }, [allMessages]);
-
-  // get the messages from messageContext and format to giftedchat
-  // useEffect(() => {
-  //   if (allMessages && currentKidData && staff) {
-  //     const allMessagesFromStaffAndKid = allMessages?.filter(
-  //       (message) =>
-  //         message.senderID === currentKidData.id ||
-  //         message.receiverIDs === currentKidData.id
-  //     );
-
-  //     // Format messages for GiftedChat
-  //     const formattedMessages = allMessagesFromStaffAndKid.map((message) => ({
-  //       _id: message.id,
-  //       text: message.content,
-  //       createdAt: new Date(message.sentAt),
-  //       user: {
-  //         _id: message.senderID,
-  //         avatar:
-  //           message.senderID === currentKidData.id
-  //             ? currentKidData.uriKid
-  //             : staff.find((staffMember) => staffMember.id === message.senderID)
-  //                 ?.uriStaff,
-  //         name: currentKidData.name,
-  //       },
-  //       received: message.isRead && message.senderID === currentUserData.id, //message.senderID === kidID, //message.isRead, //readMessages.includes(message.id),
-  //       sent: message.sentAt && message.senderID === currentUserData.id,
-  //     }));
-
-  //     // Sort messages by createdAt timestamp in ascending order
-  //     const sortedMessages = formattedMessages
-  //       .sort((a, b) => a.createdAt - b.createdAt)
-  //       .reverse();
-
-  //     setMessages(sortedMessages); // set of messages formatted to Gifted Chat
-  //     setIsLoadingEarlier(false);
-  //   }
-  // }, [allMessages, currentKidData]);
-
-  // const handleLoadEarlier = () => {
-  //   setIsLoadingEarlier(true); // Set isLoadingEarlier to true when loading earlier messages
-  //   loadMoreMessages(); // Call loadMoreMessages function from MessageContext
-  // };
-
-  //fetch new messages and format
-  // useEffect(() => {
-  //   //console.log("trigger use Effect New Messages", newMessages);
-  //   //if (newMessages.length > 0) {
-  //   //console.log("newMessages", newMessages);
-
-  //   const messagesForMe = newMessages.filter((message) => {
-  //     return message.receiverIDs.includes(kidID);
-  //   });
-
-  //   if (messagesForMe.length > 0) {
-  //     //console.log("new message for me", messagesForMe);
-  //     const formattedNewMessages = messagesForMe.map((message) => ({
-  //       _id: message.id,
-  //       text: message.content,
-  //       createdAt: new Date(message.sentAt),
-  //       user: {
-  //         _id: message.senderID,
-  //         avatar:
-  //           message.senderID === currentKidData?.id
-  //             ? currentKidData?.uriKid
-  //             : staff.find((staffMember) => staffMember.id === message.senderID)
-  //                 ?.uriStaff,
-  //         name: currentKidData?.name,
-  //       },
-  //       received: message.isRead && message.senderID === currentUserData.id,
-  //       sent: message.sentAt && message.senderID === currentUserData.id,
-  //     }));
-  //     // Filter out messages that already exist in the messages state to prevent duplicates
-  //     const uniqueNewMessages = formattedNewMessages.filter((newMessage) => {
-  //       return !messages.some(
-  //         (existingMessage) => existingMessage._id === newMessage._id
-  //       );
-  //     });
-
-  //     // Combine unique new messages with existing messages
-  //     const combinedMessages = [...messages, ...uniqueNewMessages];
-  //     // Sort combined messages by createdAt timestamp in descending order
-  //     const sortedMessages = combinedMessages.sort(
-  //       (a, b) => b.createdAt - a.createdAt
-  //     );
-  //     //console.log("sorted Messages", sortedMessages);
-  //     setMessages(sortedMessages);
-  //     //setAllMessages(sortedMessages);
-  //     setUnreadOthersMessages(messagesForMe);
-  //     setIsMarkedAsRead(false);
-  //     //setNewMessages([]);
-  //   }
-  //   // }
-  // }, [newMessages]);
-
-  //to mark as read msgs
-  useEffect(() => {
-    if (allMessages && currentKidData) {
-      try {
-        // Filtra mensagens não lidas enviadas pelo kid
-        const unreadMessagesFromOthers = allMessages.filter(
-          (message) =>
-            message.sender_user_id === currentKidData.id &&
-            message.isread === false
-        );
-
-        setUnreadOthersMessages(unreadMessagesFromOthers);
-        setIsMarkedAsRead(false);
-      } catch (error) {
-        console.error("⚠️ Error updating unread messages:", error);
-      }
-    }
-  }, [allMessages, currentKidData]);
-
-  useEffect(() => {
-    if (allMessages && currentKidData) {
-      //update the unreadMessages when get a new message
-      try {
-        const unreadMessagesFromOthers = allMessages.filter(
-          (message) =>
-            message.senderID === currentKidData.id && message.isRead === false
-        );
-        setUnreadMessages(unreadMessagesFromOthers);
-        setIsMarkedAsRead(false);
-      } catch (error) {
-        console.log("error updating the unread Message", error);
-      }
-    }
-  }, [allMessages, currentKidData]);
-
-  const updateMessagesAsRead = async (messageIds) => {
-    try {
-      if (messageIds && messageIds.length > 0) {
-        const updatePromises = messageIds.map(async (id) => {
-          await API.graphql(
-            graphqlOperation(updateMessage, {
-              input: {
-                id: id,
-                isRead: true,
-              },
-            })
-          );
-        });
-
-        // Wait for all update promises to resolve
-        try {
-          await Promise.all(updatePromises);
-          setUnreadOthersMessages([]);
-        } catch (error) {
-          console.error("Error marking messages as read:", error);
-        }
-      }
-    } catch (error) {
-      console.error("error mark as read messages", error);
-    }
-  };
-
-  useEffect(() => {
-    // Call the function to start marking messages as read if there are unread messages
-    if (unreadOthersMessages.length !== 0 && !isMarkedAsRead) {
-      const messageIds = unreadOthersMessages
-        .filter((message) => message.senderID === kidID)
-        .map((message) => message.id);
-      updateMessagesAsRead(messageIds);
-      setIsMarkedAsRead(true);
-    }
-  }, [unreadOthersMessages, isMarkedAsRead]);
-
-  const sendNotificationToParents = async (msg, currentKid) => {
-    try {
-      const { id: studentId, name } = currentKid;
-      const msgHeader = `New message regarding ${name}`;
-
-      // search for all linked contacts with the student
-      const { data: familyLinks, error: familyError } = await supabase
-        .from("student_family")
-        .select("contact_id")
-        .eq("student_id", studentId);
-
-      if (familyError) throw familyError;
-      if (!familyLinks || familyLinks.length === 0) {
-        console.log("Any contact linked with the student.");
-        return;
-      }
-
-      // search on contacts (to find the user_ids)
-      const contactIds = familyLinks.map((f) => f.contact_id);
-
-      const { data: contacts, error: contactsError } = await supabase
-        .from("contacts")
-        .select("id, firstName, lastName, user_id")
-        .in("id", contactIds);
-
-      if (contactsError) throw contactsError;
-
-      // search for tokens of users linked (logged on app)
-      const userIds = contacts.map((c) => c.user_id).filter((u) => u !== null);
-
-      if (userIds.length === 0) {
-        console.log("Any contact with activated account.");
-        return;
-      }
-
-      const { data: users, error: usersError } = await supabase
-        .from("users")
-        .select("id, pushToken")
-        .in("id", userIds);
-
-      if (usersError) throw usersError;
-
-      // send notification for each exists tokens
-      for (const user of users) {
-        if (user.pushToken) {
-          await sendPushNotification(user.pushToken, msgHeader, msg, {
-            kidID: studentId,
-          });
-          console.log(`Push notification sent to user: ${user.id}`);
-        }
-      }
-    } catch (err) {
-      console.error("Error when sending notifications:", err.message || err);
-    }
-  };
+      return () => {
+        clearInterval(timer);
+        subscription.remove();
+      };
+    }, [loadMessages]),
+  );
 
   // on send new message
   const onSend = useCallback(
-    async (newMessages = [], currentKidData) => {
+    async (newMessages = []) => {
+      const newMessage = newMessages[0];
+      if (!newMessage?.text?.trim() || !currentUserData) return;
+
       setInputText("");
+      sending.current = true;
+
+      // It shows at once (the ticks stay grey until the family reads it)
+      setMessages((previous) =>
+        Chat.append(previous, [
+          {
+            ...newMessage,
+            createdAt: Date.now(),
+            user: {
+              _id: currentUserData.id,
+              name: currentUserData.name,
+              photoPath: currentUserData.photo,
+            },
+            sent: true,
+            received: false,
+          },
+        ]),
+      );
+
       try {
-        const newMessage = newMessages[0];
-
-        setMessages((prev) => GiftedChat.append(prev, [newMessage]));
-
-        await sendNotificationToParents(newMessage.text, currentKidData);
-
-        const { error } = await supabase.from("message").insert({
-          student_id: kidID,
-          sender_user_id: currentUserData.id,
-          content: newMessage.text,
-          isread: false,
-        });
-
-        if (error) throw error;
+        // The API saves it and tells the parents with a push
+        const saved = await sendAndNotifyMsg(
+          kidID,
+          null,
+          newMessage.text.trim(),
+        );
+        if (!saved) throw new Error("The message was not saved");
       } catch (error) {
-        console.error("Error creating message:", error);
+        Alert.alert(
+          "Message not sent",
+          "Please check the connection and try again.",
+        );
+      } finally {
+        sending.current = false;
+        loadMessages(); // what the server really has (a message that failed disappears)
       }
     },
-    [currentKidData, currentUserData, kidID]
+    [currentUserData, kidID, sendAndNotifyMsg, loadMessages],
   );
 
-  const renderComposer = (props) => (
+  const renderComposer = () => (
     <TextInput
-      // key={inputText === "" ? "input-empty" : "input-filled"}
       value={inputText}
       onChangeText={setInputText}
       placeholder="Type a message..."
       placeholderTextColor="#888"
       multiline
-      // autoCorrect={false}
       style={{ flex: 1, fontSize: 16, padding: 8 }}
-      textContentType="none" // ⚠️ iOS fix
-      autoComplete="off" // ⚠️ iOS fix
-      importantForAutofill="no" // ⚠️ iOS fix
-      maxLength={200} // ⚠️ iOS fix
+      textContentType="none" // iOS fix
+      autoComplete="off" // iOS fix
+      importantForAutofill="no" // iOS fix
+      maxLength={200}
     />
   );
 
   const handleSend = () => {
-    if (inputText.trim()) {
-      const newMessage = {
+    if (!inputText.trim()) return;
+
+    onSend([
+      {
         _id: Math.random().toString(),
         text: inputText,
-        createdAt: new Date(),
+        createdAt: Date.now(),
         user: { _id: currentUserData.id },
-      };
-
-      onSend([newMessage], currentKidData);
-      Keyboard.dismiss(); // fecha o teclado (opcional)
-      setTimeout(() => setInputText(""), 50); // força limpeza após atualização do GiftedChat
-    }
+      },
+    ]);
+    Keyboard.dismiss();
+    setTimeout(() => setInputText(""), 50); // clears it after the chat updates
   };
-
-  // const renderSend = (props) => (
-  //   <Send {...props}>
-  //     <View>
-  //       <MaterialCommunityIcons
-  //         name="send-circle"
-  //         style={{ marginBottom: 5, marginRight: 5 }}
-  //         size={32}
-  //         color="#FF7276"
-  //       />
-  //     </View>
-  //   </Send>
-  // );
 
   const renderSend = () => (
     <TouchableOpacity onPress={handleSend}>
@@ -459,43 +240,52 @@ const ChatUserScreen = () => {
     </TouchableOpacity>
   );
 
-  const renderTicks = (message) => {
-    if (message.user._id !== currentUserData.id) return null;
-    return (
-      <MaterialIcons
-        name={message.received ? "done-all" : "done"}
-        size={16}
-        style={{ paddingRight: 5 }}
-        color={message.received ? "#03ff39" : "#d1d1d1"}
-      />
-    );
-  };
+  const myId = currentUserData?.id;
+  const renderTicks = useCallback(
+    (message) => {
+      if (message.user._id !== myId) return null;
+      return (
+        <MaterialIcons
+          name={message.received ? "done-all" : "done"}
+          size={16}
+          style={{ paddingRight: 5 }}
+          color={message.received ? "#03ff39" : "#d1d1d1"}
+        />
+      );
+    },
+    [myId],
+  );
 
-  const renderBubble = (props) => {
-    return (
+  const renderBubble = useCallback(
+    (props) => (
       <Bubble
         {...props}
-        wrapperStyle={{
-          right: {
-            backgroundColor: "#FF7276",
-          },
-        }}
-        textStyle={{
-          right: {
-            color: "#fff",
-          },
-        }}
-        renderTicks={renderTicks}
-      ></Bubble>
-    );
-  };
+        wrapperStyle={BUBBLE_WRAPPER_STYLE}
+        textStyle={BUBBLE_TEXT_STYLE}
+      />
+    ),
+    [],
+  );
 
-  const scrollToBottomComponent = () => (
-    <FontAwesome name="angle-double-down" size={22} color="#333" />
+  // The picture of who wrote it (the files need the login, so it is the same component as everywhere)
+  const renderAvatar = useCallback((props) => {
+    const sender = props.currentMessage?.user;
+    return (
+      <RemoteImage
+        path={sender?.photoPath}
+        name={sender?.name}
+        bucketName="profilePhotos"
+        style={AVATAR_STYLE}
+      />
+    );
+  }, []);
+
+  const scrollToBottomComponent = useCallback(
+    () => <FontAwesome name="angle-double-down" size={22} color="#333" />,
+    [],
   );
 
   if (isLoading || !currentUserData || !currentKidData) {
-    // console.log("currentUserData id:", currentUserData?.id);
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#FF7276" />
@@ -507,35 +297,25 @@ const ChatUserScreen = () => {
   }
 
   return (
-    <SafeAreaView
-      style={{ flex: 1 }}
-      edges={["top", "bottom", "left", "right"]}
-    >
-      <View style={{ flex: 1 }}>
-        <View style={{ padding: 3 }}>
-          <Text style={{ fontSize: 16, fontWeight: "bold" }}>
-            {currentKidData.name}
-          </Text>
-        </View>
-
-        <GiftedChat
-          messages={messages}
-          text={inputText}
-          onInputTextChanged={setInputText}
-          onSend={(messages) => onSend(messages, currentKidData)}
-          alwaysShowSend
-          renderComposer={renderComposer}
-          renderUsernameOnMessage
-          user={{ _id: currentUserData.id }}
-          renderBubble={renderBubble}
-          renderSend={renderSend}
-          showUserAvatar
-          showAvatarForEveryMessage
-          scrollToBottom
-          scrollToBottomComponent={scrollToBottomComponent}
-        />
-      </View>
-    </SafeAreaView>
+    <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
+      <Chat
+        messages={messages}
+        user={{ _id: currentUserData.id }}
+        onSend={(newMessages) => onSend(newMessages)}
+        isSendButtonAlwaysVisible
+        renderComposer={renderComposer}
+        renderSend={renderSend}
+        isUsernameVisible
+        renderBubble={renderBubble}
+        renderTicks={renderTicks}
+        renderAvatar={renderAvatar}
+        isUserAvatarVisible
+        isAvatarVisibleForEveryMessage
+        isScrollToBottomEnabled
+        scrollToBottomComponent={scrollToBottomComponent}
+        keyboardAvoidingViewProps={keyboardAvoidingViewProps}
+      />
+    </View>
   );
 };
 

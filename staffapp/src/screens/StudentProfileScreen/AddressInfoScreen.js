@@ -1,135 +1,118 @@
-import { View, Text, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import styles from "./styles";
-import { useEffect, useCallback } from "react";
-import { useNavigation, useFocusEffect } from "@react-navigation/native";
 
-const AddressInfoScreen = ({ kid, readOnly }) => {
-  const navigation = useNavigation();
-  // console.log(kid, "kid");
+// Read-only: the addresses of a child are created and changed in the dashboard (an address decides where
+// the van goes, so it is checked there). The app only shows them.
+
+// "123 Main St, Unit 4, Vancouver, BC, V5T 3E2"
+const formatAddress = (address) =>
+  [
+    address.addressLine1,
+    address.unitNumber ? `Unit ${address.unitNumber}` : null,
+    address.city,
+    address.province,
+    address.zipCode,
+  ]
+    .filter((part) => part && String(part).trim() !== "")
+    .join(", ");
+
+const card = {
+  borderWidth: 1,
+  borderColor: "#dee2e6",
+  borderRadius: 10,
+  padding: 12,
+  marginTop: 8,
+  backgroundColor: "#ffffff",
+};
+
+const AddressCard = ({ address, current }) => (
+  <View
+    style={[
+      card,
+      current && { borderColor: "#198754", backgroundColor: "#f1faf4" },
+    ]}
+  >
+    {!!address.houseName && (
+      <Text style={{ fontSize: 15, fontWeight: "700", color: "#212529" }}>
+        {address.houseName}
+      </Text>
+    )}
+    <Text style={{ fontSize: 14, color: "#212529", marginTop: 2 }}>
+      {formatAddress(address)}
+    </Text>
+    {!!address.addressNotes && (
+      <Text style={{ fontSize: 13, color: "#6c757d", marginTop: 4 }}>
+        {address.addressNotes}
+      </Text>
+    )}
+    {current && (
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: "700",
+          color: "#198754",
+          marginTop: 6,
+        }}
+      >
+        ✔ Current drop-off address
+      </Text>
+    )}
+  </View>
+);
+
+const AddressInfoScreen = ({ kid }) => {
+  // An empty value counts as the Drop-Off service (the same rule as in the dashboard)
+  const dropOffService = kid?.useDropOffService !== false;
+  const addresses = kid?.addresses || [];
+  const current = kid?.dropOffAddress || null;
+  const others = addresses.filter((address) => address.id !== current?.id);
 
   return (
-    <View style={styles.addressContainer}>
-      {kid?.useDropOffService ? (
-        <ScrollView>
-          <Text style={styles.detailLabel}>Current Drop-Off Address:</Text>
-          <View style={styles.addressContainer}>
-            <View style={{ flex: 1 }}>
-              {kid.dropOffAddress && (
-                <View>
-                  {/* Display houseName on the first line */}
-                  {kid.dropOffAddress.houseName && (
-                    <Text style={styles.detailTextInput}>
-                      {kid.dropOffAddress.houseName}
-                    </Text>
-                  )}
+    <ScrollView style={styles.addressContainer}>
+      <Text style={styles.detailLabel}>After class</Text>
+      <Text style={styles.detailTextInput}>
+        {dropOffService ? "Drop-off service" : "Parental pickup"}
+      </Text>
 
-                  {/* Display the rest of the address on the second line */}
-                  <Text style={styles.detailTextInput}>
-                    {`${kid.dropOffAddress.addressLine1}, `}
-                    {kid.dropOffAddress.unitNumber &&
-                      `${kid.dropOffAddress.unitNumber}, `}
-                    {`${kid.dropOffAddress.city}, ${kid.dropOffAddress.province}, ${kid.dropOffAddress.zipCode}, ${kid.dropOffAddress.country}`}
-                  </Text>
-
-                  {/* Display addressNotes on a separate line */}
-                  {kid.dropOffAddress.addressNotes && (
-                    <Text style={styles.detailTextInput}>
-                      {kid.dropOffAddress.addressNotes}
-                    </Text>
-                  )}
-                </View>
-              )}
-            </View>
-            {!readOnly && (
-              <TouchableOpacity
-                style={styles.dropOffButton}
-                onPress={() => {
-                  navigation.navigate("AddressList", {
-                    kidId: kid.id,
-                    useDropOff: kid.useDropOffService,
-                  });
-                }}
-              >
-                <Text style={styles.dropOffButtonText}>
-                  {kid.dropOffAddress ? "Change / Add more" : "Add new address"}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </ScrollView>
-      ) : (
-        <View style={styles.addressContainer}>
-          {kid.dropOffAddress ? (
-            <View>
-              <Text style={styles.detailLabel}>Address</Text>
-              <View>
-                <Text style={styles.detailTextInput}>
-                  {`${kid.dropOffAddress.addressLine1}, ${
-                    kid.dropOffAddress.unitNumber
-                      ? `${kid.dropOffAddress.unitNumber}, `
-                      : ""
-                  }${kid.dropOffAddress.city}, ${
-                    kid.dropOffAddress.province
-                  }, ${kid.dropOffAddress.zipCode}, ${
-                    kid.dropOffAddress.country
-                  }`}
-                  {`${
-                    kid.dropOffAddress.addressNotes
-                      ? ` - ${kid.dropOffAddress.addressNotes}`
-                      : ""
-                  }`}
-                </Text>
-              </View>
-              {kid.dropOffAddress ? (
-                !readOnly && (
-                  <TouchableOpacity
-                    style={styles.dropOffButton}
-                    onPress={() => {
-                      navigation.navigate("AddAddress", {
-                        address: kid.dropOffAddress,
-                        kidId: kid?.id,
-                        mode: "update",
-                        from: "kidProfile",
-                      });
-                    }}
-                  >
-                    <Text style={styles.dropOffButtonText}>Change</Text>
-                  </TouchableOpacity>
-                )
-              ) : (
-                <TouchableOpacity
-                  style={styles.dropOffButton}
-                  onPress={() => {
-                    navigation.navigate("AddAddress", {
-                      kidId: kid?.id,
-                      mode: "insert",
-                      from: "kidProfile",
-                    });
-                  }}
-                >
-                  <Text style={styles.dropOffButtonText}>Add new address</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : (
-            !readOnly && (
-              <TouchableOpacity
-                style={styles.dropOffButton}
-                onPress={() => {
-                  navigation.navigate("AddAddress", {
-                    kidId: kid?.id,
-                    mode: kid.dropOffAddress ? "update" : "insert",
-                    from: "kidProfile",
-                  });
-                }}
-              >
-                <Text style={styles.dropOffButtonText}>Add new address</Text>
-              </TouchableOpacity>
-            )
-          )}
-        </View>
+      {!dropOffService && (
+        <Text style={{ fontSize: 13, color: "#6c757d", marginTop: 4 }}>
+          A parent picks the child up at the ASP: the van does not take the
+          child home.
+        </Text>
       )}
-    </View>
+
+      {/* The address the van goes to (Drop-off), or the address on file (Parental pickup) */}
+      {current ? (
+        <>
+          <Text style={[styles.detailLabel, { marginTop: 16 }]}>
+            {dropOffService ? "Current drop-off address" : "Address"}
+          </Text>
+          <AddressCard address={current} current={dropOffService} />
+        </>
+      ) : (
+        <Text style={{ fontSize: 14, color: "#6c757d", marginTop: 16 }}>
+          {dropOffService
+            ? "No address yet. A manager adds it in the dashboard."
+            : "No address on file."}
+        </Text>
+      )}
+
+      {/* The other saved addresses (only the Drop-off service can have more than one) */}
+      {dropOffService && others.length > 0 && (
+        <>
+          <Text style={[styles.detailLabel, { marginTop: 16 }]}>
+            Other addresses
+          </Text>
+          {others.map((address) => (
+            <AddressCard key={address.id} address={address} />
+          ))}
+        </>
+      )}
+
+      <Text style={{ fontSize: 12, color: "#9ca3af", marginTop: 20 }}>
+        To add or change an address, use the dashboard.
+      </Text>
+    </ScrollView>
   );
 };
 

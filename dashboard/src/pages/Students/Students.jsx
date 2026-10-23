@@ -107,6 +107,7 @@ function Students({ closeMenu }) {
     schoolGrade: schoolGrade || "",
     schoolGradeDivision: schoolGradeDivision || "",
     schoolTeacherName: schoolTeacherName || "",
+    dropOffMode: dropOffMode,
   };
   const savedForm = selectedStudent && {
     name: selectedStudent.name || "",
@@ -121,6 +122,8 @@ function Students({ closeMenu }) {
     schoolGrade: selectedStudent.schoolGrade || "",
     schoolGradeDivision: selectedStudent.schoolGradeDivision || "",
     schoolTeacherName: selectedStudent.schoolTeacherName || "",
+    dropOffMode:
+      selectedStudent.useDropOffService === false ? "parentPickup" : "dropOff",
   };
   const scheduleDirty =
     !!savedDays && JSON.stringify(attendanceDays) !== JSON.stringify(savedDays);
@@ -454,16 +457,16 @@ function Students({ closeMenu }) {
   };
 
   // Saves the pickup mode right away: Drop-Off service = true, Parental pickup = false
-  const saveDropOffMode = async (useDropOffService) => {
-    try {
-      await api.patch(`/students/${selectedStudent.id}`, { useDropOffService });
-      await fetchKidsData();
-    } catch (error) {
-      console.error("Error saving the pickup mode:", error);
-      alert("Failed to save the pickup mode.");
-      throw error; // the caller keeps the old choice on screen
-    }
-  };
+  // const saveDropOffMode = async (useDropOffService) => {
+  //   try {
+  //     await api.patch(`/students/${selectedStudent.id}`, { useDropOffService });
+  //     await fetchKidsData();
+  //   } catch (error) {
+  //     console.error("Error saving the pickup mode:", error);
+  //     alert("Failed to save the pickup mode.");
+  //     throw error; // the caller keeps the old choice on screen
+  //   }
+  // };
 
   // Star icon: make this address the default one
   const handleSetDefaultAddress = async (addressId) => {
@@ -616,6 +619,17 @@ function Students({ closeMenu }) {
       // console.log("Updating student with:", updates);
 
       await api.patch(`/students/${selectedStudent.id}`, updates);
+
+      // Parental pickup keeps a single address (the default one): the others are removed now that the
+      // person confirmed with "Save Changes"
+      if (dropOffMode === "parentPickup") {
+        const extra = addresses.filter((a) => !a.isDefault);
+        if (extra.length > 0) {
+          await api.delete("/students_address", {
+            params: { id: `in:${extra.map((a) => a.id).join(",")}` },
+          });
+        }
+      }
 
       // The weekly schedule is saved together with the rest of the form
       if (scheduleDirty) {
@@ -1135,34 +1149,21 @@ function Students({ closeMenu }) {
                             name="dropOffMode"
                             value="parentPickup"
                             checked={dropOffMode === "parentPickup"}
-                            onChange={async () => {
+                            onChange={() => {
                               if (dropOffMode === "parentPickup") return;
 
                               const nonDefaultAddresses = addresses.filter(
                                 (a) => !a.isDefault,
                               );
-                              if (nonDefaultAddresses.length > 0) {
-                                const confirmed = window.confirm(
-                                  "Are you sure you want to switch to Parental Pickup? All addresses except the default will be removed. (This can not be undone!)",
-                                );
-                                if (!confirmed) return;
-
-                                await api.delete("/students_address", {
-                                  params: {
-                                    id: `in:${nonDefaultAddresses
-                                      .map((a) => a.id)
-                                      .join(",")}`,
-                                  },
-                                });
-                                await fetchAddresses();
+                              if (
+                                nonDefaultAddresses.length > 0 &&
+                                !window.confirm(
+                                  "Are you sure you want to switch to Parental Pickup? All addresses except the default will be removed when you click Save Changes.",
+                                )
+                              ) {
+                                return;
                               }
-
-                              try {
-                                await saveDropOffMode(false);
-                                setDropOffMode("parentPickup");
-                              } catch (error) {
-                                // the message was already shown
-                              }
+                              setDropOffMode("parentPickup"); // saved with "Save Changes"
                             }}
                           />
                         </label>
@@ -1183,15 +1184,17 @@ function Students({ closeMenu }) {
                             name="dropOffMode"
                             value="dropOff"
                             checked={dropOffMode === "dropOff"}
-                            onChange={async () => {
-                              try {
-                                await saveDropOffMode(true);
-                                setDropOffMode("dropOff");
-                              } catch (error) {
-                                // the message was already shown
-                              }
-                            }}
+                            onChange={() => setDropOffMode("dropOff")}
                           />
+                          {dropOffMode === "parentPickup" &&
+                            addresses.filter((a) => !a.isDefault).length >
+                              0 && (
+                              <p style={{ color: "#d00", fontSize: 12 }}>
+                                Saving removes{" "}
+                                {addresses.filter((a) => !a.isDefault).length}{" "}
+                                extra address(es).
+                              </p>
+                            )}
                         </label>
                       </div>
 

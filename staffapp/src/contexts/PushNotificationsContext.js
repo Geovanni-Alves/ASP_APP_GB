@@ -161,6 +161,8 @@ const PushNotificationsContextProvider = ({ children }) => {
         if (data?.type === "route") {
           emitRoutePush();
           navigation.navigate("PickupList");
+        } else if (data?.type === "message" && data.studentId) {
+          navigation.navigate("ChatUser", { student: { id: data.studentId } });
         }
       });
 

@@ -2,6 +2,7 @@ package com.asp.api.myroutes;
 
 import com.asp.api.auth.ActAs;
 import com.asp.api.auth.Roles;
+import com.asp.api.parent.FamilyNotifier;
 import java.util.LinkedHashMap;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -56,14 +57,16 @@ public class MyAttendanceController {
     private final TransactionTemplate transaction;
     private final String timezone;
     private final ActAs actAs;
+    private final FamilyNotifier family;
 
     public MyAttendanceController(JdbcTemplate jdbc, TransactionTemplate transaction,
                                   @Value("${app.timezone:America/Vancouver}") String timezone,
-                                  ActAs actAs) {
+                                  ActAs actAs, FamilyNotifier family) {
         this.jdbc = jdbc;
         this.transaction = transaction;
         this.timezone = timezone;
         this.actAs = actAs;
+        this.family = family;
     }
 
     @PostMapping("/check-in")
@@ -82,7 +85,7 @@ public class MyAttendanceController {
         Roles.requireStaffApp(auth);
         UUID me = actAs.effectiveUser(auth); // the super admin may act as somebody (test mode)
 
-        return transaction.execute(txStatus -> {
+        Map<String, Object> result = transaction.execute(txStatus -> {
             // Where is this kid on this route, and who is in charge of the kid?
             List<Map<String, Object>> stops = jdbc.queryForList(
                 "select r.date, r.status, rv.van_id, rv.driver_id, rs.responsible_staff_id "
@@ -140,6 +143,12 @@ public class MyAttendanceController {
             actAs.trace(auth, checkIn ? "act_as.check_in" : "act_as.absent", "students", studentId, me);
             return status(checkIn ? "checked_in" : "absent");
         });
+
+        // It is saved: now the family is told (nothing to tell when it was already recorded before)
+        if (result != null && !"unchanged".equals(result.get("status"))) {
+            family.feedPosted(studentId, "ATTENDANCE", checkIn ? "Picked up from school" : "Marked as absent", 0);
+        }
+        return result;
     }
 
     private static Map<String, Object> status(String value) {

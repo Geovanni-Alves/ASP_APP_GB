@@ -2,6 +2,8 @@ package com.asp.api.appdata;
 
 import com.asp.api.auth.Roles;
 import com.asp.api.audit.AuditService;
+import com.asp.api.parent.FamilyNotifier;
+import com.asp.api.push.PushService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -98,12 +100,16 @@ public class AppDataController {
     private final JdbcTemplate jdbc;
     private final String timezone;
     private final AuditService audit;
+    private final PushService push;
+    private final FamilyNotifier family;
 
     public AppDataController(JdbcTemplate jdbc, @Value("${app.timezone:America/Vancouver}") String timezone,
-                             AuditService audit) {
+                             AuditService audit, PushService push, FamilyNotifier family) {
         this.jdbc = jdbc;
         this.timezone = timezone;
         this.audit = audit;
+        this.push = push;
+        this.family = family;
     }
 
     // ------------------------------------------------------------------ team
@@ -210,6 +216,7 @@ public class AppDataController {
                 + "values (CAST('ATTENDANCE' AS feed_type), (now() at time zone CAST(? AS text)), ?, "
                 + "'has a new Attendance', ?, 'Arrived at the ASP')",
             timezone, id, me);
+        family.feedPosted(id, "ATTENDANCE", "Arrived at the ASP", 0);
 
         answer.put("status", "checked_in");
         return answer;
@@ -253,6 +260,7 @@ public class AppDataController {
                 + "values (CAST('ATTENDANCE' AS feed_type), (now() at time zone CAST(? AS text)), ?, "
                 + "'has a new Attendance', ?, 'Checked out from the ASP')",
             timezone, id, me);
+        family.feedPosted(id, "ATTENDANCE", "Checked out from the ASP", 0);
 
         answer.put("status", "checked_out");
         return answer;
@@ -323,6 +331,7 @@ public class AppDataController {
                 + "values (CAST('ATTENDANCE' AS feed_type), (now() at time zone CAST(? AS text)), ?, "
                 + "'has a new Attendance', ?, ?)",
             timezone, id, me, note);
+        family.feedPosted(id, "ATTENDANCE", note, 0);
 
         List<String> names = jdbc.queryForList("select name from students where id = ?", String.class, id);
         Map<String, Object> details = new LinkedHashMap<>();
@@ -530,6 +539,8 @@ public class AppDataController {
             body.mediaName() == null ? "" : body.mediaName(),
             body.mediaName() == null || body.mediaName().isBlank() ? null : asJsonArray(List.of(body.mediaName())),
             body.notes());
+        family.feedPosted(body.studentId(), type, body.notes(),
+            body.mediaName() == null || body.mediaName().isBlank() ? 0 : 1);
         return json(json);
     }
 
@@ -581,6 +592,9 @@ public class AppDataController {
                     + "returning to_jsonb(\"kidFeeds\")::text",
                 String.class, type, timezone, kid, text, me, first, names, note));
         }
+        for (UUID kid : kids) {
+            family.feedPosted(kid, type, note, media.size());
+        }
         return json("[" + String.join(",", created) + "]");
     }
 
@@ -606,9 +620,19 @@ public class AppDataController {
                                          @RequestParam(defaultValue = "100") int limit,
                                          Authentication auth) {
         Roles.requireStaffApp(auth);
+        // Each message comes with "sender": the name and photo of who wrote it, and whether it is the team
         String json = jdbc.queryForObject(
-            "select coalesce(jsonb_agg(to_jsonb(m) order by m.created_at desc), '[]'::jsonb)::text from ("
-                + "select * from message where student_id = ? order by created_at desc limit ?) m",
+            "select coalesce(jsonb_agg(x.doc order by x.created desc), '[]'::jsonb)::text from ("
+                + "select m.created_at as created, to_jsonb(m) || jsonb_build_object('sender', jsonb_build_object("
+                + "'name', coalesce(u.name, nullif(trim(coalesce(c.\"firstName\", '') || ' ' "
+                + "|| coalesce(c.\"lastName\", '')), '')), "
+                + "'photo', u.photo, "
+                + "'isTeam', lower(coalesce(u.\"userType\", '')) in "
+                + "('staff', 'driver', 'admin', 'manager', 'owner', 'superadmin'))) as doc "
+                + "from message m "
+                + "left join users u on u.id = m.sender_user_id "
+                + "left join contacts c on c.id = m.sender_contact_id "
+                + "where m.student_id = ? order by m.created_at desc limit ?) x",
             String.class, studentId, Math.min(Math.max(limit, 1), 500));
         return json(json);
     }
@@ -631,6 +655,23 @@ public class AppDataController {
             "insert into message (student_id, sender_user_id, content) values (?, ?, ?) "
                 + "returning to_jsonb(message)::text",
             String.class, body.studentId(), me, content);
+
+        // The parents of this kid who have an account are told (the push never breaks the message)
+        try {
+            List<UUID> parents = jdbc.queryForList(
+                "select distinct c.user_id from student_family sf join contacts c on c.id = sf.contact_id "
+                    + "where sf.student_id = ? and c.user_id is not null",
+                UUID.class, body.studentId());
+            String kidName = jdbc.queryForObject("select name from students where id = ?", String.class,
+                body.studentId());
+            String preview = content.length() > 100 ? content.substring(0, 100) + "…" : content;
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("type", "message");
+            data.put("studentId", body.studentId().toString());
+            push.sendToUsers(parents, "New message about " + kidName, preview, data);
+        } catch (Exception e) {
+            // the message is saved: a push that fails changes nothing
+        }
         return json(json);
     }
 

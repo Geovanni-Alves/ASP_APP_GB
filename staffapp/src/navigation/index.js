@@ -16,8 +16,8 @@ import HomeScreen from "../screens/HomeScreen";
 import StudentScreen from "../screens/StudentScreen";
 import StudentFeedScreen from "../screens/StudentFeedScreen";
 import StudentProfileScreen from "../screens/StudentProfileScreen";
-import AddAddressScreen from "../screens/AddAddressScreen";
-import AddressListScreen from "../screens/AddressListScreen";
+// import AddAddressScreen from "../screens/AddAddressScreen";
+// import AddressListScreen from "../screens/AddressListScreen";
 import NewActivityScreen from "../screens/NewActivityScreen";
 import IncidentsScreen from "../screens/IncidentsScreen";
 import StudentSelectionScreen from "../screens/StudentSelectionScreen";
@@ -200,7 +200,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         headerLeft: () => <CustomBackButton />,
       }}
     />
-    <Drawer.Screen
+    {/* <Drawer.Screen
       name="AddAddress"
       component={AddAddressScreen}
       options={{
@@ -208,8 +208,8 @@ const DrawerNavigator = ({ currentUserData }) => (
         headerShown: true,
         headerLeft: () => <CustomBackButton />,
       }}
-    />
-    <Drawer.Screen
+    /> */}
+    {/* <Drawer.Screen
       name="AddressList"
       component={AddressListScreen}
       options={{
@@ -217,7 +217,7 @@ const DrawerNavigator = ({ currentUserData }) => (
         headerShown: true,
         headerLeft: () => <CustomBackButton />,
       }}
-    />
+    /> */}
     <Drawer.Screen
       name="Activities"
       component={NewActivityScreen}

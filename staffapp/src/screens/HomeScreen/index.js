@@ -105,7 +105,7 @@ const HomeScreen = () => {
             <FontAwesome5 name="fingerprint" size={24} color="white" />
             <Text style={styles.buttonText}>Test Biometrics</Text>
           </TouchableOpacity> */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={[styles.pickUpButton, { backgroundColor: "#343a40" }]}
             onPress={() =>
               Alert.alert(
@@ -121,6 +121,24 @@ const HomeScreen = () => {
           >
             <FontAwesome5 name="bell" size={24} color="white" />
             <Text style={styles.buttonText}>Test Push</Text>
+          </TouchableOpacity> */}
+          <TouchableOpacity
+            style={styles.pickUpButton}
+            onPress={() => {
+              navigation.navigate("PickupList");
+            }}
+          >
+            <FontAwesome5 name="route" size={24} color="white" />
+            <Text style={styles.buttonText}>Pickup Route</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.pickUpButton}
+            onPress={() => {
+              navigation.navigate("DropOffList");
+            }}
+          >
+            <FontAwesome5 name="route" size={20} color="white" />
+            <Text style={styles.buttonText}>Drop Off</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.chatButton}
@@ -134,6 +152,8 @@ const HomeScreen = () => {
               </View>
             )}
           </TouchableOpacity>
+        </View>
+        <View style={styles.headerButtons}>
           <TouchableOpacity
             style={styles.activityButton}
             onPress={() => {
@@ -161,26 +181,6 @@ const HomeScreen = () => {
                 <Text style={styles.messageCountText}>{hereCount}</Text>
               </View>
             )}
-          </TouchableOpacity>
-        </View>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={styles.pickUpButton}
-            onPress={() => {
-              navigation.navigate("PickupList");
-            }}
-          >
-            <FontAwesome5 name="route" size={24} color="white" />
-            <Text style={styles.buttonText}>Pickup Route</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.pickUpButton}
-            onPress={() => {
-              navigation.navigate("DropOffList");
-            }}
-          >
-            <FontAwesome5 name="route" size={20} color="white" />
-            <Text style={styles.buttonText}>Drop Off</Text>
           </TouchableOpacity>
         </View>
       </View>
