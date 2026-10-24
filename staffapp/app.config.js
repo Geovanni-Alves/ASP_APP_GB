@@ -103,7 +103,7 @@ export default {
       projectId: "1f3049ff-13c7-4ab4-8683-52676c43333f",
     },
   },
-  owner: "geodarth",
+  owner: "AfterHeaven",
   runtimeVersion: "1.0.0",
   updates: {
     url: "https://u.expo.dev/86aaefd7-300b-4ba0-9f96-ede028a516c4",

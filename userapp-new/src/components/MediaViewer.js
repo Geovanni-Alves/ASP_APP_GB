@@ -9,6 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   FlatList,
   Modal,
@@ -26,6 +27,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useVideoPlayer, VideoView } from "expo-video";
+import { File, Paths } from "expo-file-system";
+import { MediaLibrary, mediaLibraryAvailable } from "../lib/optionalMediaLibrary";
 import RemoteImage from "./RemoteImage";
 import { getSignedUrl } from "../lib/api";
 
@@ -75,6 +78,7 @@ const MediaViewer = ({ visible, media, startIndex = 0, onClose }) => {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(startIndex);
+  const [saving, setSaving] = useState(false);
 
   const fade = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.9)).current;
@@ -92,16 +96,8 @@ const MediaViewer = ({ visible, media, startIndex = 0, onClose }) => {
     scale.setValue(0.9);
     dragY.setValue(0);
     Animated.parallel([
-      Animated.timing(fade, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scale, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fade, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 250, useNativeDriver: true }),
     ]).start();
   }, [visible, startIndex]);
 
@@ -110,16 +106,8 @@ const MediaViewer = ({ visible, media, startIndex = 0, onClose }) => {
     if (closing.current) return;
     closing.current = true;
     Animated.parallel([
-      Animated.timing(fade, {
-        toValue: 0,
-        duration: 220,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scale, {
-        toValue: 0.85,
-        duration: 220,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fade, { toValue: 0, duration: 220, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 0.85, duration: 220, useNativeDriver: true }),
       Animated.timing(dragY, {
         toValue: height * 0.35,
         duration: 220,
@@ -129,6 +117,63 @@ const MediaViewer = ({ visible, media, startIndex = 0, onClose }) => {
   };
   const closeRef = useRef(animateClose);
   closeRef.current = animateClose;
+
+  // Saves the picture (or the video) that is showing in the photo library of the phone. The pictures do not
+  // stay on the server forever, so the family can keep the ones it wants.
+  const saveCurrent = async () => {
+    const item = media?.[index];
+    if (!item || saving) return;
+
+    if (!mediaLibraryAvailable) {
+      Alert.alert(
+        "Not available here",
+        "Saving works in the real app. (Expo Go on Android cannot save to the photo library.)",
+      );
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // The phone asks once; "write only" is enough to save
+      const permission = await MediaLibrary.requestPermissionsAsync(true);
+      if (!permission.granted) {
+        Alert.alert(
+          "Permission needed",
+          "Allow the app to save to your photos in the settings of the phone.",
+        );
+        return;
+      }
+
+      const link = await getSignedUrl(
+        item.kind === "video" ? "feedVideos" : "feedPhotos",
+        item.name,
+        600,
+      );
+      // The name of the file already has its extension (.jpg, .mp4...)
+      const file = await File.downloadFileAsync(
+        link,
+        new File(Paths.cache, `${Date.now()}-${item.name}`),
+      );
+      await MediaLibrary.createAssetAsync(file.uri);
+      try {
+        file.delete(); // the copy of the cache is not needed any more
+      } catch (error) {
+        // nothing: the cache is cleaned by the system
+      }
+
+      Alert.alert(
+        "Saved",
+        item.kind === "video"
+          ? "The video is in your photo library."
+          : "The photo is in your photo library.",
+      );
+    } catch (error) {
+      console.log("Could not save:", error?.message);
+      Alert.alert("Could not save", "Please try again in a moment.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Drag down to close: the same gesture of the staff app (it runs on the JavaScript side)
   const pan = useMemo(
@@ -186,10 +231,7 @@ const MediaViewer = ({ visible, media, startIndex = 0, onClose }) => {
       {/* (inside a Modal the gestures need their own root view on Android) */}
       <GestureHandlerRootView style={StyleSheet.absoluteFill}>
         <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: "#000000", opacity: shade },
-          ]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: "#000000", opacity: shade }]}
         />
 
         <GestureDetector gesture={pan}>
@@ -206,11 +248,7 @@ const MediaViewer = ({ visible, media, startIndex = 0, onClose }) => {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               initialScrollIndex={Math.min(startIndex, media.length - 1)}
-              getItemLayout={(_, i) => ({
-                length: width,
-                offset: width * i,
-                index: i,
-              })}
+              getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
               keyExtractor={(m, i) => `${m.name}-${i}`}
               extraData={index}
               onMomentumScrollEnd={(e) =>
@@ -244,23 +282,35 @@ const MediaViewer = ({ visible, media, startIndex = 0, onClose }) => {
           pointerEvents="box-none"
           style={[StyleSheet.absoluteFill, { opacity: shade }]}
         >
-          <View
-            style={[local.top, { paddingTop: insets.top + 8 }]}
-            pointerEvents="box-none"
-          >
+          <View style={[local.top, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
             <View style={local.pill}>
               <Text style={local.pillText}>
                 {index + 1} / {media.length}
               </Text>
             </View>
-            <TouchableOpacity
-              style={local.closeButton}
-              onPress={() => closeRef.current()}
-              hitSlop={10}
-              accessibilityLabel="Close"
-            >
-              <MaterialCommunityIcons name="close" size={24} color="#ffffff" />
-            </TouchableOpacity>
+            <View style={local.buttons}>
+              <TouchableOpacity
+                style={local.roundButton}
+                onPress={saveCurrent}
+                disabled={saving}
+                hitSlop={10}
+                accessibilityLabel="Save to my photos"
+              >
+                {saving ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <MaterialCommunityIcons name="download" size={24} color="#ffffff" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={local.roundButton}
+                onPress={() => closeRef.current()}
+                hitSlop={10}
+                accessibilityLabel="Close"
+              >
+                <MaterialCommunityIcons name="close" size={24} color="#ffffff" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {media.length > 1 && media.length <= 12 && (
@@ -297,7 +347,8 @@ const local = StyleSheet.create({
     paddingVertical: 6,
   },
   pillText: { color: "#ffffff", fontSize: 14, fontWeight: "600" },
-  closeButton: {
+  buttons: { flexDirection: "row", gap: 10 },
+  roundButton: {
     width: 40,
     height: 40,
     borderRadius: 20,

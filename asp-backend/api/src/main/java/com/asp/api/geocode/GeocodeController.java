@@ -25,7 +25,12 @@ public class GeocodeController {
     public List<Map<String, Object>> autocomplete(@RequestParam String q,
                                                   @RequestParam(defaultValue = "5") int limit,
                                                   Authentication auth) {
-        Roles.requireStaffApp(auth);
+        // The families also search an address (their own profile); the rest of the app is for the team
+        boolean family = auth.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equalsIgnoreCase("ROLE_parent"));
+        if (!family) {
+            Roles.requireStaffApp(auth);
+        }
         String query = q.trim();
         if (query.length() < 3) {
             return List.of(); // too short to be worth a search

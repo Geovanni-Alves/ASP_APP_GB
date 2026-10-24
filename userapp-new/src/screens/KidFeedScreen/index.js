@@ -14,6 +14,7 @@ import {
 import { SegmentedButtons } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 import useKidFeed from "../../lib/useKidFeed";
+import useProgramInfo from "../../lib/useProgramInfo";
 import FeedItem from "../../components/FeedItem";
 import MediaViewer from "../../components/MediaViewer";
 import RemoteImage from "../../components/RemoteImage";
@@ -57,6 +58,9 @@ const KidFeedScreen = ({ route, navigation }) => {
     });
   }, [navigation, name, kidId, waiting]);
 
+  // How many days the pictures and videos stay on the server (the API says it)
+  const { mediaRetentionDays: retentionDays } = useProgramInfo();
+
   const [tab, setTab] = useState("updates");
   const [viewer, setViewer] = useState({ visible: false, media: [], index: 0 });
 
@@ -98,7 +102,7 @@ const KidFeedScreen = ({ route, navigation }) => {
     return (
       <View>
         {showDay && <Text style={local.day}>{dayLabel(item.dateTime)}</Text>}
-        <FeedItem item={item} onOpenMedia={openViewer} />
+        <FeedItem item={item} onOpenMedia={openViewer} retentionDays={retentionDays} />
       </View>
     );
   };
@@ -162,6 +166,12 @@ const KidFeedScreen = ({ route, navigation }) => {
           columnWrapperStyle={{ gap: 4, marginBottom: 4 }}
           onEndReached={gallery.loadMore}
           onEndReachedThreshold={0.4}
+          ListHeaderComponent={
+            <Text style={local.keepHint}>
+              Pictures and videos stay here for {retentionDays} days. Open one and
+              tap the download button to keep it on your phone.
+            </Text>
+          }
           ListFooterComponent={footer(gallery)}
           ListEmptyComponent={empty(gallery, "No pictures or videos yet.")}
           refreshControl={
@@ -229,6 +239,12 @@ const local = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: { color: "#ffffff", fontSize: 11, fontWeight: "700" },
+  keepHint: {
+    fontSize: 12,
+    color: "#6b7280",
+    textAlign: "center",
+    marginBottom: 10,
+  },
   emptyTitle: { fontSize: 17, fontWeight: "700", color: "#1f2937" },
   emptyText: { fontSize: 14, color: "#6b7280", textAlign: "center", marginTop: 6 },
 });

@@ -212,7 +212,7 @@ public class InviteService {
         // The staff app asks the person to complete the profile (name, address and phone) on the first
         // access, so there the "firstLogin" flag stays until they do it. The dashboard and the parents'
         // app have no such step.
-        if ("staff".equals(appName)) {
+        if ("staff".equals(appName) || "parent".equals(appName)) {
             jdbc.update("update users set password_hash = ?, updated_at = now() where id = ?",
                 encoder.encode(password), userId);
         } else {

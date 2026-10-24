@@ -25,6 +25,9 @@ public class FeedSchema implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         jdbc.execute("alter table \"kidFeeds\" add column if not exists \"mediaNames\" jsonb");
 
+        // The pictures and videos are deleted after some days (see MediaRetentionJob): the item stays, marked
+        jdbc.execute("alter table \"kidFeeds\" add column if not exists media_expired boolean not null default false");
+
         // The items made before have one photo: the list has that one
         jdbc.update("update \"kidFeeds\" set \"mediaNames\" = jsonb_build_array(\"mediaName\") "
             + "where \"mediaNames\" is null and \"mediaName\" is not null and \"mediaName\" <> ''");

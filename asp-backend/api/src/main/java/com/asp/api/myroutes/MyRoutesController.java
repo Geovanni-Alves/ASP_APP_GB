@@ -69,7 +69,10 @@ public class MyRoutesController {
                         'kid', to_jsonb(s),
                         'school', to_jsonb(sc),
                         'attendance', (select to_jsonb(a) from student_attendance a
-                                       where a.student_id = s.id and a.route_id = r.id limit 1)
+                                       where a.student_id = s.id
+                                         and (a.route_id = r.id or (a.route_id is null and a.date = r.date))
+                                       order by (a.route_id is null), coalesce(a.checked_in, false) desc
+                                       limit 1)
                       ) order by rs.stop_order)
                     from route_stops rs
                     join students s on s.id = rs.student_id

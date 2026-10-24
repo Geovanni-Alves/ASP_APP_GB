@@ -36,23 +36,45 @@ const AuthContextProvider = ({ children }) => {
     return data.user;
   };
 
-  const login = async (email, password) => {
+  // "beforeStart" (optional): something to do (and wait for) after the API said yes and BEFORE the app opens,
+  // for example the sun of the login jumping of joy
+  const login = async (email, password, beforeStart) => {
     const { data } = await api.post("/auth/login", {
       email: email.trim(),
       password,
       app: APP,
     });
+    if (beforeStart) await beforeStart();
     return startSession(data);
   };
 
   // The family got an invite by e-mail: sets the password and signs in
-  const acceptInvite = async (email, code, password) => {
+  const acceptInvite = async (email, code, password, beforeStart) => {
     const { data } = await api.post("/auth/accept-invite", {
       email: email.trim(),
       code: code.trim(),
       password,
       app: APP,
     });
+    if (beforeStart) await beforeStart();
+    return startSession(data);
+  };
+
+  // "I forgot my password": the API e-mails a code of 6 digits (it always answers the same, so nobody can find
+  // out which e-mails have an account)
+  const requestPasswordReset = async (email) => {
+    await api.post("/auth/forgot-password", { email: email.trim(), app: APP });
+  };
+
+  // The code + a new password: when it is right the person is signed in
+  const resetPassword = async (email, code, password, beforeStart) => {
+    const { data } = await api.post("/auth/reset-password", {
+      email: email.trim(),
+      code: code.trim(),
+      password,
+      app: APP,
+    });
+    if (beforeStart) await beforeStart();
     return startSession(data);
   };
 
@@ -96,6 +118,8 @@ const AuthContextProvider = ({ children }) => {
         session,
         login,
         acceptInvite,
+        requestPasswordReset,
+        resetPassword,
         logout,
       }}
     >

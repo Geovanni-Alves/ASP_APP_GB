@@ -4,9 +4,14 @@ import com.asp.api.auth.Roles;
 import com.asp.api.files.FileSigner;
 import com.asp.api.files.FileStorage;
 import com.asp.api.push.PushService;
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -17,6 +22,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -38,6 +46,9 @@ import org.springframework.web.server.ResponseStatusException;
  *   GET /parent/kids/{id}/messages       the conversation about one kid
  *   POST /parent/kids/{id}/messages      the family writes to the team
  *   PUT /parent/kids/{id}/messages/read  the family read what the team wrote
+ *   POST /parent/kids/{id}/absent        the kid will not come today (only until the cutoff time)
+ *   POST /parent/me/photo                the family changes ITS OWN profile photo (never the photo of a kid)
+ *   DELETE /parent/me/photo              the family removes its own profile photo
  *   GET /parent/files/signed-url         a temporary link to a photo or video the family is allowed to see
  */
 @RestController
@@ -64,6 +75,7 @@ public class ParentController {
               'notes', nullif(trim(coalesce(f.notes, '')), ''),
               'dateTime', f."dateTime",
               'createdAt', f.created_at,
+              'mediaExpired', f.media_expired,
               'by', case when u.id is null then null
                          else jsonb_build_object('name', u.name, 'photo', u.photo) end,
               'media', coalesce((
@@ -93,14 +105,17 @@ public class ParentController {
     private final FileStorage storage;
     private final FileSigner signer;
     private final PushService push;
+    private final TransactionTemplate transaction;
 
     public ParentController(JdbcTemplate jdbc, @Value("${app.timezone:America/Vancouver}") String timezone,
-                            FileStorage storage, FileSigner signer, PushService push) {
+                            FileStorage storage, FileSigner signer, PushService push,
+                            TransactionTemplate transaction) {
         this.jdbc = jdbc;
         this.timezone = timezone;
         this.storage = storage;
         this.signer = signer;
         this.push = push;
+        this.transaction = transaction;
     }
 
     /** Families only (the super admin may look too, for support). Returns the id of the person. */
@@ -119,9 +134,62 @@ public class ParentController {
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body);
     }
 
+    // After this time of the day the family can no longer say in the app that a kid will not come (the route is
+    // about to leave): the family calls the program. It comes from the setting "absence_cutoff_time" ("13:00"),
+    // and when there is none it is 1:00 PM.
+    private LocalTime absenceCutoff() {
+        try {
+            List<String> values = jdbc.queryForList(
+                "select value from settings where key = 'absence_cutoff_time' limit 1", String.class);
+            if (!values.isEmpty() && values.get(0) != null) {
+                String text = values.get(0).trim();
+                if (text.matches("^([01]?\\d|2[0-3]):[0-5]\\d$")) {
+                    String[] parts = text.split(":");
+                    return LocalTime.of(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]));
+                }
+            }
+        } catch (Exception e) {
+            // no setting: the default
+        }
+        return LocalTime.of(13, 0);
+    }
+
+    // TEST MODE, only for the accounts listed in the setting "parent_test_emails" (e-mails separated by commas).
+    // For them the family can say "not coming today" on any day and at any hour, even with no route (to try the
+    // app on a Saturday). A real family is never affected: it is not in the list, and with the setting empty
+    // nobody is.
+    private boolean isTestAccount(UUID me) {
+        try {
+            List<String> values = jdbc.queryForList(
+                "select value from settings where key = 'parent_test_emails' limit 1", String.class);
+            if (values.isEmpty() || values.get(0) == null || values.get(0).isBlank()) {
+                return false;
+            }
+            List<String> emails = jdbc.queryForList(
+                "select lower(email) from users where id = ?", String.class, me);
+            if (emails.isEmpty() || emails.get(0) == null) {
+                return false;
+            }
+            for (String listed : values.get(0).split(",")) {
+                if (listed.trim().equalsIgnoreCase(emails.get(0))) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            // no setting: not a test account
+        }
+        return false;
+    }
+
+    private String cutoffLabel(LocalTime cutoff) {
+        return cutoff.format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH));
+    }
+
     @GetMapping("/kids")
     public ResponseEntity<String> kids(Authentication auth) {
         UUID me = requireParent(auth);
+        LocalTime cutoff = absenceCutoff();
+        boolean testMode = isTestAccount(me);
 
         String json = jdbc.queryForObject("""
             with t as (select (now() at time zone CAST(? AS text))::date as d)
@@ -146,7 +214,16 @@ public class ParentController {
                                         else 'none' end,
                          'checked_in_at', k.checked_in_at,
                          'checked_out_at', k.checked_out_at,
-                         'absent_at', k.absent_at)
+                         'absent_at', k.absent_at,
+                         'checked_in_by', k.checked_in_by_name,
+                         'checked_out_by', k.checked_out_by_name,
+                         'absent_by', k.absent_by_name,
+                         'absent_by_family', k.absent_by_family,
+                         'absence_cutoff', CAST(? AS text),
+                         'test_mode', k.test_mode,
+                         'can_mark_absent', (not k.checked_in and not k.is_absent
+                                             and (k.test_mode
+                                                  or ((k.scheduled or k.in_route) and k.before_cutoff))))
                    ) order by k.name), '[]'::jsonb)::text
             from (
               select s.id, s.name, s.photo, s."birthDate" as birth_date, s."schoolId" as school_id,
@@ -166,21 +243,31 @@ public class ParentController {
                                and r.status in ('waiting_to_start', 'in_progress', 'paused', 'finished')) as in_route,
                      coalesce(a.checked_in, false) as checked_in, a.checked_in_at,
                      coalesce(a.checked_out, false) as checked_out, a.checked_out_at,
-                     coalesce(a.is_absent, false) as is_absent, a.absent_at
+                     coalesce(a.is_absent, false) as is_absent, a.absent_at,
+                     a.checked_in_by_name, a.checked_out_by_name, a.absent_by_name,
+                     coalesce(a.absent_by_family, false) as absent_by_family,
+                     ((now() at time zone CAST(? AS text))::time < CAST(? AS time)) as before_cutoff,
+                     CAST(? AS boolean) as test_mode
               from students s
               cross join t
               left join schools sc on sc.id = s."schoolId"
               left join lateral (select * from students_schedule where "studentId" = s.id limit 1) ss on true
               left join lateral (
-                select checked_in, checked_in_at, checked_out, checked_out_at, is_absent, absent_at
-                from student_attendance
-                where student_id = s.id and date = t.d
-                order by coalesce(checked_in, false) desc, id limit 1) a on true
+                select sa.checked_in, sa.checked_in_at, sa.checked_out, sa.checked_out_at,
+                       sa.is_absent, sa.absent_at,
+                       (select u.name from users u where u.id = sa.checked_in_by) as checked_in_by_name,
+                       (select u.name from users u where u.id = sa.checked_out_by) as checked_out_by_name,
+                       (select u.name from users u where u.id = sa.absent_by) as absent_by_name,
+                       exists (select 1 from users u where u.id = sa.absent_by
+                               and lower(coalesce(u."userType", '')) = 'parent') as absent_by_family
+                from student_attendance sa
+                where sa.student_id = s.id and sa.date = t.d
+                order by coalesce(sa.checked_in, false) desc, sa.id limit 1) a on true
               where s.id in (""" + MY_KIDS + """
                 )
                 and coalesce(s.status, 'Active') <> 'Inactive'
             ) k
-            """, String.class, timezone, me);
+            """, String.class, timezone, cutoffLabel(cutoff), timezone, cutoff.toString(), testMode, me);
         return json(json);
     }
 
@@ -235,6 +322,123 @@ public class ParentController {
         args.add(Math.min(Math.max(limit, 1), 60));
 
         return json(jdbc.queryForObject(sql.toString(), String.class, args.toArray()));
+    }
+
+    private String setting(String key) {
+        try {
+            List<String> values = jdbc.queryForList(
+                "select value from settings where key = ? limit 1", String.class, key);
+            if (!values.isEmpty() && values.get(0) != null && !values.get(0).isBlank()) {
+                return values.get(0).trim();
+            }
+        } catch (Exception e) {
+            // no setting
+        }
+        return null;
+    }
+
+    /**
+     * What the app of the family needs to know about the program: how long the pictures and videos stay on the
+     * server, and how to reach the program (the family calls when it is too late to tell the absence in the app).
+     */
+    @GetMapping("/settings")
+    public Map<String, Object> settings(Authentication auth) {
+        requireParent(auth);
+        int days = 60;
+        String configured = setting("media_retention_days");
+        if (configured != null) {
+            try {
+                int parsed = Integer.parseInt(configured);
+                if (parsed >= 1 && parsed <= 3650) {
+                    days = parsed;
+                }
+            } catch (NumberFormatException e) {
+                // the default
+            }
+        }
+        Map<String, Object> answer = new java.util.LinkedHashMap<>();
+        answer.put("mediaRetentionDays", days);
+        answer.put("programName", setting("after_school_name"));
+        answer.put("programPhone", setting("program_phone"));
+        answer.put("programEmail", setting("program_email"));
+        return answer;
+    }
+
+    // ------------------------------------------------------------------ the photo of the parent
+
+    /**
+     * The family changes its OWN photo. The photo of a kid is chosen by the team, never here. The old photo is
+     * deleted from the server.
+     */
+    @PostMapping("/me/photo")
+    public Map<String, Object> changeMyPhoto(@RequestParam("file") MultipartFile file,
+                                             Authentication auth) throws IOException {
+        UUID me = requireParent(auth);
+
+        if (file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Empty file");
+        }
+        String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase();
+        String extension = switch (type) {
+            case "image/jpeg", "image/jpg" -> "jpg";
+            case "image/png" -> "png";
+            default -> null;
+        };
+        if (extension == null) {
+            throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Please use a JPEG or PNG photo");
+        }
+        if (file.getSize() > 10L * 1024 * 1024) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "The photo is too large");
+        }
+
+        String name;
+        try (InputStream in = file.getInputStream()) {
+            name = storage.save("profilePhotos", in, extension);
+        }
+
+        List<String> before = jdbc.queryForList("select photo from users where id = ?", String.class, me);
+        jdbc.update("update users set photo = ?, updated_at = now() where id = ?", name, me);
+        deleteFile(before.isEmpty() ? null : before.get(0));
+        return Map.of("photo", name);
+    }
+
+    @DeleteMapping("/me/photo")
+    public Map<String, Object> removeMyPhoto(Authentication auth) {
+        UUID me = requireParent(auth);
+        List<String> before = jdbc.queryForList("select photo from users where id = ?", String.class, me);
+        jdbc.update("update users set photo = null, updated_at = now() where id = ?", me);
+        deleteFile(before.isEmpty() ? null : before.get(0));
+        return Map.of("photo", "");
+    }
+
+    private void deleteFile(String name) {
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        try {
+            storage.delete("profilePhotos", name);
+        } catch (IOException e) {
+            // the file stays on the disk: nothing breaks
+        }
+    }
+
+    /** The next events of the program (the card opens its link, when it has one). */
+    @GetMapping("/events")
+    public ResponseEntity<String> events(Authentication auth) {
+        requireParent(auth);
+        String json = jdbc.queryForObject("""
+            select coalesce(jsonb_agg(jsonb_build_object(
+                     'id', e.id,
+                     'name', e.name,
+                     'date', e.date,
+                     'image', e.image,
+                     'link', case when e.link ~* '^https?://' then e.link else null end
+                   ) order by e.date), '[]'::jsonb)::text
+            from (select * from events
+                  where date >= (now() at time zone CAST(? AS text))::date
+                  order by date limit 10) e
+            """, String.class, timezone);
+        return json(json);
     }
 
     // ------------------------------------------------------------------ chat
@@ -337,6 +541,124 @@ public class ParentController {
             where m.student_id = ? and coalesce(m.isread, false) = false and """ + FROM_TEAM + """
             """, studentId);
         return Map.of("marked", changed);
+    }
+
+    // ------------------------------------------------------------------ absence
+
+    public record AbsenceBody(String note) {}
+
+    private String firstNameOf(UUID studentId) {
+        List<String> names = jdbc.queryForList(
+            "select split_part(name, ' ', 1) from students where id = ?", String.class, studentId);
+        return names.isEmpty() ? "Your child" : names.get(0);
+    }
+
+    // A feed item that tells the team and the family what happened
+    private void attendanceNews(UUID studentId, UUID me, String notes) {
+        jdbc.update(
+            "insert into \"kidFeeds\" (type, \"dateTime\", \"studentId\", text, \"creatorId\", notes) "
+                + "values (CAST('ATTENDANCE' AS feed_type), (now() at time zone CAST(? AS text)), ?, "
+                + "'has a new Attendance', ?, ?)",
+            timezone, studentId, me, notes);
+    }
+
+    // A message in the chat of the kid (it appears for the team as a message of the family) and a push to the
+    // managers. It never breaks what called it.
+    private void tellTheTeam(UUID studentId, UUID me, String content) {
+        try {
+            jdbc.update("""
+                insert into message (student_id, sender_user_id, sender_contact_id, content, isread)
+                values (?, ?,
+                        (select c.id from student_family sf join contacts c on c.id = sf.contact_id
+                         where c.user_id = ? and sf.student_id = ? limit 1),
+                        ?, false)
+                """, studentId, me, me, studentId, content);
+            List<UUID> team = jdbc.queryForList("""
+                select u.id from users u
+                where lower(u."userType") in ('owner', 'manager', 'admin') and coalesce(u.active, true)
+                """, UUID.class);
+            String preview = content.length() > 100 ? content.substring(0, 100) + "…" : content;
+            Map<String, Object> data = Map.of("type", "message", "studentId", studentId.toString());
+            push.sendToUsers(team, "New message about " + firstNameOf(studentId), preview, data);
+        } catch (Exception e) {
+            // nothing: the absence itself is saved
+        }
+    }
+
+    /** The family says the kid will not come today. Only for today, and only before the kid is at the ASP. */
+    @PostMapping("/kids/{studentId}/absent")
+    public Map<String, Object> markAbsent(@PathVariable UUID studentId,
+                                          @RequestBody(required = false) AbsenceBody body,
+                                          Authentication auth) {
+        UUID me = requireParent(auth);
+        requireMyKid(me, studentId);
+
+        String note = body == null || body.note() == null ? "" : body.note().trim();
+        if (note.length() > 300) {
+            note = note.substring(0, 300);
+        }
+        final String reason = note;
+
+        // After the cutoff the family calls the program (the test accounts skip this)
+        LocalTime cutoff = absenceCutoff();
+        Boolean late = jdbc.queryForObject(
+            "select (now() at time zone CAST(? AS text))::time >= CAST(? AS time)", Boolean.class,
+            timezone, cutoff.toString());
+        if (Boolean.TRUE.equals(late) && !isTestAccount(me)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "It is after " + cutoffLabel(cutoff) + ". Please call the program to tell us that "
+                    + firstNameOf(studentId) + " will not come today.");
+        }
+
+        Boolean changed = transaction.execute(tx -> {
+            List<Map<String, Object>> rows = jdbc.queryForList("""
+                select id, checked_in, is_absent from student_attendance
+                where student_id = ? and date = (now() at time zone CAST(? AS text))::date
+                order by (route_id is null), id limit 1
+                """, studentId, timezone);
+            if (!rows.isEmpty() && Boolean.TRUE.equals(rows.get(0).get("checked_in"))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Your child is already at the ASP today");
+            }
+            if (!rows.isEmpty() && Boolean.TRUE.equals(rows.get(0).get("is_absent"))) {
+                return false; // it was already marked
+            }
+
+            // The pickup route of today in which the kid is (the team reads the attendance by route)
+            List<Map<String, Object>> route = jdbc.queryForList("""
+                select r.id as route_id, rv.van_id
+                from route_stops rs
+                join route_vans rv on rv.id = rs.route_van_id
+                join routes r on r.id = rv.route_id
+                where rs.student_id = ? and r.type = 'pickup'
+                  and r.date = (now() at time zone CAST(? AS text))::date
+                  and r.status in ('waiting_to_start', 'in_progress', 'paused')
+                limit 1
+                """, studentId, timezone);
+            UUID routeId = route.isEmpty() ? null : (UUID) route.get(0).get("route_id");
+            UUID vanId = route.isEmpty() ? null : (UUID) route.get(0).get("van_id");
+
+            if (rows.isEmpty()) {
+                jdbc.update("""
+                    insert into student_attendance (student_id, route_id, van_id, date, is_absent, absent_at, absent_by)
+                    values (?, ?, ?, (now() at time zone CAST(? AS text))::date, true, now(), ?)
+                    """, studentId, routeId, vanId, timezone, me);
+            } else {
+                jdbc.update("""
+                    update student_attendance
+                    set is_absent = true, absent_at = now(), absent_by = ?,
+                        route_id = coalesce(route_id, ?), van_id = coalesce(van_id, ?)
+                    where id = ?
+                    """, me, routeId, vanId, rows.get(0).get("id"));
+            }
+            attendanceNews(studentId, me, "Marked as absent by the family");
+            return true;
+        });
+
+        if (Boolean.TRUE.equals(changed)) {
+            String kid = firstNameOf(studentId);
+            tellTheTeam(studentId, me, kid + " will not come today" + (reason.isEmpty() ? "." : ": " + reason));
+        }
+        return Map.of("status", "absent");
     }
 
     /**

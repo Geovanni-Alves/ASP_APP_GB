@@ -71,8 +71,9 @@ const HomeScreen = () => {
   const { kids } = useKidsContext();
   const { currentUserData } = useUsersContext();
   const { loaded, statusOf } = useTodayContext();
-  const { sendTestPush } = usePushNotificationsContext();
+  // const { sendTestPush } = usePushNotificationsContext();
 
+  // console.log(kids);
   // The API only sends the messages from the families that nobody read yet
   const msgsCount = unreadMessages?.length || 0;
 

@@ -1,9 +1,12 @@
 // src/screens/HomeScreen/index.js
-// "My children": each child of the family with how today is going.
-import React from "react";
+// "My children": each child of the family with how today is going. From here the family can say that a child
+// will not come today, and write to the team.
+import React, { useState } from "react";
 import {
   View,
   Text,
+  Alert,
+  Linking,
   FlatList,
   RefreshControl,
   TouchableOpacity,
@@ -11,23 +14,84 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import api, { errorMessage } from "../../lib/api";
 import { useAuthContext } from "../../contexts/AuthState";
 import { useKidsContext } from "../../contexts/KidsContext";
 import { useMessagesContext } from "../../contexts/MessagesContext";
+import { useProfileContext } from "../../contexts/ProfileContext";
 import RemoteImage from "../../components/RemoteImage";
 import CustomLoading from "../../components/CustomLoading";
+import AbsenceDialog from "../../components/AbsenceDialog";
+import EventsCarousel from "../../components/EventsCarousel";
+import ContactProgram from "../../components/ContactProgram";
+import useEvents from "../../lib/useEvents";
+import useProgramInfo from "../../lib/useProgramInfo";
 import { statusOf, detailOf, WEEK_DAYS } from "../../lib/today";
 
+const DAY_KEYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
 const HomeScreen = ({ navigation }) => {
-  const { session, logout } = useAuthContext();
-  const { kids, loading, refreshing, refreshKids, error } = useKidsContext();
+  const { session } = useAuthContext();
+  const { profile } = useProfileContext();
+  const { kids, loading, refreshing, refreshKids, reloadKids, error } =
+    useKidsContext();
   const { unread } = useMessagesContext();
-  const firstName = (session?.user?.name || "").trim().split(" ")[0];
+
+  const { events, reload: reloadEvents } = useEvents();
+  const program = useProgramInfo();
+
+  const [absenceKid, setAbsenceKid] = useState(null); // the child of the open dialog
+  const [busy, setBusy] = useState(false);
+
+  const fullName = profile?.name || session?.user?.name || "";
+  const firstName = fullName.trim().split(" ")[0];
+
+  const serverDate = kids[0]?.today?.date; // "2026-10-24": the day as the program sees it
+  const dateText = new Date(
+    serverDate ? `${serverDate}T12:00:00` : Date.now(),
+  ).toLocaleDateString([], {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  const anyTest = kids.some((kid) => kid.today?.test_mode);
+
+  // The family confirmed: the child will not come today
+  const confirmAbsence = async (note) => {
+    if (!absenceKid) return;
+    setBusy(true);
+    try {
+      await api.post(`/parent/kids/${absenceKid.id}/absent`, { note });
+      setAbsenceKid(null);
+      await reloadKids();
+    } catch (e) {
+      Alert.alert("Could not mark the absence", errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const renderKid = ({ item: kid }) => {
     const status = statusOf(kid);
     const detail = detailOf(kid);
     const waiting = unread[kid.id] || 0;
+    // The API says if the family can still say "not coming today" (only until the cutoff time of the day)
+    const canMarkAbsent = !!kid.today?.can_mark_absent;
+    const tooLate = kid.today?.status === "waiting" && !canMarkAbsent;
+    const cutoff = kid.today?.absence_cutoff;
+    const first = (kid.name || "").trim().split(" ")[0];
+    // Which day of the week is today (to highlight it in the week of the child)
+    const todayKey = kid.today?.date
+      ? DAY_KEYS[new Date(`${kid.today.date}T12:00:00`).getDay()]
+      : null;
 
     return (
       <TouchableOpacity
@@ -56,23 +120,68 @@ const HomeScreen = ({ navigation }) => {
                 {status.label}
               </Text>
             </View>
-            {!!detail && <Text style={styles.detail}>{detail}</Text>}
           </View>
+          {!!detail && <Text style={styles.detail}>{detail}</Text>}
 
           {/* The days of the week the child comes */}
           <View style={styles.week}>
-            {WEEK_DAYS.map((day) => (
-              <Text
-                key={day.key}
-                style={[
-                  styles.day,
-                  kid.schedule?.[day.key] ? styles.dayOn : styles.dayOff,
-                ]}
-              >
-                {day.label}
-              </Text>
-            ))}
+            {WEEK_DAYS.map((day) => {
+              const comes = !!kid.schedule?.[day.key];
+              const isToday = day.key === todayKey;
+              return (
+                <Text
+                  key={day.key}
+                  style={[
+                    styles.day,
+                    comes ? styles.dayOn : styles.dayOff,
+                    // Today: strong when the child comes today, with an outline when it does not
+                    isToday && comes && styles.dayTodayOn,
+                    isToday && !comes && styles.dayTodayOff,
+                  ]}
+                >
+                  {day.label}
+                </Text>
+              );
+            })}
           </View>
+
+          {canMarkAbsent && (
+            <>
+              <TouchableOpacity
+                style={styles.actionRed}
+                onPress={() => setAbsenceKid(kid)}
+              >
+                <MaterialCommunityIcons
+                  name="calendar-remove-outline"
+                  size={16}
+                  color="#b02a37"
+                />
+                <Text style={styles.actionRedText}>Not coming today</Text>
+              </TouchableOpacity>
+              {!!cutoff && (
+                <Text style={styles.hint}>You can tell us until {cutoff}</Text>
+              )}
+            </>
+          )}
+          {tooLate && (
+            <>
+              <Text style={styles.hint}>
+                {cutoff ? `It is after ${cutoff}. ` : ""}To tell us that {first}{" "}
+                will not come today, please call the program.
+              </Text>
+              {!!program.programPhone && (
+                <TouchableOpacity
+                  style={styles.actionPurple}
+                  onPress={() =>
+                    Linking.openURL(`tel:${program.programPhone.replace(/[^\d+]/g, "")}`)
+                  }
+                >
+                  <MaterialCommunityIcons name="phone" size={16} color="#5337E0" />
+                  <Text style={styles.actionPurpleText}>Call the program</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
         </View>
 
         {/* Write to the team (with the number of messages waiting) */}
@@ -102,16 +211,34 @@ const HomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.date}>{dateText}</Text>
           <Text style={styles.hello}>
-            {firstName ? `Hello, ${firstName}` : "Hello"}
+            {firstName ? `Welcome, ${firstName}` : "Welcome"}
           </Text>
           <Text style={styles.sub}>My children</Text>
         </View>
-        <TouchableOpacity onPress={logout}>
-          <Text style={styles.signOut}>Sign out</Text>
+        <TouchableOpacity
+          style={styles.profileButton}
+          onPress={() => navigation.navigate("Profile")}
+          accessibilityLabel="My profile"
+        >
+          <RemoteImage
+            path={profile?.photo}
+            name={fullName}
+            bucketName="profilePhotos"
+            style={styles.profileAvatar}
+          />
         </TouchableOpacity>
       </View>
+
+      {anyTest && (
+        <View style={styles.testBanner}>
+          <Text style={styles.testBannerText}>
+            Test mode: you can say "not coming today" on any day and at any hour.
+          </Text>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.center}>
@@ -124,7 +251,23 @@ const HomeScreen = ({ navigation }) => {
           renderItem={renderKid}
           contentContainerStyle={{ padding: 16, flexGrow: 1 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={refreshKids} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                refreshKids();
+                reloadEvents();
+              }}
+            />
+          }
+          ListFooterComponent={
+            <View>
+              <EventsCarousel events={events} />
+              <ContactProgram
+                name={program.programName}
+                phone={program.programPhone}
+                email={program.programEmail}
+              />
+            </View>
           }
           ListEmptyComponent={
             <View style={styles.center}>
@@ -133,13 +276,23 @@ const HomeScreen = ({ navigation }) => {
               </Text>
               <Text style={styles.emptyText}>
                 {error
-                  ? "Check your connection and pull down to try again."
+                  ? `Check your connection and pull down to try again. (${
+                      error.response?.status || "no connection"
+                    })`
                   : "No child is linked to your account yet. Please contact the program."}
               </Text>
             </View>
           }
         />
       )}
+
+      <AbsenceDialog
+        visible={!!absenceKid}
+        kidName={absenceKid?.name?.split(" ")[0] || ""}
+        busy={busy}
+        onCancel={() => setAbsenceKid(null)}
+        onConfirm={confirmAbsence}
+      />
     </SafeAreaView>
   );
 };
@@ -149,13 +302,22 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingHorizontal: 16,
     paddingTop: 8,
   },
-  hello: { fontSize: 24, fontWeight: "bold", color: "#1f2937" },
+  date: { fontSize: 13, color: "#6b7280" },
+  hello: { fontSize: 24, fontWeight: "bold", color: "#1f2937", marginTop: 2 },
   sub: { fontSize: 14, color: "#6b7280", marginTop: 2 },
-  signOut: { color: "#c0392b", fontWeight: "600" },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#e7e3ff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileAvatar: { width: 40, height: 40, borderRadius: 20 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   card: {
     flexDirection: "row",
@@ -171,7 +333,57 @@ const styles = StyleSheet.create({
   statusRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   pillText: { fontSize: 12, fontWeight: "700" },
-  detail: { fontSize: 12, color: "#6b7280", marginLeft: 8 },
+  detail: { fontSize: 12, color: "#6b7280", marginTop: 4 },
+  week: { flexDirection: "row", marginTop: 10, gap: 6 },
+  day: {
+    fontSize: 11,
+    fontWeight: "600",
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  dayOn: { backgroundColor: "#e7e3ff", color: "#5337E0" },
+  dayOff: { backgroundColor: "#f1f3f5", color: "#b8bec5" },
+  dayTodayOn: { backgroundColor: "#5337E0", color: "#ffffff" },
+  dayTodayOff: { borderWidth: 1, borderColor: "#b8bec5" },
+  testBanner: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: "#fff3cd",
+  },
+  testBannerText: { fontSize: 12, color: "#8a5a00", fontWeight: "600" },
+  actionRed: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#f1aeb5",
+    backgroundColor: "#fff5f6",
+  },
+  actionRedText: { color: "#b02a37", fontSize: 13, fontWeight: "600" },
+  hint: { fontSize: 12, color: "#6b7280", marginTop: 8 },
+  actionPurple: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#cfc7ff",
+    backgroundColor: "#f6f4ff",
+  },
+  actionPurpleText: { color: "#5337E0", fontSize: 13, fontWeight: "600" },
   chatButton: {
     width: 44,
     height: 44,
@@ -194,17 +406,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: { color: "#ffffff", fontSize: 11, fontWeight: "700" },
-  week: { flexDirection: "row", marginTop: 10, gap: 6 },
-  day: {
-    fontSize: 11,
-    fontWeight: "600",
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  dayOn: { backgroundColor: "#e7e3ff", color: "#5337E0" },
-  dayOff: { backgroundColor: "#f1f3f5", color: "#b8bec5" },
   emptyTitle: { fontSize: 18, fontWeight: "700", color: "#1f2937" },
   emptyText: { fontSize: 14, color: "#6b7280", textAlign: "center", marginTop: 8 },
 });

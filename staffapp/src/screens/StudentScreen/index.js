@@ -348,6 +348,11 @@ const StudentScreen = () => {
         status === "checked_out" ||
         status === "absent");
 
+    // An absence that the FAMILY reported is not a mistake of the team: there is nothing to "Correct" (if the
+    // child comes after all, "Mark here" does it)
+    const reportedByFamily =
+      status === "absent" && !!today[item.id]?.absent_by_family;
+
     return (
       <TouchableOpacity
         activeOpacity={0.85}
@@ -380,6 +385,11 @@ const StudentScreen = () => {
                 </Text>
               </View>
             )}
+            {reportedByFamily && (
+              <Text style={{ fontSize: 12, color: "#6c757d", marginTop: 2 }}>
+                Reported by the family
+              </Text>
+            )}
           </View>
 
           {/* Who registered it (only for who runs the school) */}
@@ -397,10 +407,10 @@ const StudentScreen = () => {
           )}
         </View>
 
-        {(action || canFix) && (
+        {(action || (canFix && !reportedByFamily)) && (
           <View style={styles.cardActions}>
             {/* A mistake of today: only who runs the school corrects it */}
-            {canFix && fixOptionsOf(status).length > 0 && (
+            {canFix && !reportedByFamily && fixOptionsOf(status).length > 0 && (
               <TouchableOpacity
                 style={[styles.actionButton, styles.actionFix]}
                 onPress={() => askToFix(item, status)}

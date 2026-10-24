@@ -6,7 +6,7 @@ export default {
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon-v2.png",
-  userInterfaceStyle: "automatic",
+  userInterfaceStyle: "light",
   splash: {
     image: "./assets/splash.png",
     backgroundColor: "#5337E0",
@@ -31,11 +31,23 @@ export default {
   web: {
     favicon: "./assets/favicon.png",
   },
-  plugins: ["expo-secure-store", "expo-notifications"],
+  plugins: [
+    "expo-secure-store",
+    "expo-notifications",
+    [
+      "expo-media-library",
+      {
+        savePhotosPermission:
+          "Allow the app to save the photos and videos of your child to your photo library.",
+        isAccessMediaLocationEnabled: false,
+      },
+    ],
+  ],
   extra: {
     eas: {
       projectId: "682ba0bc-01bc-4e1b-99b4-b1e285d545c0",
     },
   },
-  owner: "x3_web_services",
+
+  owner: "AfterHeaven",
 };

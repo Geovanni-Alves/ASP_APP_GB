@@ -29,7 +29,7 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/health", "/auth/login", "/auth/accept-invite", "/error").permitAll()
+                .requestMatchers("/health", "/auth/login", "/auth/accept-invite", "/auth/forgot-password", "/auth/reset-password", "/error").permitAll()
                 // Signed file links (<img> tags cannot send a token); the signature is checked in FilesController.
                 .requestMatchers(HttpMethod.GET, "/files/*/*").permitAll()
                 .anyRequest().authenticated())

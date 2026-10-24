@@ -81,6 +81,28 @@ public class MailService {
         }
     }
 
+    /** The code to reset a password (6 digits, a few minutes). Nothing in it says if the account exists. */
+    public void sendPasswordReset(String to, String firstName, String code, int validMinutes) {
+        String greeting = (firstName == null || firstName.isBlank()) ? "Hi," : "Hi " + firstName + ",";
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
+        message.setTo(to);
+        message.setSubject("Your password reset code");
+        message.setText(greeting + "\n\n"
+            + "Someone (hopefully you) asked to reset the password of your account.\n\n"
+            + "Your code: " + code + "\n\n"
+            + "Open the app, type this code with your email address, and choose a new password.\n"
+            + "The code is valid for " + validMinutes + " minutes and can be used only once.\n\n"
+            + "If you did not ask for this, you can ignore this message: your password has not changed.\n");
+
+        try {
+            sender.send(message);
+        } catch (MailException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Could not send the email");
+        }
+    }
+
     // The person types the code in a mobile app
     private static String appInvite(String greeting, String app, String purpose, String code, int validDays) {
         return greeting + "\n\n"

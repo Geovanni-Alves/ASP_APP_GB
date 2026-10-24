@@ -34,8 +34,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 Claims claims = jwt.parse(header.substring(7));
                 // A deactivated or deleted user is treated as not logged in, even with a valid token.
                 // The role is the one the person has NOW (not the one the token was made with).
-                String role = activeUsers.activeRole(UUID.fromString(claims.getSubject()));
-                if (role != null) {
+                UUID userId = UUID.fromString(claims.getSubject());
+                String role = activeUsers.activeRole(userId);
+                // A session opened before the last change of the password does not work any more
+                if (role != null && activeUsers.tokenIsCurrent(userId, claims.getIssuedAt())) {
                     var auth = new UsernamePasswordAuthenticationToken(
                         claims.getSubject(), null,
                         List.of(new SimpleGrantedAuthority("ROLE_" + role)));

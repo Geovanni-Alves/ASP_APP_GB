@@ -146,7 +146,8 @@ public class AppDataController {
                                     else 'none' end,
                      'checked_in_at', x.checked_in_at,
                      'checked_out_at', x.checked_out_at,
-                     'absent_at', x.absent_at)), '[]'::jsonb)::text
+                     'absent_at', x.absent_at,
+                     'absent_by_family', x.absent_by_family)), '[]'::jsonb)::text
             from (
               select s.id, t.d as day,
                 coalesce((select case extract(isodow from t.d)
@@ -160,13 +161,17 @@ public class AppDataController {
                           and r.status in ('waiting_to_start', 'in_progress', 'paused', 'finished')) as in_route,
                 coalesce(a.checked_in, false) as checked_in, a.checked_in_at,
                 coalesce(a.checked_out, false) as checked_out, a.checked_out_at,
-                coalesce(a.is_absent, false) as is_absent, a.absent_at
+                coalesce(a.is_absent, false) as is_absent, a.absent_at,
+                coalesce(a.absent_by_family, false) as absent_by_family
               from students s cross join t
               left join lateral (
-                select checked_in, checked_in_at, checked_out, checked_out_at, is_absent, absent_at
-                from student_attendance
-                where student_id = s.id and date = t.d
-                order by coalesce(checked_in, false) desc, id limit 1) a on true
+                select sa.checked_in, sa.checked_in_at, sa.checked_out, sa.checked_out_at, sa.is_absent,
+                       sa.absent_at,
+                       exists (select 1 from users u where u.id = sa.absent_by
+                               and lower(coalesce(u."userType", '')) = 'parent') as absent_by_family
+                from student_attendance sa
+                where sa.student_id = s.id and sa.date = t.d
+                order by coalesce(sa.checked_in, false) desc, sa.id limit 1) a on true
               where coalesce(s.status, 'Active') <> 'Inactive'
             ) x
             """, String.class, timezone);
@@ -287,7 +292,10 @@ public class AppDataController {
         }
 
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "select id, checked_in, checked_out, is_absent from student_attendance where student_id = ? "
+            "select id, checked_in, checked_out, is_absent, "
+                + "exists (select 1 from users u where u.id = absent_by "
+                + "and lower(coalesce(u.\"userType\", '')) = 'parent') as by_family "
+                + "from student_attendance where student_id = ? "
                 + "and date = (now() at time zone CAST(? AS text))::date "
                 + "order by coalesce(checked_in, false) desc, id limit 1 for update",
             id, timezone);
@@ -318,6 +326,11 @@ public class AppDataController {
             default -> {
                 if (!Boolean.TRUE.equals(row.get("is_absent"))) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "This child was not marked absent");
+                }
+                // The family said it: it is not a mistake of the team. If the child comes after all, "Mark here"
+                if (Boolean.TRUE.equals(row.get("by_family"))) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "The family reported this absence. If the child comes after all, use \"Mark here\".");
                 }
                 jdbc.update("update student_attendance set is_absent = false, absent_at = null, absent_by = null "
                     + "where id = ?", row.get("id"));

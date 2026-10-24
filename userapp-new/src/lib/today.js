@@ -16,15 +16,21 @@ export const formatTime = (iso) =>
     ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     : "";
 
-// The small line under the status: since when, or until when
+// The small line under the status: since when, or until when, and who did it
 export const detailOf = (kid) => {
   const today = kid?.today;
   if (!today) return "";
+  const by = (name) => (name ? ` · ${name}` : "");
+
   if (today.status === "checked_in" && today.checked_in_at) {
-    return `Since ${formatTime(today.checked_in_at)}`;
+    return `Since ${formatTime(today.checked_in_at)}${by(today.checked_in_by)}`;
   }
   if (today.status === "checked_out" && today.checked_out_at) {
-    return `Left at ${formatTime(today.checked_out_at)}`;
+    return `Left at ${formatTime(today.checked_out_at)}${by(today.checked_out_by)}`;
+  }
+  if (today.status === "absent") {
+    if (today.absent_by_family) return "Marked by you";
+    return today.absent_by ? `Marked by ${today.absent_by}` : "";
   }
   return "";
 };

@@ -105,7 +105,7 @@ const MediaPager = ({ media, width, onOpen }) => {
   );
 };
 
-const FeedItem = ({ item, onOpenMedia }) => {
+const FeedItem = ({ item, onOpenMedia, retentionDays }) => {
   const { width: screen } = useWindowDimensions();
   const type = TYPES[item.type] || { icon: "information", color: "#6c757d" };
   const incident = item.type === "INCIDENT";
@@ -130,6 +130,16 @@ const FeedItem = ({ item, onOpenMedia }) => {
       </View>
 
       {!!body && <Text style={local.body}>{body}</Text>}
+
+      {item.mediaExpired && !(item.media?.length > 0) && (
+        <View style={local.expired}>
+          <MaterialCommunityIcons name="image-off-outline" size={18} color="#6b7280" />
+          <Text style={local.expiredText}>
+            The pictures of this post were removed
+            {retentionDays ? ` (they stay ${retentionDays} days)` : ""}.
+          </Text>
+        </View>
+      )}
 
       {item.media?.length > 0 && (
         <MediaPager
@@ -162,6 +172,16 @@ const local = StyleSheet.create({
   headline: { fontSize: 16, fontWeight: "700", color: "#1f2937" },
   meta: { fontSize: 12, color: "#9ca3af", marginTop: 2 },
   body: { fontSize: 15, color: "#374151", marginTop: 10, lineHeight: 21 },
+  expired: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: "#f3f4f6",
+  },
+  expiredText: { flex: 1, fontSize: 13, color: "#6b7280" },
   dots: { flexDirection: "row", justifyContent: "center", marginTop: 8, gap: 6 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#ced4da" },
   dotActive: { backgroundColor: "#5337E0" },
